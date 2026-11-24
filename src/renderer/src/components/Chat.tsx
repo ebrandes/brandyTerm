@@ -1,0 +1,262 @@
+import { useEffect, useRef, useState } from 'react'
+import { ArrowLeft, ArrowUp, ChevronRight, Circle, CircleCheck, ImagePlus, ListChecks, Loader2, MessageCircleQuestion, Paperclip, Sparkles, User } from 'lucide-react'
+import { AGENT_NAMES, EFFORT_LABEL, type AgentId, type Message, type Project, type Thread } from '../types'
+import { AgentBadge } from './AgentBadge'
+import { Rich } from './Rich'
+
+interface Props {
+  project: Project
+  thread?: Thread
+  draft: string
+  onDraft: (text: string) => void
+  onSend: () => void
+  onBack: () => void
+}
+
+const time = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+function Avatar({ m, agent }: { m: Message; agent?: AgentId }) {
+  if (m.author === 'user') return <div className="avatar"><User size={15} /></div>
+  if (m.author === 'agent' && agent) return <div className="avatar"><AgentBadge agent={agent} size="sm" /></div>
+  return <div className="avatar accent"><Sparkles size={15} /></div>
+}
+
+function AskCard({ project, ask }: { project: Project; ask: NonNullable<Message['ask']> }) {
+  const [text, setText] = useState('')
+  const t = project.threads.find((x) => x.id === ask.threadId)
+  const open = t?.state === 'waiting' && t.question?.text === ask.question
+  const answer = (value: string) => {
+    if (!value.trim()) return
+    void window.brandy.send({ projectId: project.id, text: value.trim(), threadId: ask.threadId })
+    setText('')
+  }
+  return (
+    <div className={`ask${open ? '' : ' answered'}`}>
+      <div className="ask-q">
+        <MessageCircleQuestion size={15} /> {ask.question}
+      </div>
+      {open ? (
+        <>
+          {ask.options && (
+            <div className="ask-opts">
+              {ask.options.map((o) => (
+                <button key={o} onClick={() => answer(o)}>
+                  {o}
+                </button>
+              ))}
+            </div>
+          )}
+          <form
+            className="ask-form"
+            onSubmit={(e) => {
+              e.preventDefault()
+              answer(text)
+            }}
+          >
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Sua resposta…" aria-label="Resposta para a thread" />
+            <button type="submit" disabled={!text.trim()}>Responder</button>
+          </form>
+        </>
+      ) : (
+        <div className="ask-done">Respondida · a thread continuou</div>
+      )}
+    </div>
+  )
+}
+
+function MessageView({ m, agent, inThread, project }: { m: Message; agent?: AgentId; inThread: boolean; project: Project }) {
+  if (m.author === 'system') return <div className={`notice${m.isError ? ' notice-error' : ''}`}>{m.text}</div>
+  const label =
+    m.author === 'user'
+      ? 'Você'
+      : m.author === 'coordinator'
+        ? inThread
+          ? 'Delegado pelo coordenador'
+          : 'Coordenador'
+        : agent
+          ? AGENT_NAMES[agent]
+          : 'Thread'
+  return (
+    <div className="msg">
+      <Avatar m={m} agent={agent} />
+      <div className="msg-body">
+        <div className="msg-head">
+          <span className="msg-author">{label}</span>
+          <span className="msg-time">{time(m.time)}</span>
+        </div>
+        <div className={m.isError ? 'msg-error' : ''}>
+          <Rich text={m.text} />
+        </div>
+        {m.ask && <AskCard project={project} ask={m.ask} />}
+        {m.summaries && (
+          <div className="summaries">
+            <div className="summaries-head">
+              <ListChecks size={14} /> Resumos recebidos
+            </div>
+            {m.summaries.map((s) => (
+              <div className="summary" key={s.title}>
+                <AgentBadge agent={s.agent} />
+                <div>
+                  <div className="summary-title">
+                    {AGENT_NAMES[s.agent]} <span className="sep">·</span> {s.title}
+                  </div>
+                  <div className="summary-text">{s.text}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Live plan + collapsed actions of the current run, Claude Code style. */
+function RunPanel({ t }: { t: Thread }) {
+  const total = t.todos.length
+  const done = t.todos.filter((x) => x.status === 'completed').length
+  const running = t.state === 'running'
+  if (!total && !t.steps.length && !running) return null
+  return (
+    <div className="run">
+      {total > 0 && (
+        <div className="plan">
+          <div className="plan-head">
+            <ListChecks size={14} /> Plano
+            <span className="plan-count">
+              {done}/{total}
+            </span>
+          </div>
+          {t.todos.map((x, i) => (
+            <div key={i} className={`todo ${x.status}`}>
+              {x.status === 'completed' ? (
+                <CircleCheck size={14} />
+              ) : x.status === 'in_progress' ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <Circle size={14} />
+              )}
+              <span>{x.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {t.steps.length > 0 && (
+        <details className="steps">
+          <summary>
+            <ChevronRight size={13} className="chev" />
+            {t.steps.length} {t.steps.length === 1 ? 'ação' : 'ações'}
+            {running && t.note ? <span className="steps-now"> · {t.note}</span> : null}
+          </summary>
+          <ul>
+            {t.steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {running && total === 0 && (
+        <div className="working">
+          <Loader2 size={14} className="spin" /> {t.note ?? 'Trabalhando…'}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function Chat({ project, thread, draft, onDraft, onSend, onBack }: Props) {
+  const endRef = useRef<HTMLDivElement>(null)
+  const messages = thread ? thread.messages : project.messages
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'end' })
+  }, [project.id, thread?.id, messages.length, thread?.todos, thread?.steps.length, project.busy])
+
+  // the run panel sits right after the last prompt (objective or follow-up) of the thread
+  let panelAt = -1
+  if (thread) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].author !== 'agent' && messages[i].author !== 'system') {
+        panelAt = i
+        break
+      }
+    }
+  }
+
+  const target = thread ? `a thread “${thread.title}”` : `o coordenador do ${project.name}`
+
+  return (
+    <main className="chat">
+      <header className="chat-header">
+        {thread ? (
+          <>
+            <button className="back" onClick={onBack}>
+              <ArrowLeft size={13} /> Coordenador
+            </button>
+            <h1>{thread.title}</h1>
+            <div className="chips">
+              <span className="chip">
+                <AgentBadge agent={thread.agent} size="sm" /> {AGENT_NAMES[thread.agent]}
+                {thread.model ? ` ${thread.model}` : ''}
+              </span>
+              <span className="chip">{EFFORT_LABEL[thread.effort]}</span>
+              <span className="chip warn">somente leitura</span>
+              {thread.why && (
+                <span className="chip why" title={thread.why}>
+                  {thread.why}
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <h1>{project.name}</h1>
+            <p>Terminal do coordenador{project.path ? ` · ${project.path}` : ''}</p>
+          </>
+        )}
+      </header>
+
+      <div className="chat-scroll">
+        {messages.length === 0 && (
+          <p className="empty">Nenhum pedido ainda. Descreva o que o coordenador deve fazer em {project.name}.</p>
+        )}
+        {messages.map((m, i) => (
+          <div key={m.id} className="row">
+            <MessageView m={m} agent={thread?.agent} inThread={!!thread} project={project} />
+            {thread && i === panelAt && <RunPanel t={thread} />}
+          </div>
+        ))}
+        {!thread && project.busy && (
+          <div className="working pad">
+            <Loader2 size={14} className="spin" /> O coordenador está pensando…
+          </div>
+        )}
+        <div ref={endRef} />
+      </div>
+
+      <form
+        className="composer"
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSend()
+        }}
+      >
+        <input
+          value={draft}
+          onChange={(e) => onDraft(e.target.value)}
+          placeholder={`Fale com ${target}...`}
+          aria-label={`Mensagem para ${target}`}
+        />
+        <button type="button" className="icon-btn" aria-label="Anexar arquivo" disabled title="Anexos chegam em breve">
+          <Paperclip size={16} />
+        </button>
+        <button type="button" className="icon-btn" aria-label="Anexar imagem" disabled title="Anexos chegam em breve">
+          <ImagePlus size={16} />
+        </button>
+        <button type="submit" className="send-btn" aria-label="Enviar" disabled={!draft.trim()}>
+          <ArrowUp size={17} />
+        </button>
+      </form>
+    </main>
+  )
+}
