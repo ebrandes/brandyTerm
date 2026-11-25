@@ -81,7 +81,7 @@ test('store keeps a corrupt copy', () => {
   let s: ConnectorStore
   try { s = new ConnectorStore(file) } finally { console.error = prev }
   assert.deepEqual(s.list(), [])
-  const copy = fs.readdirSync(join(file, '..')).find(f => f.startsWith('connectors.json.corrupt-'))
+  const copy = fs.readdirSync(join(file, '..')).find(f => /^connectors\.json\.corrupt-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/.test(f))
   assert.ok(copy)
   assert.equal(fs.readFileSync(join(file, '..', copy), 'utf8'), '{not json')
 })

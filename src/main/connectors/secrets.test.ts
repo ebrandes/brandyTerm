@@ -54,3 +54,19 @@ test('a value that fails to decrypt reads as empty', () => {
   console.error = () => {}
   try { assert.deepEqual(new SecretStore(join(d, 's.json'), bad).get('a'), {}) } finally { console.error = prev }
 })
+
+test('an unreadable secrets file is copied aside before the next set', () => {
+  const d = dir()
+  const file = join(d, 's.json')
+  fs.writeFileSync(file, '{not json')
+  const prev = console.error
+  console.error = () => {}
+  try {
+    const s = new SecretStore(file, fake)
+    assert.deepEqual(s.get('a'), {})
+    s.set('b', { env: { K: 'v' } })
+  } finally { console.error = prev }
+  const copy = fs.readdirSync(d).find(f => /^s\.json\.corrupt-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/.test(f))
+  assert.ok(copy)
+  assert.equal(fs.readFileSync(join(d, copy), 'utf8'), '{not json')
+})

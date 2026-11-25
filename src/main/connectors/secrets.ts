@@ -1,7 +1,7 @@
 // Connector secrets, encrypted with the OS keychain (Electron safeStorage), in userData/connector-secrets.json.
 import fs from 'node:fs'
 import { dirname } from 'node:path'
-import { writeAtomic } from '../atomic-write.ts'
+import { keepCorrupt, writeAtomic } from '../atomic-write.ts'
 import type { ConnectorSecrets } from '../../shared/connectors.ts'
 
 export interface Cipher {
@@ -20,10 +20,18 @@ export class SecretStore {
   }
 
   private read(): Record<string, string> {
+    let text: string
     try {
-      const v = JSON.parse(fs.readFileSync(this.file, 'utf8'))
+      text = fs.readFileSync(this.file, 'utf8')
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') keepCorrupt(this.file, 'connectors')
+      return {}
+    }
+    try {
+      const v = JSON.parse(text)
       if (v && typeof v === 'object' && !Array.isArray(v)) return v
-    } catch { /* missing or corrupt: no secrets */ }
+    } catch { /* fall through */ }
+    keepCorrupt(this.file, 'connectors')
     return {}
   }
 
