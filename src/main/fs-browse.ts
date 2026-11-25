@@ -15,11 +15,16 @@ const SHOW_CAP = 50
 /** true when the mention text is an absolute or home-relative path */
 export const isOutside = (query: string): boolean => query.startsWith('/') || query.startsWith('~/')
 
-export async function browseDir(query: string): Promise<FsEntry[]> {
+/** The folder a browse query lists (`dir`, absolute) and the prefix its entries keep (`typedDir`, as typed). */
+export function browseTarget(query: string, home: string = homedir()): { typedDir: string; dir: string; seg: string } {
   const cut = query.lastIndexOf('/') + 1
   const typedDir = query.slice(0, cut)
-  const seg = query.slice(cut).toLowerCase()
-  const dir = resolve(typedDir.startsWith('~/') ? join(homedir(), typedDir.slice(2)) : typedDir)
+  const dir = resolve(typedDir.startsWith('~/') ? join(home, typedDir.slice(2)) : typedDir)
+  return { typedDir, dir, seg: query.slice(cut).toLowerCase() }
+}
+
+export async function browseDir(query: string): Promise<FsEntry[]> {
+  const { typedDir, dir, seg } = browseTarget(query)
   const found: { name: string; dir: boolean }[] = []
   try {
     const handle = await opendir(dir)

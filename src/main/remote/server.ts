@@ -14,6 +14,7 @@ import type { CallCtx } from '../rpc/registry.ts'
 import { authorize, filterState } from './host-filter.ts'
 import { handlePair, type PairingCtx } from './host-pairing.ts'
 import { acceptLan } from './lan.ts'
+import type { RemoteGuard } from './read-guard.ts'
 import type { TrustStore } from './trust.ts'
 import { keepAlive, MAX_PAYLOAD } from './ws-keepalive.ts'
 import { wsSocket } from './ws-socket.ts'
@@ -28,6 +29,8 @@ export interface HostDeps {
   publish?: (info: { name: string; port: number; txt: Record<string, string> }) => { stop(): void }
   /** upgrade filter; default: local address is a LAN interface and the peer is a private IPv4 */
   acceptAddress?: (local: string, remote: string) => boolean
+  /** keeps hidden projects, the app's data and dot entries out of remote file calls (read-guard.ts) */
+  guard: RemoteGuard
 }
 
 const IDLE_MS = 10_000
@@ -195,7 +198,9 @@ export class HostServer extends EventEmitter {
     if (channel === 'state:get') return filterState(state)
     const auth = authorize(channel, arg, state)
     if (!auth.ok) throw new Error(auth.error)
-    return this.deps.invoke(channel, auth.arg, { remote: { deviceId: ch.peerPub, terminal: dev.terminal } })
+    this.deps.guard.before(channel, auth.arg, state)
+    const out = await this.deps.invoke(channel, auth.arg, { remote: { deviceId: ch.peerPub, terminal: dev.terminal } })
+    return this.deps.guard.after(channel, auth.arg, out, this.deps.state())
   }
 
   private readonly onTrust = (): void => {

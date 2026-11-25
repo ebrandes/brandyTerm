@@ -17,14 +17,14 @@ export const fsIdentity: Identity = (p) => {
 }
 
 /** `p` and every folder above it, up to the root. */
-function chain(p: string): string[] {
+export function chain(p: string): string[] {
   const out = [p]
   for (let cur = p, up = dirname(cur); up !== cur; cur = up, up = dirname(cur)) out.push(up)
   return out
 }
 
 /** Resolved first: a symlinked parent of a protected folder must enter its chain (stat alone only follows the last link). */
-const resolved = (p: string): string => { try { return realpathSync(p) } catch { return p } }
+export const resolved = (p: string): string => { try { return realpathSync(p) } catch { return p } }
 
 const devOf = (id: string): string => id.slice(0, id.indexOf(':'))
 

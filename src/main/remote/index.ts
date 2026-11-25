@@ -7,6 +7,8 @@ import { publishMdns } from './mdns.ts'
 import { HostServer } from './server.ts'
 import { TrustStore } from './trust.ts'
 import { loadIdentity } from './identity.ts'
+import { readGuard } from './read-guard.ts'
+import { attachmentsRoot } from '../attachments.ts'
 
 export interface Remote {
   trust: TrustStore
@@ -17,6 +19,7 @@ export interface Remote {
 /** Runs the LAN host server while `settings.remote.enabled`, restarting it when the port changes. */
 export function startRemote(engine: Engine): Remote {
   const trust = new TrustStore(app.getPath('userData'))
+  const guard = readGuard({ userData: () => app.getPath('userData'), attachmentsRoot })
   let server: HostServer | null = null
   let port = 0
   let applying: Promise<void> = Promise.resolve()
@@ -48,7 +51,8 @@ export function startRemote(engine: Engine): Remote {
       },
       trust,
       machine: () => engine.state.machine ?? loadIdentity(),
-      publish: publishMdns
+      publish: publishMdns,
+      guard
     })
     try {
       await next.start(want)

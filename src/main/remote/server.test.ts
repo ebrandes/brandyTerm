@@ -1,82 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
-import os from 'node:os'
-import { join } from 'node:path'
-import { EventEmitter } from 'node:events'
-import { WebSocket } from 'ws'
-import { HostServer } from './server.ts'
-import { TrustStore } from './trust.ts'
-import { wsSocket } from './ws-socket.ts'
-import { Registry, type CallCtx } from '../rpc/registry.ts'
-import { connectChannel, type SecureChannel } from '../../shared/remote/channel.ts'
-import { fromB64, newKeyPair, toB64, type KeyPair } from '../../shared/remote/crypto.ts'
-import type { MachineInfo } from '../../shared/remote/machine.ts'
-import { clientProof, verifyHostProof } from '../../shared/remote/pairing.ts'
+import { newKeyPair, toB64, fromB64 } from '../../shared/remote/crypto.ts'
+import { verifyHostProof } from '../../shared/remote/pairing.ts'
 import { parsePaired, parsePairFail } from '../../shared/remote/pair-wire.ts'
-import type { AppState, Project } from '../../shared/types.ts'
-
-const HOST: MachineInfo = { id: '33333333-3333-4333-8333-333333333333', name: 'Host', os: 'mac' }
-const ME: MachineInfo = { id: '44444444-4444-4444-8444-444444444444', name: 'Cliente', os: 'linux' }
-const proj = (id: string, over: Partial<Project> = {}) => ({ id, name: id, ...over }) as Project
-
-interface Env {
-  host: HostServer
-  trust: TrustStore
-  calls: { channel: string; arg: unknown; ctx: CallCtx }[]
-  bus: EventEmitter
-  state: AppState
-  client: KeyPair
-  connect(key?: KeyPair): Promise<SecureChannel>
-  raw(): Promise<WebSocket>
-}
-
-async function withHost(fn: (e: Env) => Promise<void>): Promise<void> {
-  const dir = fs.mkdtempSync(join(os.tmpdir(), 'bt-server-'))
-  const trust = new TrustStore(dir)
-  const bus = new EventEmitter()
-  const calls: Env['calls'] = []
-  const state = {
-    projects: [proj('a'), proj('b', { remoteHidden: true })], agents: [], plugins: [],
-    accounts: { list: [{ id: 'x', label: 'L', kind: 'token', token: 'sk-ant-xyz' }], activeId: 'x', autoSwitch: false },
-    settings: { keepAwake: true, lastSeen: { a: 'now' } }
-  } as unknown as AppState
-  const reg = new Registry()
-  reg.add('chat:send', a => `sent:${a.projectId}`, 'pass')
-  reg.add('settings:set', () => 1, 'deny')
-  reg.add('term:write', () => 'wrote', 'terminal')
-  reg.add('archive:list', ids => ids, 'pass')
-  reg.add('fs:list', a => ['listed'], 'pass')
-  reg.add('process:stop', () => 'stopped', 'pass')
-  const host = new HostServer({
-    state: () => state,
-    invoke: (channel, arg, ctx) => { calls.push({ channel, arg, ctx }); return reg.invoke(channel, arg, ctx) },
-    onChange: cb => { bus.on('change', cb); return () => bus.off('change', cb) },
-    trust,
-    machine: () => HOST,
-    acceptAddress: () => true
-  })
-  await host.start(0)
-  const client = newKeyPair()
-  trust.add({ pub: toB64(client.pub), role: 'client', machineId: ME.id, name: ME.name, os: ME.os })
-  const raw = (): Promise<WebSocket> => new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${host.port()}`)
-    ws.once('open', () => resolve(ws))
-    ws.once('error', reject)
-  })
-  const connect = async (key = client): Promise<SecureChannel> => {
-    const ws = await raw()
-    return connectChannel(wsSocket(ws), key, trust.ownKey().pub, ME)
-  }
-  try {
-    await fn({ host, trust, calls, bus, state, client, connect, raw })
-  } finally {
-    await host.stop()
-    fs.rmSync(dir, { recursive: true, force: true })
-  }
-}
-
-const closed = (ch: SecureChannel): Promise<string> => new Promise(r => ch.onClose(r))
+import type { AppState } from '../../shared/types.ts'
+import { closed, exchange, pairMsg, withHost } from './server-rig.ts'
 
 test('state:get is filtered; hidden project and denied channel are refused', () => withHost(async e => {
   const ch = await e.connect()
@@ -151,25 +79,6 @@ test('clients() lists connections and touch records lastSeen', () => withHost(as
   assert.ok(e.trust.get(toB64(e.client.pub), 'client')?.lastSeen)
   ch.close()
 }))
-
-function exchange(ws: WebSocket, text: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    ws.once('message', d => resolve(d.toString('utf8')))
-    ws.once('error', reject)
-    ws.send(text)
-  })
-}
-
-function pairMsg(code: string, key: KeyPair, over: Record<string, unknown> = {}) {
-  const nonceC = new Uint8Array(16).fill(3)
-  return {
-    nonceC,
-    text: JSON.stringify({
-      t: 'pair', cpub: toB64(key.pub), nonceC: toB64(nonceC), proof: clientProof(code, key.pub, nonceC),
-      machineId: '55555555-5555-4555-8555-555555555555', name: 'Celular', os: 'phone', protocol: 1, ...over
-    })
-  }
-}
 
 test('pairing round trip: right code pairs, host proof verifies, then the key is trusted', () => withHost(async e => {
   const code = e.host.openPairing()
