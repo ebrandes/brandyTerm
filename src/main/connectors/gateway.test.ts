@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import { join, resolve } from 'node:path'
+import net from 'node:net'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { startGatewayServer, type GwHandler } from './gateway-server.ts'
@@ -83,4 +84,29 @@ test('dead socket answers instead of hanging', async () => {
     assert.equal(text(r), 'BrandyTerm não está respondendo')
     assert.ok(Date.now() - t0 < 2000 + 1500)
   }, dead)
+})
+
+test('parallel first calls share one socket connection', async () => {
+  const srv = await startGatewayServer(sockPath(), listHandler)
+  const proxyPath = sockPath()
+  let conns = 0
+  const proxy = net.createServer(client => {
+    conns++
+    const up = net.connect(srv.path)
+    client.pipe(up); up.pipe(client)
+    client.on('error', () => up.destroy()); up.on('error', () => client.destroy())
+    client.on('close', () => up.destroy()); up.on('close', () => client.destroy())
+  })
+  await new Promise<void>(r => proxy.listen(proxyPath, () => r()))
+  const token = srv.issue({ projectId: 'p', threadId: 't' })
+  const client = new Client({ name: 'test', version: '1' })
+  await client.connect(new StdioClientTransport({
+    command: process.execPath, args: [script],
+    env: { NODE_NO_WARNINGS: '1', ELECTRON_RUN_AS_NODE: '1', BRANDY_GATEWAY_SOCKET: proxyPath, BRANDY_GATEWAY_TOKEN: token },
+  }))
+  try {
+    const rs = await Promise.all([1, 2, 3, 4, 5].map(i => client.callTool({ name: 'call_connector', arguments: { name: 'R', tool: `t${i}` } })))
+    assert.deepEqual(rs.map(r => text(r)), [1, 2, 3, 4, 5].map(i => `call:R:t${i}:undefined`))
+    assert.equal(conns, 1)
+  } finally { await client.close(); proxy.close(); await srv.close() }
 })

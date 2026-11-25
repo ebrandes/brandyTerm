@@ -4,55 +4,68 @@ import net from 'node:net'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { MAX_RESULT, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
+import { LineReader, MAX_RESULT, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
 
 type Pending = { resolve(r: GwResponse): void; reject(e: Error): void }
 
+/** One socket and the requests that went out on it; its close fails only those. */
+class Conn {
+  sock: net.Socket
+  pending = new Map<number, Pending>()
+  constructor(sock: net.Socket, onClose: () => void) {
+    this.sock = sock
+    const lines = new LineReader()
+    sock.on('data', (chunk: Buffer) => {
+      const ok = lines.feed(chunk, line => {
+        try {
+          const res = JSON.parse(line) as GwResponse
+          const p = this.pending.get(res.id)
+          if (p) { this.pending.delete(res.id); p.resolve(res) }
+        } catch { /* ignore a garbled line */ }
+      })
+      if (!ok) sock.destroy()
+    })
+    sock.on('close', () => {
+      onClose()
+      for (const [id, p] of this.pending) { this.pending.delete(id); p.reject(new Error(NOT_RESPONDING)) }
+    })
+  }
+}
+
 class Link {
-  private sock: net.Socket | null = null
-  private pending = new Map<number, Pending>()
+  private conn: Conn | null = null
+  private connecting: Promise<Conn> | null = null
   private next = 1
   private path: string
   private token: string
   constructor(path: string, token: string) { this.path = path; this.token = token }
 
-  private connect(): Promise<net.Socket> {
+  private open(): Promise<Conn> {
     return new Promise((resolve, reject) => {
       const s = net.connect(this.path)
-      let buf = ''
-      s.setEncoding('utf8')
-      s.once('connect', () => { s.off('error', reject); s.on('error', () => {}); resolve(s) })
+      s.once('connect', () => {
+        s.off('error', reject)
+        s.on('error', () => {})
+        const c: Conn = new Conn(s, () => { if (this.conn === c) this.conn = null })
+        resolve(c)
+      })
       s.once('error', reject)
-      s.on('data', (chunk: string) => {
-        buf += chunk
-        let nl: number
-        while ((nl = buf.indexOf('\n')) >= 0) {
-          const line = buf.slice(0, nl)
-          buf = buf.slice(nl + 1)
-          try {
-            const res = JSON.parse(line) as GwResponse
-            const p = this.pending.get(res.id)
-            if (p) { this.pending.delete(res.id); p.resolve(res) }
-          } catch { /* ignore a garbled line */ }
-        }
-      })
-      s.on('close', () => {
-        if (this.sock === s) this.sock = null
-        for (const [id, p] of this.pending) { this.pending.delete(id); p.reject(new Error(NOT_RESPONDING)) }
-      })
     })
   }
 
+  private async ensure(): Promise<Conn> {
+    if (this.conn && !this.conn.sock.destroyed) return this.conn
+    this.connecting ??= this.open().then(c => { this.conn = c; return c }).finally(() => { this.connecting = null })
+    try { return await this.connecting } catch { throw new Error(NOT_RESPONDING) }
+  }
+
   async request(part: Omit<GwRequest, 'id' | 'token'>): Promise<GwResponse> {
-    if (!this.sock || this.sock.destroyed) {
-      try { this.sock = await this.connect() } catch { throw new Error(NOT_RESPONDING) }
-    }
+    const conn = await this.ensure()
     const id = this.next++
-    const sock = this.sock
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject })
-      sock.write(JSON.stringify({ ...part, id, token: this.token }) + '\n', e => {
-        if (e && this.pending.delete(id)) reject(new Error(NOT_RESPONDING))
+      conn.pending.set(id, { resolve, reject })
+      conn.sock.write(JSON.stringify({ ...part, id, token: this.token }) + '\n', e => {
+        if (e && conn.pending.delete(id)) reject(new Error(NOT_RESPONDING))
       })
     })
   }

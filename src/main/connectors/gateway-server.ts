@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ThreadRef } from '../../shared/connectors.ts'
-import { BAD_SESSION, MAX_LINE, MAX_RESULT, type GwRequest, type GwResponse } from './gateway-protocol.ts'
+import { BAD_SESSION, LineReader, MAX_RESULT, type GwRequest, type GwResponse } from './gateway-protocol.ts'
 
 export type GwHandler = (ctx: ThreadRef, req: GwRequest, signal: AbortSignal) => Promise<unknown>
 
@@ -53,20 +53,18 @@ export async function startGatewayServer(path: string, handle: GwHandler): Promi
   const server = net.createServer(sock => {
     sockets.add(sock)
     const ctl = new AbortController()
-    let buf = ''
-    sock.setEncoding('utf8')
+    const lines = new LineReader()
     sock.on('error', () => {})
     sock.on('close', () => { sockets.delete(sock); ctl.abort() })
-    sock.on('data', (chunk: string) => {
-      buf += chunk
-      let nl: number
-      while ((nl = buf.indexOf('\n')) >= 0) {
-        const req = parse(buf.slice(0, nl))
-        buf = buf.slice(nl + 1)
-        if (!req) { sock.destroy(); return }
+    sock.on('data', (chunk: Buffer) => {
+      let bad = false
+      const ok = lines.feed(chunk, line => {
+        if (bad) return
+        const req = parse(line)
+        if (!req) { bad = true; return }
         void answer(req, ctl.signal).then(res => { if (!sock.destroyed) sock.write(JSON.stringify(res) + '\n') })
-      }
-      if (buf.length > MAX_LINE) sock.destroy()
+      })
+      if (!ok || bad) sock.destroy()
     })
   })
 

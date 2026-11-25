@@ -94,6 +94,33 @@ test('oversized line drops the socket and the server keeps serving', async () =>
   } finally { await srv.close() }
 })
 
+test('a complete line over MAX_LINE in one chunk drops the socket', async () => {
+  const srv = await startGatewayServer(tmpPath(), async () => 'ok')
+  try {
+    const token = srv.issue({ projectId: 'p', threadId: 't' })
+    const s = await connect(srv.path)
+    s.on('error', () => {})
+    const got: string[] = []
+    s.on('data', d => got.push(String(d)))
+    const closed = new Promise<void>(r => s.once('close', () => r()))
+    s.write(JSON.stringify({ id: 9, token, op: 'list', args: 'a'.repeat(MAX_LINE) }) + '\n')
+    await closed
+    assert.deepEqual(got, [])
+    assert.equal((await ask(srv.path, { id: 10, token, op: 'list' })).ok, true)
+  } finally { await srv.close() }
+})
+
+test('MAX_LINE counts bytes, not characters', async () => {
+  const srv = await startGatewayServer(tmpPath(), async () => 'ok')
+  try {
+    const s = await connect(srv.path)
+    s.on('error', () => {})
+    const closed = new Promise<void>(r => s.once('close', () => r()))
+    s.write('é'.repeat(MAX_LINE / 2 + 1))
+    await closed
+  } finally { await srv.close() }
+})
+
 test('a result over the cap is truncated and the connection stays usable', async () => {
   const srv = await startGatewayServer(tmpPath(), async (_c, req) => (req.id === 6 ? 'x'.repeat(150_000) : 'curto'))
   try {

@@ -47,3 +47,22 @@ export const TOOLS = [
     },
   },
 ]
+
+/**
+ * Splits a byte stream into "\n"-terminated lines. A line (or unterminated tail) longer than
+ * MAX_LINE bytes is refused before it is parsed: feed() returns false and the caller drops the socket.
+ */
+export class LineReader {
+  private buf = Buffer.alloc(0)
+  feed(chunk: Buffer, onLine: (line: string) => void): boolean {
+    this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk
+    let nl: number
+    while ((nl = this.buf.indexOf(10)) >= 0) {
+      if (nl > MAX_LINE) return false
+      const line = this.buf.subarray(0, nl).toString('utf8')
+      this.buf = this.buf.subarray(nl + 1)
+      onLine(line)
+    }
+    return this.buf.length <= MAX_LINE
+  }
+}
