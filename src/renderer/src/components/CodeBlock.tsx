@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, Copy, Play } from 'lucide-react'
 import { runInTerminal } from '../terminals'
+import { MermaidBlock } from './MermaidBlock'
 
 const SHELL = new Set(['bash', 'sh', 'zsh', 'shell', 'console', 'terminal', 'powershell', 'ps1', 'cmd'])
 const PROMPT = /^\s*\$\s+/
@@ -70,11 +71,13 @@ export function PreBlock({ children, projectId }: { children?: ReactNode; projec
   const code = Array.isArray(children) ? children[0] : children
   const props = (code as { props?: { className?: string; children?: ReactNode } })?.props ?? {}
   const lang = LANG.exec(props.className ?? '')?.[1]?.toLowerCase() ?? ''
-  return (
-    <CodeBlock lang={lang} code={textOf(props.children).replace(/\n$/, '')} projectId={projectId}>
+  const raw = textOf(props.children).replace(/\n$/, '')
+  const block = (
+    <CodeBlock lang={lang} code={raw} projectId={projectId}>
       {props.children}
     </CodeBlock>
   )
+  return lang === 'mermaid' ? <MermaidBlock code={raw} fallback={block} /> : block
 }
 
 /** Short inline code (paths, flags, names) stays on one line; long snippets may wrap. */

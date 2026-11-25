@@ -3,13 +3,20 @@ import { Copy, ExternalLink, X } from 'lucide-react'
 import type { ArtifactContent } from '../types'
 import { artifactUrl, closeArtifact, fenced, resolveRelative, useArtifact, type ArtifactTarget } from '../artifacts'
 import { Rich } from './Rich'
+import { CodeBlock } from './CodeBlock'
+import { MermaidBlock } from './MermaidBlock'
 import './artifact.css'
+
+/** A diagram at full size; invalid code shows as a plain block. */
+function BigDiagram({ code }: { code: string }) {
+  return <MermaidBlock code={code} large fallback={<CodeBlock lang="mermaid" code={code}>{code}</CodeBlock>} />
+}
 
 type FileTarget = Extract<ArtifactTarget, { path: string }>
 
 const mb = (n: number) => (n / 1024 / 1024).toFixed(1).replace('.', ',')
 
-/** Body of a project file, by kind. Mermaid renders as code until MermaidBlock exists. */
+/** Body of a project file, by kind. */
 function FileBody({ target, content }: { target: FileTarget; content: ArtifactContent }) {
   const dir = target.path.includes('/') ? target.path.slice(0, target.path.lastIndexOf('/')) : ''
   const imageSrc = useCallback(
@@ -24,7 +31,8 @@ function FileBody({ target, content }: { target: FileTarget; content: ArtifactCo
   if (content.kind === 'md') return <Rich text={content.text} imageSrc={imageSrc} />
   if (content.kind === 'html' || content.kind === 'svg')
     return <iframe className="art-frame" sandbox="" src={artifactUrl(target.projectId, target.path)} title={target.path} />
-  return <Rich text={fenced(content.text, content.kind === 'mermaid' ? 'mermaid' : (content.lang ?? ''))} />
+  if (content.kind === 'mermaid') return <BigDiagram code={content.text} />
+  return <Rich text={fenced(content.text, content.lang ?? '')} />
 }
 
 function FileView({ target }: { target: FileTarget }) {
@@ -100,7 +108,7 @@ export function ArtifactViewer() {
   if ('path' in target) return <FileView target={target} />
   return (
     <Frame title="Diagrama">
-      <Rich text={fenced(target.code, 'mermaid')} />
+      <BigDiagram code={target.code} />
     </Frame>
   )
 }
