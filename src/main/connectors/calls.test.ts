@@ -13,13 +13,14 @@ const mk = (o: Partial<Connector> = {}): Connector => ({
   auth: { kind: 'none' }, alwaysAllow: [], ...o,
 })
 
-function setup(o: { connectors?: Connector[]; needsLogin?: boolean; elsewhere?: string; holdMs?: number; hold?: boolean; result?: unknown; callError?: Error; noThread?: boolean; loginError?: Error } = {}) {
+function setup(o: { connectors?: Connector[]; needsLogin?: boolean; elsewhere?: string; holdMs?: number; hold?: boolean; defer?: boolean; result?: unknown; callError?: Error; noThread?: boolean; loginError?: Error } = {}) {
   const connectors = o.connectors ?? [mk()]
   const log = {
     order: [] as string[], asks: [] as ApprovalAsk[], allowed: [] as string[][], released: [] as string[][],
     notified: [] as string[], calls: [] as unknown[][], loginSignals: [] as AbortSignal[],
   }
   let answer: ApprovalDecision = 'allow'
+  let release: (d: ApprovalDecision) => void = () => {}
   const deps: CallsDeps = {
     store: {
       list: () => connectors,
@@ -41,6 +42,7 @@ function setup(o: { connectors?: Connector[]; needsLogin?: boolean; elsewhere?: 
     approvals: {
       ask: (_t, a) => {
         log.order.push('ask'); log.asks.push(a)
+        if (o.defer) return new Promise(res => { release = res })
         if (o.hold) return new Promise(res => a.signal.addEventListener('abort', () => res('deny'), { once: true }))
         return Promise.resolve(answer)
       },
@@ -54,7 +56,7 @@ function setup(o: { connectors?: Connector[]; needsLogin?: boolean; elsewhere?: 
   }
   const handle = createCalls(deps)
   const req = (op: GwRequest['op'], extra: Partial<GwRequest> = {}): GwRequest => ({ id: 1, token: 't', op, ...extra })
-  return { handle, req, log, setAnswer: (d: ApprovalDecision) => { answer = d } }
+  return { handle, req, log, answerNow: (d: ApprovalDecision) => release(d), setAnswer: (d: ApprovalDecision) => { answer = d } }
 }
 const sig = () => new AbortController().signal
 const call = (s: ReturnType<typeof setup>, extra: Partial<GwRequest> = {}, signal = sig()) =>
@@ -222,4 +224,37 @@ test('missing name or tool is refused', async () => {
   const s = setup()
   await assert.rejects(s.handle(ref, s.req('tools'), sig()), { message: 'Informe o nome do conector' })
   await assert.rejects(call(s, { tool: undefined }), { message: 'Informe a ferramenta' })
+})
+
+test('a connector removed while its card is pending never runs', async () => {
+  const list = [mk()]
+  const s = setup({ connectors: list, defer: true })
+  const p = call(s)
+  const failed = assert.rejects(p, { message: 'Railway foi removido.' })
+  await sleep(5)
+  list.length = 0
+  s.answerNow('allow')
+  await failed
+  assert.deepEqual(s.log.calls, [])
+})
+
+test('a connector disabled while its card is pending never runs', async () => {
+  const list = [mk()]
+  const s = setup({ connectors: list, defer: true })
+  const p = call(s)
+  const failed = assert.rejects(p, { message: 'Railway está desativado.' })
+  await sleep(5)
+  list[0] = { ...list[0], enabled: false }
+  s.answerNow('allow')
+  await failed
+  assert.deepEqual(s.log.calls, [])
+})
+
+test('a connector removed while the login is pending never reaches approval', async () => {
+  const list = [mk()]
+  const s = setup({ connectors: list, needsLogin: true })
+  const p = s.handle(ref, s.req('call', { name: 'Railway', tool: 'get_logs' }), sig())
+  list.length = 0
+  await assert.rejects(p, { message: 'Railway foi removido.' })
+  assert.deepEqual(s.log.asks, [])
 })

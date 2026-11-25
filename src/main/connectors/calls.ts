@@ -82,6 +82,14 @@ export function createCalls(d: CallsDeps): GwHandler {
     return c
   }
 
+  /** the connector as it is now: removed or turned off while the call waited means it must not run */
+  function still(c: Connector): Connector {
+    const now = d.store.list().find(x => x.id === c.id)
+    if (!now) throw new Error(`${c.name} foi removido.`)
+    if (!now.enabled) throw new Error(`${c.name} está desativado.`)
+    return now
+  }
+
   async function approve(c: Connector, t: Thread, tool: string, args: unknown, signal: AbortSignal): Promise<void> {
     if (c.alwaysAllow.includes(tool)) return
     const detail = (JSON.stringify(args ?? {}, null, 2) ?? '{}').slice(0, DETAIL_CAP)
@@ -111,8 +119,9 @@ export function createCalls(d: CallsDeps): GwHandler {
     if (!req.tool) throw new Error('Informe a ferramenta')
     if (signal.aborted) throw new Error('Chamada cancelada')
     if (await d.login.needsLogin(c)) await d.login.require(c, ref, signal)
-    await approve(c, t, req.tool, req.args, signal)
-    const res = await d.hub.call(c, req.tool, req.args, signal)
+    const fresh = still(c)
+    await approve(fresh, t, req.tool, req.args, signal)
+    const res = await d.hub.call(still(c), req.tool, req.args, signal)
     const text = textOf(res.content)
     if (res.isError) throw new Error(text)
     return text

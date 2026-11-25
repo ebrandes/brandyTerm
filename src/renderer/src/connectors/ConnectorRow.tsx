@@ -6,7 +6,7 @@ import type { Project } from '../types'
 import { api } from '../api'
 import { report } from '../notice'
 import { ConfigureConnector } from './ConfigureConnector'
-import { RAILWAY_HINT, statusClass } from './status'
+import { RAILWAY_HINT, entrarArgs, statusClass } from './status'
 
 interface Props {
   c: ConnectorView
@@ -64,7 +64,7 @@ export function ConnectorRow({ c, projects }: Props) {
       {c.status === 'erro' && c.preset === 'railway' && <div className="conn-error">{RAILWAY_HINT}</div>}
       <div className="conn-actions">
         {c.status === 'precisa de login' && (
-          <button className="primary-sm" onClick={() => run(api.connectors.login({ id: c.id, values: {} }))}>Entrar</button>
+          <button className="primary-sm" onClick={() => run(api.connectors.login(entrarArgs(c)))}>Entrar</button>
         )}
         <button onClick={() => setEditing((v) => !v)} aria-expanded={editing}>Configurar</button>
         <button onClick={() => void test()} disabled={testing}>
