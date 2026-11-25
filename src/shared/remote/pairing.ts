@@ -8,6 +8,8 @@ const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 const CODE_LEN = 16
 const WINDOW_MS = 120_000
 const MAX_BAD = 3
+const PUB_LEN = 32
+export const NONCE_LEN = 16
 const utf8 = (s: string) => new TextEncoder().encode(s)
 
 export function newCodeFrom(bytes: Uint8Array): string {
@@ -40,12 +42,14 @@ export function normalizeCode(input: string): string | null {
 }
 
 function mac(code: string, label: string, parts: Uint8Array[]): Uint8Array {
+  const norm = normalizeCode(code)
+  if (norm === null) throw new Error('invalid pairing code')
   const msg = utf8(label)
   const full = new Uint8Array(msg.length + parts.reduce((n, p) => n + p.length, 0))
   full.set(msg)
   let o = msg.length
   for (const p of parts) { full.set(p, o); o += p.length }
-  return hmac(sha256, utf8(code), full)
+  return hmac(sha256, utf8(norm), full)
 }
 
 export function clientProof(code: string, cpub: Uint8Array, nonceC: Uint8Array): string {
@@ -56,6 +60,14 @@ export function hostProof(
   code: string, hpub: Uint8Array, cpub: Uint8Array, nonceH: Uint8Array, nonceC: Uint8Array
 ): string {
   return toB64(mac(code, 'pair-h', [hpub, cpub, nonceH, nonceC]))
+}
+
+export function verifyHostProof(
+  code: string, hpub: Uint8Array, cpub: Uint8Array, nonceH: Uint8Array, nonceC: Uint8Array, proof: string
+): boolean {
+  if (hpub.length !== PUB_LEN || cpub.length !== PUB_LEN) return false
+  if (nonceH.length !== NONCE_LEN || nonceC.length !== NONCE_LEN) return false
+  return proofEquals(hostProof(code, hpub, cpub, nonceH, nonceC), proof)
 }
 
 export function proofEquals(a: string, b: string): boolean {
@@ -84,8 +96,8 @@ export class PairingWindow {
   check(cpub: Uint8Array, nonceC: Uint8Array, proof: string): 'ok' | 'bad' | 'closed' {
     if (this.code === null) return 'closed'
     if (this.now() - this.openedAt > WINDOW_MS) { this.close(); return 'closed' }
-    const norm = normalizeCode(this.code)!
-    if (proofEquals(clientProof(norm, cpub, nonceC), proof)) { this.close(); return 'ok' }
+    const wellFormed = cpub.length === PUB_LEN && nonceC.length === NONCE_LEN
+    if (wellFormed && proofEquals(clientProof(this.code, cpub, nonceC), proof)) { this.close(); return 'ok' }
     if (++this.bad >= MAX_BAD) this.close()
     return 'bad'
   }
