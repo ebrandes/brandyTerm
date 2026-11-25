@@ -5,9 +5,9 @@ import { RemoteFolderPicker } from './RemoteFolderPicker'
 
 type Open = { id: number; machineId: string; name: string; resolve: (projectId: string | null) => void }
 
-/** Shows the picker whenever the renderer calls api.openFolder(machineId); mount it once. */
 let seq = 0
 
+/** Shows the picker whenever the renderer calls api.openFolder(machineId); mount it once. */
 export function RemoteFolderHost() {
   const [open, setOpen] = useState<Open | null>(null)
   useEffect(() => onRemoteFolderRequest(async ({ machineId, resolve }) => {

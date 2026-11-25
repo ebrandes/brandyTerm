@@ -168,3 +168,26 @@ test('new channels are classified; a hidden project attach:read is refused', () 
   assert.equal(authorize('attach:read', { projectId: 'a', path: '/x' }, s).ok, true)
   assert.equal(authorize('fs:browse', '~/', s).ok, true)
 })
+
+test('project:add-path: a symlinked parent of a protected folder still protects its real parent', () => {
+  const { base } = setup()
+  const make = (dirs: { home?: string; userData?: string; hidden?: string }) => remoteCalls({
+    engine: { addProject: () => 'x' }, attachmentsRoot: () => base, rootOf: () => null,
+    home: () => dirs.home ?? join(base, 'home'), userData: () => dirs.userData ?? join(base, 'userdata'),
+    hiddenRoots: () => (dirs.hidden ? [dirs.hidden] : [])
+  })
+  // $HOME is a link to <base>/data/me: the real parent <base>/data must be refused
+  mkdirSync(join(base, 'data', 'me'), { recursive: true })
+  symlinkSync(join(base, 'data', 'me'), join(base, 'homelink'))
+  assert.throws(() => make({ home: join(base, 'homelink') }).addPath(join(base, 'data')), /Pasta não permitida/)
+  // userData under a linked folder
+  mkdirSync(join(base, 'dots', 'cfg'), { recursive: true })
+  symlinkSync(join(base, 'dots'), join(base, 'cfglink'))
+  assert.throws(() => make({ userData: join(base, 'cfglink', 'cfg') }).addPath(join(base, 'dots')), /Pasta não permitida/)
+  // a hidden project reached through a linked folder
+  mkdirSync(join(base, 'vol', 'code', 'secret'), { recursive: true })
+  symlinkSync(join(base, 'vol', 'code'), join(base, 'codelink'))
+  const hid = make({ hidden: join(base, 'codelink', 'secret') })
+  assert.throws(() => hid.addPath(join(base, 'vol')), /Projeto não disponível remotamente/)
+  assert.throws(() => hid.addPath(join(base, 'vol', 'code')), /Projeto não disponível remotamente/)
+})
