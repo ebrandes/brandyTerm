@@ -22,8 +22,16 @@ class End implements Socket {
     const d = this.wrap(data)
     queueMicrotask(() => this.peer.deliver(d))
   }
+  hold = false
+  private held: Data[] = []
+  /** Delivers everything held back in one synchronous batch, like a transport that coalesces reads. */
+  release(): void {
+    this.hold = false
+    for (const d of this.held.splice(0)) this.cb?.(d)
+  }
   deliver(d: Data): void {
     if (this.closed) return
+    if (this.hold && typeof d !== 'string') { this.held.push(d); return }
     if (this.cb) this.cb(d)
     else this.queue.push(d)
   }
@@ -101,10 +109,56 @@ test('request resolves with handler value; handler error message becomes rejecti
   client.close()
 })
 
-test('request without a serve handler errors with "sem handler"', async () => {
-  const { client } = await connected()
-  await assert.rejects(client.request('x', 1), { message: 'sem handler' })
+test('first request and push, delivered in the same batch as the hello, are not lost', async () => {
+  const [a, b] = pair()
+  a.hold = true
+  const sk = newKeyPair()
+  const [clientP, server] = [
+    connectChannel(a, newKeyPair(), sk.pub, clientInfo),
+    await acceptChannel(b, sk, () => true, serverInfo)
+  ]
+  const reply = server.request('q', 2)
+  server.push('p', 1)
+  await sleep(5)
+  a.release()
+  const client = await clientP
+  const pushes: unknown[] = []
+  client.onPush((t, p) => pushes.push([t, p]))
+  client.serve(async (ch, arg) => [ch, arg])
+  assert.deepEqual(await reply, ['q', 2])
+  assert.deepEqual(pushes, [['p', 1]])
   client.close()
+})
+
+test('queue overflow closes with "fila cheia"', async () => {
+  const { client, server } = await connected()
+  const reasons: string[] = []
+  server.onClose(r => reasons.push(r))
+  for (let i = 0; i < 257; i++) client.push('t', i)
+  await sleep(10)
+  assert.deepEqual(reasons, ['fila cheia'])
+})
+
+test('non-serialisable request rejects only that request; handler result becomes an error response', async () => {
+  const { client, server } = await connected()
+  server.serve(async (ch) => (ch === 'big' ? 10n : 'ok'))
+  await assert.rejects(client.request('x', 1n))
+  await assert.rejects(client.request('big', 1), { message: 'resposta inválida' })
+  assert.equal(await client.request('y', 1), 'ok')
+  client.close()
+})
+
+test('throwing onPush and onClose callbacks do not escape or stop other callbacks', async () => {
+  const { client, server } = await connected()
+  client.onPush(() => { throw new Error('x') })
+  const seen: string[] = []
+  client.onClose(() => { throw new Error('y') })
+  client.onClose(r => seen.push(r))
+  server.push('a', 1)
+  server.push('b', 2)
+  await sleep(5)
+  client.close('fim')
+  assert.deepEqual(seen, ['fim'])
 })
 
 test('push from server reaches client onPush', async () => {
@@ -159,9 +213,15 @@ test('trusted key without its private key fails at the first frame (key confirma
   const victim = newKeyPair()
   const sk = newKeyPair()
   const p = acceptChannel(b, sk, pub => toB64(pub) === toB64(victim.pub), serverInfo)
-  const { msg } = initiatorStart(victim)
-  a.send(JSON.stringify({ ie: msg.ie, is: msg.is }))
-  a.send(new Uint8Array(64).fill(7))
+  // Claims the victim's public key but holds a different static private key.
+  const fake = newKeyPair()
+  const { msg, e } = initiatorStart(fake)
+  a.onMessage(d => {
+    if (typeof d !== 'string') return
+    const keys = initiatorFinish(fake, e, sk.pub, JSON.parse(d))
+    a.send(helloBytes(new FrameCipher(keys), 1, clientInfo))
+  })
+  a.send(JSON.stringify({ ie: msg.ie, is: toB64(victim.pub) }))
   await assert.rejects(p, { message: 'quadro inválido' })
   assert.ok(b.closed)
 })
@@ -233,10 +293,36 @@ test('tampered frame closes the channel with "quadro inválido"', async () => {
   ])
   const reasons: string[] = []
   server.onClose(r => reasons.push(r))
-  a.send(new Uint8Array(40).fill(9))
+  const origSend = a.send.bind(a)
+  a.send = d => {
+    if (typeof d === 'string') return origSend(d)
+    const t = d.slice()
+    t[t.length - 1] ^= 1 // flip one bit of a real sealed frame: counter is right, AEAD fails
+    origSend(t)
+  }
+  const req = client.request('x', 1)
+  await assert.rejects(req, { message: 'Máquina desconectada' })
+  assert.deepEqual(reasons, ['quadro inválido'])
+})
+
+test('stray hello after the handshake closes with "quadro inválido"', async () => {
+  const [a, b] = pair()
+  const sk = newKeyPair()
+  const raw = newKeyPair()
+  const p = acceptChannel(b, sk, () => true, serverInfo)
+  const { msg, e } = initiatorStart(raw)
+  a.onMessage(d => {
+    if (typeof d !== 'string') return
+    const c = new FrameCipher(initiatorFinish(raw, e, sk.pub, JSON.parse(d)))
+    a.send(helloBytes(c, 1, clientInfo))
+    a.send(helloBytes(c, 1, clientInfo))
+  })
+  a.send(JSON.stringify(msg))
+  const server = await p
+  const reasons: string[] = []
+  server.onClose(r => reasons.push(r))
   await sleep(5)
   assert.deepEqual(reasons, ['quadro inválido'])
-  await assert.rejects(client.request('x', 1), { message: 'Máquina desconectada' })
 })
 
 test('text frame after the handshake closes the channel', async () => {

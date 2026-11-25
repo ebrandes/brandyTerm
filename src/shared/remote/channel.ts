@@ -14,6 +14,9 @@ function asBytes(data: unknown): Uint8Array | null {
   return new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
 }
 
+const MAX_QUEUED = 256
+const encode = (f: Frame): Uint8Array => enc.encode(JSON.stringify(f))
+
 interface Pending { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
 
 export class SecureChannel {
@@ -24,6 +27,8 @@ export class SecureChannel {
   private pushCb: ((topic: string, payload: unknown) => void) | null = null
   private readonly closeCbs: ((reason: string) => void)[] = []
   private closeReason = ''
+  private readonly inboxReq: Extract<Frame, { k: 'req' }>[] = []
+  private readonly inboxPush: Extract<Frame, { k: 'push' }>[] = []
 
   private readonly sock: Socket
   private readonly cipher: FrameCipher
@@ -40,21 +45,30 @@ export class SecureChannel {
   request(channel: string, arg: unknown, timeoutMs = 60_000): Promise<unknown> {
     if (this.closed) return Promise.reject(new Error('Máquina desconectada'))
     const id = ++this.nextId
+    let bytes: Uint8Array
+    try { bytes = encode({ k: 'req', id, channel, arg }) } catch (e) { return Promise.reject(e) }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id)
         reject(new Error('sem resposta'))
       }, timeoutMs)
       this.pending.set(id, { resolve, reject, timer })
-      this.send({ k: 'req', id, channel, arg })
+      this.transmit(bytes)
     })
   }
 
-  serve(h: (channel: string, arg: unknown) => Promise<unknown>): void { this.handler = h }
-  onPush(cb: (topic: string, payload: unknown) => void): void { this.pushCb = cb }
+  serve(h: (channel: string, arg: unknown) => Promise<unknown>): void {
+    this.handler = h
+    queueMicrotask(() => this.flush())
+  }
+
+  onPush(cb: (topic: string, payload: unknown) => void): void {
+    this.pushCb = cb
+    queueMicrotask(() => this.flush())
+  }
 
   onClose(cb: (reason: string) => void): void {
-    if (this.closed) cb(this.closeReason)
+    if (this.closed) { try { cb(this.closeReason) } catch { /* ignore */ } }
     else this.closeCbs.push(cb)
   }
 
@@ -70,7 +84,11 @@ export class SecureChannel {
     }
     this.pending.clear()
     try { this.sock.close() } catch { /* already closed */ }
-    for (const cb of this.closeCbs.splice(0)) cb(reason)
+    this.inboxReq.length = 0
+    this.inboxPush.length = 0
+    for (const cb of this.closeCbs.splice(0)) {
+      try { cb(reason) } catch { /* a throwing callback must not stop the others */ }
+    }
   }
 
   /** Called by the socket wiring; not part of the public API. */
@@ -82,8 +100,19 @@ export class SecureChannel {
     try { frame = decodeFrame(dec.decode(this.cipher.open(bytes))) } catch { frame = null }
     if (!frame || frame.k === 'hello') return this.close('quadro inválido')
     if (frame.k === 'res') this.onResponse(frame)
-    else if (frame.k === 'push') this.pushCb?.(frame.topic, frame.payload)
-    else this.onRequest(frame)
+    else if (frame.k === 'push') this.inboxPush.push(frame)
+    else this.inboxReq.push(frame)
+    if (this.inboxReq.length + this.inboxPush.length > MAX_QUEUED) return this.close('fila cheia')
+    this.flush()
+  }
+
+  // Requests and pushes wait here until serve()/onPush() is registered, then run in arrival order.
+  private flush(): void {
+    while (!this.closed && this.pushCb && this.inboxPush.length) {
+      const f = this.inboxPush.shift()!
+      try { this.pushCb(f.topic, f.payload) } catch { /* a throwing callback must not reach the transport */ }
+    }
+    while (!this.closed && this.handler && this.inboxReq.length) this.onRequest(this.inboxReq.shift()!)
   }
 
   /** Called by the socket wiring; not part of the public API. */
@@ -99,21 +128,27 @@ export class SecureChannel {
   }
 
   private onRequest(f: Extract<Frame, { k: 'req' }>): void {
-    const h = this.handler
-    if (!h) return this.send({ k: 'res', id: f.id, ok: false, error: 'sem handler' })
+    const h = this.handler!
+    const fail = (error: string): void => this.send({ k: 'res', id: f.id, ok: false, error })
     Promise.resolve()
       .then(() => h(f.channel, f.arg))
       .then(
-        value => this.send({ k: 'res', id: f.id, ok: true, value }),
-        (err: unknown) => this.send({
-          k: 'res', id: f.id, ok: false, error: err instanceof Error ? err.message : String(err)
-        })
+        value => {
+          try { this.send({ k: 'res', id: f.id, ok: true, value }) } catch { fail('resposta inválida') }
+        },
+        (err: unknown) => fail(err instanceof Error ? err.message : String(err))
       )
   }
 
+  /** Encodes outside the transport guard: a bad value throws to the caller instead of closing the channel. */
   private send(frame: Frame): void {
     if (this.closed) return
-    try { this.sock.send(this.cipher.seal(enc.encode(JSON.stringify(frame)))) } catch { this.close('falha ao enviar') }
+    this.transmit(encode(frame))
+  }
+
+  private transmit(bytes: Uint8Array): void {
+    if (this.closed) return
+    try { this.sock.send(this.cipher.seal(bytes)) } catch { this.close('falha ao enviar') }
   }
 }
 
@@ -143,11 +178,11 @@ function establish(sock: Socket, me: MachineInfo, timeoutMs: number, role: Role)
       if (typeof data !== 'string') return fail('mensagem inválida')
       try {
         const r = role.onText(data)
-        if (r.reply) sock.send(r.reply)
         cipher = new FrameCipher(r.keys)
         peerPub = r.peerPub
+        if (r.reply) sock.send(r.reply)
         const hello: Frame = { k: 'hello', protocol: PROTOCOL_VERSION, machine: me }
-        sock.send(cipher.seal(enc.encode(JSON.stringify(hello))))
+        sock.send(cipher.seal(encode(hello)))
       } catch (e) {
         cipher = null
         fail(e instanceof Error && e.message === 'não confiável' ? e.message : 'handshake inválido')
