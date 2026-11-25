@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  clock, groupProjects, groupTitle, lastSeenLabel, offlineLabel, roleLabel, secondsLeft, showGroups, showRemoteToggle
+  clock, groupProjects, groupTitle, lastSeenLabel, offlineLabel, roleLabel, secondsLeft, showGroups, showRemoteToggle,
+  terminalAccess
 } from './machine-groups.ts'
 import type { Project } from '../../shared/types.ts'
 import type { RemoteHostInfo } from '../../shared/remote/machine.ts'
@@ -74,4 +75,12 @@ test('"Disponível remotamente" shows once remote access is on or another machin
   assert.equal(showRemoteToggle(false, one), false, 'the feature off: nothing about it')
   assert.equal(showRemoteToggle(true, one), true)
   assert.equal(showRemoteToggle(false, two), true)
+})
+
+test('terminal button: here for a local folder, "em breve" for a paired machine, none for a demo', () => {
+  const remote = { id: 'm2', name: 'Outro', os: 'linux', remote: true, online: true } as Project['machine']
+  assert.equal(terminalAccess({ ...proj('a'), path: '/p' }), 'local')
+  assert.equal(terminalAccess({ ...proj('@m2/a', remote), path: '/p' }), 'remote')
+  assert.equal(terminalAccess({ ...proj('a'), path: '/p', demo: true } as Project), null)
+  assert.equal(terminalAccess(proj('a')), null)
 })

@@ -54,6 +54,7 @@ html[data-platform='win32'] .titlebar { right: 140px; }
 .chat-header { position: relative; padding: 0 40px 14px 0; border-bottom: 1px solid var(--line); }
 .term-toggle { position: absolute; right: 0; top: 0; }
 .term-toggle.on { color: var(--accent); background: var(--accent-soft); }
+.term-toggle.soon { opacity: .4; cursor: default; }
 .chat-header h1 { font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
 .chat-header p { font-size: 13px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; padding: 2px 0 8px; }

@@ -13,6 +13,7 @@ import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention } from './ThreadAttention'
 import { ThreadMetaChips } from './ThreadMetaChips'
 import { MachineChip } from './MachineChip'
+import { terminalAccess } from '../machine-groups'
 import { api } from '../api'
 
 interface Props {
@@ -218,7 +219,8 @@ function RunPanel({ t }: { t: Thread }) {
 
 export function Chat(props: Props) {
   const { project, thread, onBack, terminalOpen, onToggleTerminal, onOpenThread } = props
-  const canTerminal = !project.demo && !!project.path
+  const term = terminalAccess(project)
+  const canTerminal = term === 'local'
   const [dropping, setDropping] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const messages = thread ? thread.messages : project.messages
@@ -265,6 +267,16 @@ export function Chat(props: Props) {
         </div>
       )}
       <header className="chat-header">
+        {term === 'remote' && (
+          <button
+            className="icon-btn term-toggle soon"
+            aria-disabled="true"
+            aria-label="Terminal remoto (em breve)"
+            title="Terminal remoto (em breve)"
+          >
+            <SquareTerminal size={17} />
+          </button>
+        )}
         {canTerminal && (
           <button
             className={`icon-btn term-toggle${terminalOpen ? ' on' : ''}`}

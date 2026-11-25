@@ -57,6 +57,12 @@ export const showGroups = (groups: MachineGroup[]): boolean => groups.length > 1
 /** The overview's "Disponível remotamente": once remote access is on or another machine is listed (as the chip). */
 export const showRemoteToggle = (remoteEnabled: boolean, groups: MachineGroup[]): boolean => remoteEnabled || showGroups(groups)
 
+/** The chat's terminal button: a terminal here, "em breve" on a paired machine's project, none without a folder. */
+export function terminalAccess(p: Pick<Project, 'demo' | 'path' | 'machine'>): 'local' | 'remote' | null {
+  if (p.demo || !p.path) return null
+  return p.machine?.remote ? 'remote' : 'local'
+}
+
 /** Whole seconds left of a pairing code that expires at `expiresAt` (ms). Never negative. */
 export const secondsLeft = (expiresAt: number, now: number): number => Math.max(0, Math.ceil((expiresAt - now) / 1000))
 
