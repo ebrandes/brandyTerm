@@ -1,3 +1,4 @@
+import type { ThreadRef } from '../../shared/connectors.ts'
 import type { AgentId, AgentInfo, ApprovalDecision, Attachment, Effort, Todo } from '../../shared/types.ts'
 
 export interface ApprovalAsk {
@@ -34,6 +35,8 @@ export interface RunOpts {
   plugins?: string[]
   /** compact the session automatically when it reaches this many tokens */
   autocompact?: number
+  /** the work thread this run belongs to: only runs carrying it load the connector gateway */
+  thread?: ThreadRef
   /** files sent with this prompt (images/PDFs as content, text inlined, others by path) */
   attachments?: Attachment[]
 }

@@ -6,6 +6,7 @@ import type { AgentEvent, RunHandle, RunOpts } from './types.ts'
 import { LIMIT_RE, claudeAuth } from './auth.ts'
 import { claudeStream, describeTool } from './claude-events.ts'
 import { attachmentText, claudeUserMessage } from '../attach-content.ts'
+import { gatewayFor } from './gateway-launch.ts'
 import { readOnlyBashRules, rtkBin, rtkSettings } from '../rtk.ts'
 
 /**
@@ -18,6 +19,11 @@ import { readOnlyBashRules, rtkBin, rtkSettings } from '../rtk.ts'
 const TOOLS = ['Read', 'Grep', 'Glob', 'Bash', 'Edit', 'Write', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Skill', 'TaskCreate', 'TaskUpdate', 'TaskList', 'TodoWrite']
 /** never asked: reading, planning and loading skills */
 const FREE = ['Read', 'Grep', 'Glob', 'Skill', 'TaskCreate', 'TaskUpdate', 'TaskList', 'TodoWrite']
+
+/** the gateway's tools: approval happens in the hub, so they are never asked here */
+const BRANDY_TOOLS = ['list_connectors', 'connector_tools', 'call_connector'].map((n) => `mcp__brandy__${n}`)
+/** a connector call may wait for the user (approval, login): longer than the 60 s default */
+const MCP_TOOL_TIMEOUT_MS = '960000'
 
 /** a kept-alive session closes after this long without a turn (the next one resumes it) */
 const IDLE_MS = 10 * 60_000
@@ -55,13 +61,14 @@ function detailOf(tool: string, input: Record<string, unknown>): string | undefi
   return d && d.length > 2000 ? d.slice(0, 2000) + '\n…' : d
 }
 
-function buildOptions(opts: RunOpts, env: Record<string, string | undefined>, canUseTool: CanUseTool): Options {
+export function buildOptions(opts: RunOpts, env: Record<string, string | undefined>, canUseTool: CanUseTool): Options {
   const work = opts.tools === 'work'
+  const gw = work ? gatewayFor(opts.thread) : null
   const rtk = work ? rtkBin() : null
   const atts = opts.attachments ?? []
   return {
     cwd: opts.cwd,
-    env,
+    env: gw ? { ...env, MCP_TOOL_TIMEOUT: MCP_TOOL_TIMEOUT_MS } : env,
     pathToClaudeCodeExecutable: executable(),
     model: opts.model,
     effort: opts.effort,
@@ -70,7 +77,8 @@ function buildOptions(opts: RunOpts, env: Record<string, string | undefined>, ca
     settingSources: ['project'],
     strictMcpConfig: true,
     tools: work ? TOOLS : [],
-    allowedTools: work ? [...FREE, ...readOnlyBashRules(!!rtk)] : [],
+    allowedTools: work ? [...FREE, ...(gw ? BRANDY_TOOLS : []), ...readOnlyBashRules(!!rtk)] : [],
+    ...(gw ? { mcpServers: { brandy: { type: 'stdio' as const, command: gw.command, args: gw.args, env: gw.env } } } : {}),
     permissionMode: 'default',
     ...(work ? { canUseTool } : {}),
     plugins: (opts.plugins ?? []).map((path) => ({ type: 'local' as const, path })),
@@ -98,6 +106,7 @@ export function runClaudeSdk(opts: RunOpts, onEvent: (e: AgentEvent) => void): R
   // "always" is remembered by BrandyTerm on the thread (allow-rules.ts), not as SDK permission
   // updates: those may write to the project's .claude/settings.local.json
   const canUseTool: CanUseTool = async (tool, input, { signal, blockedPath }): Promise<PermissionResult> => {
+    if (tool.startsWith('mcp__brandy__')) return { behavior: 'allow', updatedInput: input }
     if (!opts.approve) return { behavior: 'deny', message: 'Execução sem aprovação disponível: a ferramenta foi negada.' }
     const summary = describeTool(tool, input)
     const d = await opts.approve({ tool, input, summary, detail: detailOf(tool, input), blockedPath, signal })

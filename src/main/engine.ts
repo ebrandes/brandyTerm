@@ -313,6 +313,7 @@ export class Engine extends EventEmitter {
         model: t.model,
         effort: t.effort,
         tools: 'work',
+        thread: { projectId: p.id, threadId: t.id },
         approve: (a) => this.approvals.ask(t, a),
         plugins: this.pluginsFor(p.path ?? null),
         autocompact: AUTOCOMPACT,
