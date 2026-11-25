@@ -75,7 +75,7 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     if (report) void shell.openPath(report)
   }, ruleOf('plugin:open-report'))
   registry.add('thread:approve', (a: { projectId: string; threadId: string; id: string; decision: string }) => {
-    const d = a.decision === 'allow' || a.decision === 'always' || a.decision === 'all' ? a.decision : 'deny'
+    const d = a.decision === 'allow' || a.decision === 'always' || a.decision === 'all' || a.decision === 'forever' ? a.decision : 'deny'
     engine.respondApproval(String(a.projectId), String(a.threadId), String(a.id), d)
   }, ruleOf('thread:approve'))
   registry.add('thread:allowAll', (a: { projectId: string; threadId: string; on: boolean }) => engine.setAllowAll(String(a.projectId), String(a.threadId), !!a.on), ruleOf('thread:allowAll'))

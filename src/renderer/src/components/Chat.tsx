@@ -34,6 +34,8 @@ interface Props {
   onOpenThread: (threadId: string) => void
   /** another machine is paired or visible: conversations say which one they run on */
   showMachine?: boolean
+  /** connector id -> name, so saved permissions read `Railway · get_logs` */
+  connectorNames?: Record<string, string>
 }
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -294,7 +296,7 @@ export function Chat(props: Props) {
               <ArrowLeft size={13} /> Coordenador
             </button>
             <h1>{thread.title}<MachineChip machine={props.showMachine ? project.machine : undefined} /></h1>
-            <ThreadMetaChips thread={thread} projectId={project.id} />
+            <ThreadMetaChips thread={thread} projectId={project.id} connectorNames={props.connectorNames} />
           </>
         ) : (
           <>
@@ -319,7 +321,7 @@ export function Chat(props: Props) {
             <ArtifactCards projectId={project.id} files={thread.files} />
           </div>
         ) : null}
-        {thread && <ThreadAttention t={thread} projectId={project.id} />}
+        {thread && <ThreadAttention t={thread} projectId={project.id} machine={project.machine} />}
         {!thread && project.busy && (
           <div className="working pad">
             <Loader2 size={14} className="spin" /> O coordenador está pensando…

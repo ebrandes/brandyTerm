@@ -51,6 +51,18 @@ export const RULES = {
   'accounts:add-token': 'deny',
   'accounts:login-start': 'deny',
   'accounts:login-cancel': 'deny',
+  // connectors are installed, configured and logged in only on the machine they belong to
+  'connectors:presets': 'deny',
+  'connectors:add': 'deny',
+  'connectors:update': 'deny',
+  'connectors:remove': 'deny',
+  'connectors:enable': 'deny',
+  'connectors:test': 'deny',
+  'connectors:login': 'deny',
+  'connectors:login-cancel': 'deny',
+  'connectors:revoke-always': 'deny',
+  'connectors:import-list': 'deny',
+  'connectors:import': 'deny',
   'clipboard:read': 'deny',
   'clipboard:write': 'deny',
   // pairing and device management never run on behalf of a remote

@@ -3,6 +3,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { wireClipboard } from './terminal-clipboard'
 import { api } from './api'
+import { exitNotice } from './terminal-exit'
 
 /**
  * xterm instances live outside React, one per project, so the scrollback
@@ -30,7 +31,7 @@ function wire(): void {
     if (!e) return
     e.alive = false
     e.started = false
-    e.term.write(`\r\n\x1b[2m[processo encerrado (${exitCode}). Pressione Enter para abrir outro shell]\x1b[0m\r\n`)
+    e.term.write(exitNotice(id, exitCode))
   })
 }
 
@@ -55,8 +56,8 @@ export function terminalFor(id: string): Entry {
   const entry: Entry = { term, fit, host, started: false, alive: false }
   term.onData((data) => {
     if (!entry.alive) {
-      // only project shells restart on Enter; other terminals belong to a flow (account login)
-      if (data === '\r' && !id.startsWith('account-')) void start(id)
+      // only project shells restart on Enter; other terminals belong to a flow (account or connector login)
+      if (data === '\r' && !id.startsWith('account-') && !id.startsWith('connector-')) void start(id)
       return
     }
     void api.term.write({ id, data })

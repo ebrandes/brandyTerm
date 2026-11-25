@@ -3,6 +3,7 @@ import { execFile } from 'node:child_process'
 import type { AgentAdapter, AgentEvent, RunHandle, RunOpts } from './types.ts'
 import { resolveCli, spawnCli } from './proc.ts'
 import { attachmentText } from '../attach-content.ts'
+import { gatewayFor } from './gateway-launch.ts'
 
 function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
@@ -10,6 +11,34 @@ function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
       resolve(err ? undefined : out.trim().split('\n')[0])
     )
   })
+}
+
+export function codexArgs(opts: RunOpts): string[] {
+  const args = ['exec']
+  if (opts.sessionId) args.push('resume', opts.sessionId)
+  // -i takes several values, so it goes before the other flags and never swallows the final "-"
+  const atts = opts.attachments ?? []
+  for (const a of atts) if (a.kind === 'image') args.push('-i', a.path)
+  args.push('--json', '--skip-git-repo-check')
+  // headless runs cannot ask for approval: a working thread gets codex's sandbox (writes only
+  // inside the project, no network), everything else stays read-only
+  const mode = opts.tools === 'work' ? 'workspace-write' : 'read-only'
+  if (opts.sessionId) args.push('-c', `sandbox_mode="${mode}"`)
+  else args.push('-s', mode, '-C', opts.cwd)
+  if (opts.model) args.push('-m', opts.model)
+  if (opts.effort) args.push('-c', `model_reasoning_effort="${opts.effort}"`)
+  if (opts.autocompact) args.push('-c', `model_auto_compact_token_limit=${opts.autocompact}`)
+  // connectors: work threads load the BrandyTerm gateway (a stdio MCP server); approval is in the hub
+  const gw = opts.tools === 'work' ? gatewayFor(opts.thread) : null
+  if (gw) {
+    const env = Object.entries(gw.env).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join(', ')
+    args.push('-c', `mcp_servers.brandy.command=${JSON.stringify(gw.command)}`)
+    args.push('-c', `mcp_servers.brandy.args=${JSON.stringify(gw.args)}`)
+    args.push('-c', `mcp_servers.brandy.env={ ${env} }`)
+    args.push('-c', 'mcp_servers.brandy.tool_timeout_sec=960')
+  }
+  args.push('-')
+  return args
 }
 
 export const codexAdapter: AgentAdapter = {
@@ -29,21 +58,8 @@ export const codexAdapter: AgentAdapter = {
       onEvent({ kind: 'done', ok: false, text: '', error: 'Codex CLI não encontrado' })
       return { done: Promise.resolve(), cancel() {} }
     }
-    const args = ['exec']
-    if (opts.sessionId) args.push('resume', opts.sessionId)
-    // -i takes several values, so it goes before the other flags and never swallows the final "-"
+    const args = codexArgs(opts)
     const atts = opts.attachments ?? []
-    for (const a of atts) if (a.kind === 'image') args.push('-i', a.path)
-    args.push('--json', '--skip-git-repo-check')
-    // headless runs cannot ask for approval: a working thread gets codex's sandbox (writes only
-    // inside the project, no network), everything else stays read-only
-    const mode = opts.tools === 'work' ? 'workspace-write' : 'read-only'
-    if (opts.sessionId) args.push('-c', `sandbox_mode="${mode}"`)
-    else args.push('-s', mode, '-C', opts.cwd)
-    if (opts.model) args.push('-m', opts.model)
-    if (opts.effort) args.push('-c', `model_reasoning_effort="${opts.effort}"`)
-    if (opts.autocompact) args.push('-c', `model_auto_compact_token_limit=${opts.autocompact}`)
-    args.push('-')
 
     let finished = false
     const finish = (e: Extract<AgentEvent, { kind: 'done' }>) => {

@@ -99,6 +99,11 @@ test('authorize: archive:list keeps only visible string ids', () => {
 test('authorize knows every registered channel (none falls into the unknown refusal by accident)', () => {
   const s = state()
   for (const ch of Object.keys(RULES)) {
+    // connectors:* are deny and deliberately in neither SCOPED nor UNSCOPED: the host refuses them as unknown
+    if (ch.startsWith('connectors:')) {
+      assert.deepEqual(authorize(ch, { id: 'x' }, s), { ok: false, error: HIDDEN }, ch)
+      continue
+    }
     const viaProject = authorize(ch, { projectId: 'a', id: 'a' }, s)
     const viaString = authorize(ch, 'a', s)
     const viaNothing = authorize(ch, undefined, s)
@@ -150,4 +155,31 @@ test('authorize fs:list: remote queries stay inside the project', () => {
   }
   for (const query of ['', 'src/ma', 'a..b', 'file.ts']) assert.equal(q(query).ok, true, query)
   assert.equal(authorize('fs:list', { projectId: 'b', query: 'x' }, s).ok, false)
+})
+
+test('remote state has no connector command, args, url, envKeys, headerKeys, projects or logins', () => {
+  const s = {
+    ...state(),
+    connectors: {
+      list: [{
+        id: 'c1', name: 'Railway', description: 'd', transport: 'stdio', command: '/Users/eu/bin/railway', args: ['mcp', '--token=sk-1'],
+        url: 'https://secret.example/mcp', envKeys: ['RAILWAY_TOKEN'], headerKeys: ['Authorization'], projects: ['/Users/eu/p'],
+        authKind: 'cli', enabled: true, preset: 'railway', alwaysAllow: ['get_logs'], status: 'conectado', error: 'boom /Users/eu', toolCount: 12
+      }],
+      logins: [{ connectorId: 'c1', name: 'Railway', phase: 'ask', authKind: 'cli', panel: true, terminalId: 'connector-login-c1' }]
+    }
+  } as unknown as AppState
+  const out = filterState(s)
+  assert.deepEqual(out.connectors, {
+    list: [{ id: 'c1', name: 'Railway', description: 'd', preset: 'railway', enabled: true, status: 'conectado', toolCount: 12 }],
+    logins: []
+  })
+  const json = JSON.stringify(out)
+  for (const leak of ['bin/railway', '--token', 'secret.example', 'RAILWAY_TOKEN', 'Authorization', '/Users/eu', 'get_logs', 'boom']) {
+    assert.ok(!json.includes(leak), leak)
+  }
+})
+
+test('a state without connectors stays without connectors', () => {
+  assert.equal(filterState(state()).connectors, undefined)
 })

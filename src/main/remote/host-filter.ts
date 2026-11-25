@@ -1,5 +1,6 @@
 // What a remote device may see of the app state, and which calls it may make about which projects. Pure.
 import type { AppState } from '../../shared/types.ts'
+import type { ConnectorView, RemoteConnectorView } from '../../shared/connectors.ts'
 import { SCOPED, UNSCOPED, projectOf } from '../../shared/remote/scope.ts'
 
 export { projectOf }
@@ -31,6 +32,14 @@ export function filterState(s: AppState): AppState {
   if (s.userPlugins) {
     const paths = new Set(out.projects.map(p => p.path).filter((p): p is string => !!p))
     out.userPlugins = { ...s.userPlugins, list: s.userPlugins.list.filter(u => pluginVisible(u.id, paths)) }
+  }
+  if (s.connectors) {
+    // only what the "Só em <máquina>" warning needs: no command, args, url, key names, projects or login cards.
+    // The narrower shape (RemoteConnectorView) is what a client reads; AppState types the full one.
+    const list: RemoteConnectorView[] = s.connectors.list.map(({ id, name, description, preset, enabled, status, toolCount }) => ({
+      id, name, description, preset, enabled, status, toolCount
+    }))
+    out.connectors = { list: list as ConnectorView[], logins: [] }
   }
   if (settings) {
     const shown: Record<string, unknown> = {}

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Download, FolderPlus, Loader2 } from 'lucide-react'
 import type { AccountsState, AgentInfo, AppSettings, PluginInfo, Project, UserPluginsState } from '../types'
+import type { ConnectorsState } from '../../../shared/connectors.ts'
 import type { MachineInfo } from '../../../shared/remote/machine.ts'
 import { UserPluginsPanel } from './UserPluginsPanel'
 import { AccountsPanel } from './AccountsPanel'
 import { ProjectRow, type ProjectAsk } from './ProjectRow'
 import { ArchivedProjects } from './ArchivedProjects'
+import { ConnectorsSection } from '../connectors/ConnectorsSection'
 import { RemotePanel } from './RemotePanel'
 import { MachineGroupHead } from './MachineGroupHead'
 import { showGroups, type MachineGroup } from '../machine-groups'
@@ -21,6 +23,7 @@ interface Props {
   plugins: PluginInfo[]
   accounts?: AccountsState
   userPlugins?: UserPluginsState
+  connectors?: ConnectorsState
   /** this machine and the app settings (remote access) */
   machine?: MachineInfo
   settings?: AppSettings
@@ -75,9 +78,10 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
+export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, connectors, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
   const grouped = showGroups(groups)
+  const viewed = projects.find((p) => p.id === activeId)
   return (
     <aside className="sidebar">
       <img className="brand" src={logo} alt="BrandyTerm" draggable={false} />
@@ -112,9 +116,9 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
         ))}
       </div>
 
-      {(['plugin', 'mcp', 'tool'] as const).map((kind) => (
+      {(['plugin', 'tool'] as const).map((kind) => (
         <div key={kind} className="side-section">
-          <h3>{kind === 'mcp' ? 'MCPs' : kind === 'tool' ? 'Ferramentas' : 'Plugins'}</h3>
+          <h3>{kind === 'tool' ? 'Ferramentas' : 'Plugins'}</h3>
           {plugins
             .filter((p) => (p.kind ?? 'plugin') === kind)
             .map((p) => (
@@ -122,6 +126,8 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
             ))}
         </div>
       ))}
+
+      <ConnectorsSection state={connectors} projects={projects} viewing={viewed?.machine?.remote ? viewed.machine : undefined} />
 
       {userPlugins && <UserPluginsPanel state={userPlugins} />}
 

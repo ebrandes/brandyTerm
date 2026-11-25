@@ -195,7 +195,7 @@ export function buildThreadPrompt(project: Project, objective: string, agent: Ag
     agent === 'claude'
       ? 'Crie o plano com TaskCreate (3-6 tarefas curtas) e marque cada uma com TaskUpdate (in_progress ao começar, completed ao terminar).'
       : 'Mantenha um plano curto (3-6 itens) com a ferramenta de plano (update_plan) e atualize conforme avança.'
-  return `Você é uma thread do BrandyTerm trabalhando no projeto "${project.name}" (pasta atual). Você pode ler, rodar comandos e editar arquivos do projeto. Leitura e comandos de consulta rodam direto; comandos que alteram algo, edições e acesso à web pedem aprovação do usuário automaticamente: chame a ferramenta normalmente e espere. Se o usuário negar, siga sem aquilo ou pergunte. Faça o trabalho até o fim (inclusive rodar testes e verificar) em vez de deixar como pendente.
+  return `Você é uma thread do BrandyTerm trabalhando no projeto "${project.name}" (pasta atual). Você pode ler, rodar comandos e editar arquivos do projeto. Leitura e comandos de consulta rodam direto; comandos que alteram algo, edições e acesso à web pedem aprovação do usuário automaticamente: chame a ferramenta normalmente e espere. Se o usuário negar, siga sem aquilo ou pergunte. Serviços externos (Railway, GitHub e outros) ficam disponíveis pelas ferramentas list_connectors, connector_tools e call_connector; use só quando a tarefa precisar. Faça o trabalho até o fim (inclusive rodar testes e verificar) em vez de deixar como pendente.
 
 Objetivo:
 ${objective}

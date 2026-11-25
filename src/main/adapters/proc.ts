@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { delimiter, dirname, join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 export interface ResolvedCli {
   cmd: string
@@ -12,10 +12,12 @@ const isWin = process.platform === 'win32'
 /**
  * On Windows `claude`/`codex` are .cmd shims. Spawning them needs a shell, which breaks
  * quoting of JSON args. Read the shim and spawn the real exe / node script directly.
+ * `path` and `platform` default to this process's.
  */
-export function resolveCli(name: string): ResolvedCli | null {
-  const dirs = (process.env.PATH ?? process.env.Path ?? '').split(delimiter).filter(Boolean)
-  if (!isWin) {
+export function resolveCli(name: string, o: { path?: string; platform?: NodeJS.Platform } = {}): ResolvedCli | null {
+  const win = (o.platform ?? process.platform) === 'win32'
+  const dirs = (o.path ?? process.env.PATH ?? process.env.Path ?? '').split(win ? ';' : ':').filter(Boolean)
+  if (!win) {
     for (const d of dirs) if (existsSync(join(d, name))) return { cmd: join(d, name), prefix: [] }
     return null
   }
@@ -41,10 +43,21 @@ export function resolveCli(name: string): ResolvedCli | null {
 
 const live = new Set<ChildProcess>()
 
+type Run = (cmd: string, args: string[]) => void
+const runQuiet: Run = (cmd, args) => {
+  spawn(cmd, args, { stdio: 'ignore', windowsHide: true }).on('error', () => {})
+}
+
+/** Kills a process by pid. On Windows the whole tree: the child of a cmd.exe or npx wrapper would outlive a plain kill. */
+export function killPidTree(pid: number, platform: NodeJS.Platform = process.platform, run: Run = runQuiet): void {
+  if (platform === 'win32') run('taskkill', ['/pid', String(pid), '/T', '/F'])
+  else process.kill(pid)
+}
+
 export function killTree(child: ChildProcess): void {
   if (child.pid === undefined || child.exitCode !== null) return
   if (isWin) {
-    spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+    killPidTree(child.pid, 'win32')
   } else {
     child.kill('SIGTERM')
   }

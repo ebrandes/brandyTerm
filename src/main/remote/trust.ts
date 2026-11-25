@@ -3,28 +3,10 @@ import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import { join } from 'node:path'
 import { newKeyPair, toB64, fromB64, type KeyPair } from '../../shared/remote/crypto.ts'
+import { writeAtomic, keepCorrupt } from '../atomic-write.ts'
 import type { TrustedDevice, TrustRole } from '../../shared/remote/machine.ts'
 
 export type { TrustedDevice, TrustRole }
-
-function writeAtomic(file: string, data: string, mode?: number): void {
-  const tmp = `${file}.${process.pid}.tmp`
-  fs.writeFileSync(tmp, data, mode === undefined ? undefined : { mode })
-  fs.renameSync(tmp, file)
-}
-
-/** A file that exists but cannot be used is copied to `<file>.corrupt-<time>` (same mode) before it is replaced. */
-function keepCorrupt(file: string): void {
-  if (!fs.existsSync(file)) return
-  const copy = `${file}.corrupt-${new Date().toISOString().replace(/[:.]/g, '-')}`
-  try {
-    fs.copyFileSync(file, copy)
-    fs.chmodSync(copy, fs.statSync(file).mode & 0o777)
-    console.error(`[remote] ${file} inválido; cópia guardada em ${copy}`)
-  } catch (e) {
-    console.error(`[remote] ${file} inválido e não foi copiado:`, e instanceof Error ? e.message : e)
-  }
-}
 
 export class TrustStore extends EventEmitter {
   private readonly keyFile: string

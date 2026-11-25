@@ -1,6 +1,7 @@
 import type { FileDiff } from './diff-summary.ts'
 import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustRole, TrustedDevice } from './remote/machine.ts'
 import type { RemoteStatus } from './remote/status.ts'
+import type { ConnectorDraft, ConnectorPatch, ConnectorSecrets, ImportCandidate, Preset } from './connectors.ts'
 import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, ArtifactContent, Attachment, FsEntry, SlashCommand } from './types.ts'
 
 /** answer of an action the main may refuse (unknown project, empty name, threads running) */
@@ -75,6 +76,24 @@ export interface BrandyApi {
     /** runs `claude setup-token` in the 'account-login' terminal */
     loginStart(args: { label: string; rows: number }): Promise<void>
     loginCancel(): Promise<void>
+  }
+  /** MCP connectors of this machine (never routed to a paired machine). Secret values go in, never come out. */
+  connectors: {
+    presets(): Promise<Preset[]>
+    add(args: { preset?: string; draft: ConnectorDraft; secrets?: ConnectorSecrets }): Promise<{ id: string }>
+    update(args: { id: string; patch: ConnectorPatch; secrets?: ConnectorSecrets }): Promise<void>
+    remove(args: { id: string }): Promise<void>
+    enable(args: { id: string; on: boolean }): Promise<void>
+    /** connects and counts the tools */
+    test(args: { id: string }): Promise<{ tools: number }>
+    /** without `values`, opens the login card; with them (even `{}`), runs the login */
+    login(args: { id: string; values?: Record<string, string> }): Promise<void>
+    loginCancel(args: { id: string }): Promise<void>
+    revokeAlways(args: { id: string; tool: string }): Promise<void>
+    /** servers in ~/.claude.json: key names only, never values */
+    importList(): Promise<ImportCandidate[]>
+    /** main re-reads the file for the values; stdio entries need trusted */
+    import(args: { names: string[]; trusted: boolean }): Promise<{ imported: string[] }>
   }
   /** other BrandyTerm machines: the ones this machine controls (client) and the devices that control it (host) */
   remote: {
