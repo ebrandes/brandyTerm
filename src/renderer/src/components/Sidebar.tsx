@@ -85,7 +85,7 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
   const grouped = showGroups(groups)
   const viewed = projects.find((p) => p.id === activeId)
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" id="sidebar">
       <img className="brand" src={logo} alt="BrandyTerm" draggable={false} />
       <div className="side-head">
         <h2 className="side-title">Projetos</h2>

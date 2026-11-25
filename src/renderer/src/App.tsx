@@ -21,6 +21,7 @@ import { ProjectDialogs } from './components/ProjectDialogs'
 import type { ProjectAsk } from './components/ProjectRow'
 
 const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
+const SIDE = { storageKey: 'brandy:sidebar-width', defaultWidth: 272, minWidth: 232, maxWidth: 380, side: 'left' } as const
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null)
@@ -63,6 +64,7 @@ export function App() {
     return () => window.removeEventListener('brandy:terminal', open)
   }, [])
   const panel = useResizablePanel(PANEL)
+  const side = useResizablePanel(SIDE)
   const activeRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -138,7 +140,7 @@ export function App() {
   }
 
   return (
-    <div className="app" style={{ ['--panel-w' as string]: `${panel.width}px` }}>
+    <div className="app" style={{ ['--panel-w' as string]: `${panel.width}px`, ['--side-w' as string]: `${side.width}px` }}>
       <div className="titlebar" />
       <Sidebar
         projects={state.projects}
@@ -156,6 +158,7 @@ export function App() {
         onOpen={(machineId) => void openFolder(machineId)}
         onAsk={(kind, id) => setAsk({ kind, id })}
       />
+      <ResizeHandle handle={side.handleProps} dragging={side.dragging} label="Redimensionar o menu lateral" controls="sidebar" />
       <Chat
         project={project}
         thread={thread}

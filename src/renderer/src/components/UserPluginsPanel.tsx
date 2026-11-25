@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import type { UserPlugin, UserPluginsState } from '../types'
 import { api } from '../api'
 import { plural } from '../side-summary'
+import { viewPlugins } from '../plugin-list'
 import { SideSection } from './SideSection'
 import './userplugins.css'
 
@@ -43,6 +45,9 @@ function Row({ p }: { p: UserPlugin }) {
 
 /** Sidebar "Skills": which of the user's own Claude Code skills/plugins the threads may use. */
 export function UserPluginsPanel({ state }: { state: UserPluginsState }) {
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState(false)
+  const view = viewPlugins(state.list, query, expanded)
   const on = state.list.filter((p) => p.on).length + (state.personal?.on ? 1 : 0)
   const total = state.list.length + (state.personal ? 1 : 0)
   if (!total) return null
@@ -57,9 +62,25 @@ export function UserPluginsPanel({ state }: { state: UserPluginsState }) {
           <Toggle on={state.personal.on} label="Usar suas skills nas threads" onChange={(v) => void api.setUserPlugin({ id: 'personal', on: v })} />
         </div>
       )}
-      {state.list.map((p) => (
+      {view.searchable && (
+        <input
+          className="up-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar plugin…"
+          aria-label="Buscar plugin"
+        />
+      )}
+      {view.rows.map((p) => (
         <Row key={p.id} p={p} />
       ))}
+      {view.searchable && !view.matches && <p className="up-hint">Nenhum plugin encontrado.</p>}
+      {view.canExpand && (
+        <button className="up-more" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+          {expanded ? 'Mostrar menos' : `Mostrar todos (${view.matches})`}
+        </button>
+      )}
       <p className="up-hint">Ligue o que as threads do Claude podem usar. MCPs e configurações globais ficam de fora.</p>
     </SideSection>
   )

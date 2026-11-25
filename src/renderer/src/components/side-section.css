@@ -8,11 +8,13 @@
 .side-sec-head { padding: 0; margin-bottom: 0; border-radius: 8px; }
 .side-sec-head:hover { background: var(--card); }
 .side-sec-toggle { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 8px; text-align: left; }
-.side-chev { flex: none; color: var(--faint); transition: transform .15s; }
+.side-chev-hit { flex: none; align-self: stretch; display: grid; place-items: center; width: 22px; margin-right: 4px; cursor: pointer; }
+.side-chev { color: var(--faint); transition: transform .15s; }
+.side-sec-head:hover .side-chev { color: var(--muted); }
 .side-chev.open { transform: rotate(90deg); }
 .side-sec-toggle .side-title { flex: 0 1 auto; }
 .side-summary { margin-left: auto; min-width: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.side-actions { flex: none; display: flex; align-items: center; gap: 2px; padding-right: 4px; }
+.side-actions { flex: none; display: flex; align-items: center; gap: 2px; }
 .side-actions .icon-btn { width: 22px; height: 22px; margin: 0; border-radius: 6px; }
 .side-body { padding: 2px 8px 10px; }
 .side-body .agent-row { font-size: 13px; }

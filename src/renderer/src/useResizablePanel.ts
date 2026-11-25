@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
+import { clampWidth, edgeDistance, maxWidthFor, readWidth, widenKey, writeWidth, type PanelSide } from './panel-size.ts'
 
 interface Options {
   /** localStorage key for the preferred width */
@@ -7,7 +8,11 @@ interface Options {
   defaultWidth: number
   minWidth: number
   /** largest share of the window the panel may take (0..1) */
-  maxRatio: number
+  maxRatio?: number
+  /** fixed largest width in px (combined with maxRatio when both are given) */
+  maxWidth?: number
+  /** window edge the panel is docked to; default 'right' */
+  side?: PanelSide
   /** keyboard step in px; Shift multiplies it by 4 */
   step?: number
 }
@@ -28,22 +33,15 @@ export interface ResizeHandleProps {
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void
 }
 
-function readStored(key: string, fallback: number): number {
-  try {
-    const n = Number(localStorage.getItem(key))
-    return Number.isFinite(n) && n > 0 ? n : fallback
-  } catch {
-    return fallback
-  }
-}
+const store = () => (typeof localStorage === 'undefined' ? undefined : localStorage)
 
 /**
- * Width of a panel docked to the right edge of the window, resized by dragging a handle
- * on its left edge. The preferred width is persisted; the applied width is clamped to
- * [minWidth, maxRatio * window width], so shrinking the window never loses the preference.
+ * Width of a panel docked to the left or right edge of the window, resized by dragging a
+ * handle on its inner edge. The preferred width is persisted; the applied width is clamped to
+ * [minWidth, min(maxWidth, maxRatio * window width)], so shrinking the window never loses the preference.
  */
-export function useResizablePanel({ storageKey, defaultWidth, minWidth, maxRatio, step = 16 }: Options) {
-  const [preferred, setPreferred] = useState(() => readStored(storageKey, defaultWidth))
+export function useResizablePanel({ storageKey, defaultWidth, minWidth, maxRatio, maxWidth: cap, side = 'right', step = 16 }: Options) {
+  const [preferred, setPreferred] = useState(() => readWidth(store(), storageKey, defaultWidth))
   const [viewport, setViewport] = useState(() => window.innerWidth)
   const [dragging, setDragging] = useState(false)
   const grab = useRef(0)
@@ -54,18 +52,14 @@ export function useResizablePanel({ storageKey, defaultWidth, minWidth, maxRatio
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const maxWidth = Math.max(minWidth, Math.floor(viewport * maxRatio))
-  const clamp = useCallback((w: number) => Math.round(Math.min(maxWidth, Math.max(minWidth, w))), [minWidth, maxWidth])
+  const maxWidth = maxWidthFor(viewport, minWidth, maxRatio, cap)
+  const clamp = useCallback((w: number) => clampWidth(w, minWidth, maxWidth), [minWidth, maxWidth])
   const width = clamp(preferred)
 
   // persist once a gesture ends, not on every pointer move
   useEffect(() => {
     if (dragging) return
-    try {
-      localStorage.setItem(storageKey, String(preferred))
-    } catch {
-      /* storage full or disabled: the width just won't survive a reload */
-    }
+    writeWidth(store(), storageKey, preferred)
   }, [dragging, preferred, storageKey])
 
   // keep the col-resize cursor and block text selection while dragging over other elements
@@ -86,12 +80,12 @@ export function useResizablePanel({ storageKey, defaultWidth, minWidth, maxRatio
       e.preventDefault()
       e.currentTarget.setPointerCapture(e.pointerId)
       // offset between the pointer and the panel edge, so the handle does not jump
-      grab.current = window.innerWidth - e.clientX - width
+      grab.current = edgeDistance(side, e.clientX, window.innerWidth) - width
       setDragging(true)
     },
     onPointerMove: (e) => {
       if (!dragging) return
-      setPreferred(clamp(window.innerWidth - e.clientX - grab.current))
+      setPreferred(clamp(edgeDistance(side, e.clientX, window.innerWidth) - grab.current))
     },
     onPointerUp: (e) => {
       if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
@@ -103,9 +97,9 @@ export function useResizablePanel({ storageKey, defaultWidth, minWidth, maxRatio
     onKeyDown: (e) => {
       const delta = e.shiftKey ? step * 4 : step
       let next: number | null = null
-      // the handle sits on the panel's left edge: moving it left widens the panel
-      if (e.key === 'ArrowLeft') next = width + delta
-      else if (e.key === 'ArrowRight') next = width - delta
+      // the handle sits on the panel's inner edge: moving it away from the docked edge widens the panel
+      if (e.key === widenKey(side)) next = width + delta
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') next = width - delta
       else if (e.key === 'Home') next = minWidth
       else if (e.key === 'End') next = maxWidth
       else if (e.key === 'Enter') next = defaultWidth

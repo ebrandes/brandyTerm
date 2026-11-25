@@ -18,7 +18,7 @@ interface Props {
   children: ReactNode
 }
 
-/** Collapsible sidebar section: chevron, title and summary on one line; closed by default. */
+/** Collapsible sidebar section: title, summary, actions and chevron on one line; closed by default. */
 export function SideSection({ id, title, summary, actions, forceOpen, children }: Props) {
   const [stored, setStored] = useState(() => readOpen(store(), id))
   const open = stored || !!forceOpen
@@ -31,7 +31,6 @@ export function SideSection({ id, title, summary, actions, forceOpen, children }
     <section className="side-sec">
       <div className="side-head side-sec-head">
         <button className="side-sec-toggle" onClick={toggle} aria-expanded={open} aria-controls={`side-${id}`}>
-          <ChevronRight size={12} className={`side-chev${open ? ' open' : ''}`} />
           <span className="side-title">{title}</span>
           {summary !== undefined && <span className="side-summary">{summary}</span>}
         </button>
@@ -40,6 +39,10 @@ export function SideSection({ id, title, summary, actions, forceOpen, children }
             {actions}
           </span>
         )}
+        {/* on the right so every section title shares the static headers' left edge; the button above has the keyboard */}
+        <span className="side-chev-hit" aria-hidden onClick={toggle}>
+          <ChevronRight size={12} className={`side-chev${open ? ' open' : ''}`} />
+        </span>
       </div>
       {open && (
         <div className="side-body" id={`side-${id}`}>
