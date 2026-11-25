@@ -31,6 +31,20 @@ test('filterState drops hidden projects, secrets and local settings', () => {
   assert.equal(out.accounts?.list[0].label, 'Conta')
 })
 
+test('filterState is an allowlist: plugins, the machine and any new field stay on the host', () => {
+  const s = {
+    ...state(),
+    plugins: [{ id: 'rtk', name: 'RTK', kind: 'tool', path: '/Users/eu/.rtk', report: '/Users/eu/rtk.md' }],
+    machine: { id: 'm', name: 'Mac do Eu', os: 'mac' },
+    secretTop: 'x'
+  } as unknown as AppState
+  const out = filterState(s)
+  assert.deepEqual(Object.keys(out).sort(), ['accounts', 'agents', 'plugins', 'projects', 'settings'])
+  assert.deepEqual(out.plugins, [])
+  assert.ok(!JSON.stringify(out).includes('/Users/eu'))
+  assert.ok(!JSON.stringify(out).includes('Mac do Eu'))
+})
+
 test('filterState does not mutate its input', () => {
   const s = state()
   filterState(s)

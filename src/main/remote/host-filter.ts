@@ -10,9 +10,14 @@ export const OUTSIDE = 'Fora do projeto'
 // Settings a remote device may see (allowlist: anything new stays local until listed here).
 const SETTINGS_SHOWN = ['keepAwake', 'allowAllThreads', 'idleCompact'] as const
 
+/**
+ * The state a paired client gets, as an allowlist: visible projects, agents, accounts without secrets, the user
+ * plugins of visible projects and the settings listed above. Installed plugins (local folders, report paths), the
+ * machine and any field added later stay on the host until listed here.
+ */
 export function filterState(s: AppState): AppState {
-  const { accounts, settings, ...rest } = s
-  const out: AppState = { ...rest, projects: s.projects.filter(p => !p.remoteHidden) }
+  const { accounts, settings } = s
+  const out: AppState = { projects: s.projects.filter(p => !p.remoteHidden), agents: s.agents, plugins: [] }
   if (accounts) {
     out.accounts = {
       list: accounts.list.map(a => ({
