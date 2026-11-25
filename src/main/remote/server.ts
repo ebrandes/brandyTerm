@@ -52,6 +52,8 @@ export class HostServer extends EventEmitter {
   private http: http.Server | null = null
   private wss: WebSocketServer | null = null
   private mdns: { stop(): void } | null = null
+  /** the name in the current mDNS announcement */
+  private announced: string | null = null
   private readonly live = new Set<Live>()
   private readonly unauth = new Set<WebSocket>()
   private readonly offs: (() => void)[] = []
@@ -79,13 +81,20 @@ export class HostServer extends EventEmitter {
     this.http = srv
     this.wss = wss
     this.stopped = false
-    this.offs.push(this.deps.onChange(() => this.schedulePush()))
+    this.offs.push(this.deps.onChange(() => { this.announce(); this.schedulePush() }))
     this.deps.trust.on('change', this.onTrust)
     this.offs.push(() => this.deps.trust.off('change', this.onTrust))
-    if (this.deps.publish) {
-      const m = this.deps.machine()
-      this.mdns = this.deps.publish({ name: m.name, port: this.port(), txt: { id: m.id, os: m.os, v: '1' } })
-    }
+    this.announce()
+  }
+
+  /** (Re)announces the host on the LAN when it has no announcement yet or the machine was renamed. */
+  private announce(): void {
+    if (!this.deps.publish || this.stopped) return
+    const m = this.deps.machine()
+    if (this.mdns && this.announced === m.name) return
+    try { this.mdns?.stop() } catch { /* best effort */ }
+    this.mdns = this.deps.publish({ name: m.name, port: this.port(), txt: { id: m.id, os: m.os, v: '1' } })
+    this.announced = m.name
   }
 
   port(): number {
@@ -103,6 +112,7 @@ export class HostServer extends EventEmitter {
     this.code = null
     try { this.mdns?.stop() } catch { /* best effort */ }
     this.mdns = null
+    this.announced = null
     for (const l of [...this.live]) l.ch.close('servidor parado')
     for (const ws of this.unauth) ws.terminate()
     this.unauth.clear()
