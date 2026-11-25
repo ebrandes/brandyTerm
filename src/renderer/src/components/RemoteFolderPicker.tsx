@@ -60,7 +60,7 @@ export function RemoteFolderPicker({ machineId, machineName, onDone }: { machine
         {error && <p className="rfp-error">{error}</p>}
         <div className="modal-actions">
           <button onClick={() => onDone(null)}>Cancelar</button>
-          <button className="primary" disabled={busy} onClick={() => void open()}>Abrir como projeto</button>
+          <button className="primary" disabled={busy || dir === '~/'} title={dir === '~/' ? 'Entre em uma pasta' : undefined} onClick={() => void open()}>Abrir como projeto</button>
         </div>
       </div>
     </div>

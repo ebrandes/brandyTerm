@@ -7,6 +7,7 @@ import { remoteCalls } from './remote-calls.ts'
 import { MAX_ARTIFACT } from '../artifact-read.ts'
 import { MAX_ATTACHMENT } from '../attachment-scope.ts'
 import { authorize, HIDDEN } from './host-filter.ts'
+import { fsIdentity, type Identity } from './folder-guard.ts'
 import { SCOPED, UNSCOPED } from '../../shared/remote/scope.ts'
 import type { AppState, Project } from '../../shared/types.ts'
 
@@ -25,8 +26,7 @@ function setup() {
     rootOf: id => (id === 'p1' ? proj : null),
     home: () => join(base, 'home'),
     userData: () => join(base, 'userdata'),
-    hiddenRoots: () => [join(base, 'hidden')],
-    platform: 'linux'
+    hiddenRoots: () => [join(base, 'hidden')]
   })
   return { base, att, proj, added, c }
 }
@@ -96,7 +96,7 @@ test('project:add-path refuses roots, home, app data and anything around a hidde
   no('~', /Pasta não permitida/)
   no('~/', /Pasta não permitida/)
   no(join(base, 'home'), /Pasta não permitida/)
-  no(base, /Pasta não permitida/) // contains home
+  no(base, /Projeto não disponível remotamente/) // contains hidden project and home
   no(join(base, 'userdata'), /Pasta não permitida/)
   mkdirSync(join(base, 'userdata', 'sub'))
   no(join(base, 'userdata', 'sub'), /Pasta não permitida/)
@@ -107,14 +107,46 @@ test('project:add-path refuses roots, home, app data and anything around a hidde
   no(join(base, 'hidden', '..', 'hidden'), /Projeto não disponível remotamente/)
 })
 
-test('project:add-path compares case-insensitively off Linux', () => {
+test('project:add-path compares folder identity: an alias string cannot dodge a protected folder', () => {
   const { base } = setup()
+  const make = (alias: string, real: string) => {
+    mkdirSync(alias, { recursive: true })
+    const id: Identity = p => fsIdentity(p.startsWith(alias) ? real + p.slice(alias.length) : p)
+    return remoteCalls({
+      engine: { addProject: () => 'x' }, attachmentsRoot: () => base, rootOf: () => null, home: () => join(base, 'home'),
+      userData: () => join(base, 'userdata'), hiddenRoots: () => [join(base, 'hidden')], identity: id
+    })
+  }
+  // an alias folder that the fake says is the same folder as home / userData / a hidden project / a parent of them
+  const home = make(join(base, 'alias-home'), join(base, 'home'))
+  assert.throws(() => home.addPath(join(base, 'alias-home')), /Pasta não permitida/)
+  const ud = make(join(base, 'alias-ud'), join(base, 'userdata'))
+  mkdirSync(join(base, 'userdata', 'deep'), { recursive: true })
+  mkdirSync(join(base, 'alias-ud', 'deep'), { recursive: true })
+  assert.throws(() => ud.addPath(join(base, 'alias-ud')), /Pasta não permitida/)
+  assert.throws(() => ud.addPath(join(base, 'alias-ud', 'deep')), /Pasta não permitida/)
+  const hid = make(join(base, 'alias-hid'), join(base, 'hidden'))
+  mkdirSync(join(base, 'alias-hid', 'inner'), { recursive: true })
+  assert.throws(() => hid.addPath(join(base, 'alias-hid')), /Projeto não disponível remotamente/)
+  assert.throws(() => hid.addPath(join(base, 'alias-hid', 'inner')), /Projeto não disponível remotamente/)
+  // an alias of the folder that contains the hidden project
+  const par = make(join(base, 'alias-base'), base)
+  assert.throws(() => par.addPath(join(base, 'alias-base')), /Projeto não disponível remotamente/)
+})
+
+test('project:add-path refuses mount points and dotfolders', () => {
+  const { base, proj } = setup()
+  mkdirSync(join(base, 'home', '.ssh'), { recursive: true })
+  mkdirSync(join(base, 'home', 'work', '.git', 'x'), { recursive: true })
   const c = remoteCalls({
     engine: { addProject: () => 'x' }, attachmentsRoot: () => base, rootOf: () => null, home: () => join(base, 'home'),
-    userData: () => join(base, 'USERDATA'), hiddenRoots: () => [join(base, 'HIDDEN')], platform: 'darwin'
+    userData: () => join(base, 'userdata'), hiddenRoots: () => [],
+    identity: p => (p === proj ? `99:${fsIdentity(p)?.split(':')[1]}` : fsIdentity(p))
   })
-  assert.throws(() => c.addPath(join(base, 'hidden', 'inner')), /Projeto não disponível/)
-  assert.throws(() => c.addPath(join(base, 'userdata')), /Pasta não permitida/)
+  assert.throws(() => c.addPath(proj), /Pasta não permitida/) // dev differs from its parent: a mount
+  assert.throws(() => c.addPath('~/.ssh'), /Pasta não permitida/)
+  assert.throws(() => c.addPath(join(base, 'home', 'work', '.git', 'x')), /Pasta não permitida/)
+  assert.equal(c.addPath('~/work'), 'x')
 })
 
 test('fs:browse lists folders only', async () => {

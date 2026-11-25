@@ -13,14 +13,14 @@ const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 export function safeName(name: unknown): string {
   const last = String(name ?? '').split(/[\\/]/).pop() ?? ''
   let clean = last
-    .replace(/[\x00-\x1f\x7f‎‏‪-‮⁦-⁩]/g, '')
+    .replace(/[\x00-\x1f\x7f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '')
     .replace(/[<>:"|?*]/g, '_')
     .replace(/\.{2,}/g, '.')
-    .replace(/[. ]+$/, '')
-    .trim()
+  // cap first (keeps the tail, so the extension), then trim, then the reserved check on what is really left
+  clean = clean.slice(-NAME_CAP).replace(/[. ]+$/, '').trim()
   if (!clean) clean = 'arquivo'
-  if (RESERVED.test(clean.split('.')[0].trim())) clean = `_${clean}`
-  return clean.slice(-NAME_CAP)
+  if (RESERVED.test(clean.split('.')[0].trim())) clean = `_${clean.slice(-(NAME_CAP - 1))}`
+  return clean
 }
 
 /** 'open' only for the allowlist; anything else (apps, scripts, html, no extension) is just shown in its folder. */

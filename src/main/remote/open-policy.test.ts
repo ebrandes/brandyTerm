@@ -23,6 +23,16 @@ test('safeName: Windows-hostile characters, reserved device names, bidi controls
   assert.equal(safeName('name. . '), 'name')
 })
 
+test('safeName: the length cap cannot leave a reserved name behind', () => {
+  const reserved = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+  for (const n of ['x'.repeat(10) + 'CON.' + 'y'.repeat(116), 'p'.repeat(5) + 'lpt1.' + 'z'.repeat(115), 'CON' + '.'.repeat(130) + 'a']) {
+    const out = safeName(n)
+    assert.ok(out.length <= 120, out)
+    assert.ok(!reserved.test(out.split('.')[0]), out)
+  }
+  assert.equal(safeName('a'.repeat(119) + '.' + '.'.repeat(5)), 'a'.repeat(119))
+})
+
 test('targetPath: a hostile machine id or name never leaves the base folder', () => {
   const base = '/data/remote-open'
   for (const id of ['..', 'a/b', '..\\x', '../../..', '/etc', '']) {

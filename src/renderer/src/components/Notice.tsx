@@ -14,5 +14,5 @@ export function Notice() {
     return () => { off(); clearTimeout(t) }
   }, [])
   if (!msg) return null
-  return <div className="notice" role="alert" onClick={() => setMsg(null)}>{msg}</div>
+  return <div className="toast" role="alert" onClick={() => setMsg(null)}>{msg}</div>
 }

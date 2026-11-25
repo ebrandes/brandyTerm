@@ -5,4 +5,3 @@
 .rfp-item:hover { background: var(--line); }
 .rfp-note { padding: 8px; }
 .rfp-error { color: #e0777d; margin-top: 8px; }
-.notice { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 60; max-width: 80vw; padding: 9px 14px; border-radius: 9px; background: #5a2a2e; border: 1px solid #8a3a3a; color: #fff; font-size: 13px; cursor: pointer; }
