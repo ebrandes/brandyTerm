@@ -66,7 +66,7 @@ export class FakeHost {
 
   openPairing(): string { return (this.code = this.window.open()) }
 
-  dial = (_address: string): Socket => {
+  dial: (address: string) => Socket = (_address: string): Socket => {
     this.dials++
     if (this.down) return deadSocket()
     const [client, host] = endPair()
@@ -81,7 +81,7 @@ export class FakeHost {
         onClose: cb => host.onClose(cb),
         close: () => host.close()
       }
-      void acceptChannel(replay, this.trust.ownKey(), pub => !!this.trust.get(toB64(pub)), this.info).then(ch => {
+      void acceptChannel(replay, this.trust.ownKey(), pub => !!this.trust.get(toB64(pub), 'client'), this.info).then(ch => {
         this.channels.push(ch)
         ch.serve(async (channel, arg) => {
           if (channel === 'hang') return new Promise(() => {})

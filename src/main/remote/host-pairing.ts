@@ -32,7 +32,9 @@ export function handlePair(text: string, ctx: PairingCtx): { reply: string; pair
   if (r !== 'ok' || ctx.code === null) {
     return { reply: fail(r === 'closed' || ctx.code === null ? 'pareamento fechado' : 'código inválido'), paired: false }
   }
-  ctx.trust.add({ pub: toB64(cpub), machineId: msg.machineId, name: msg.name, os: msg.os })
+  const pub = toB64(cpub)
+  ctx.trust.add({ pub, role: 'client', machineId: msg.machineId, name: msg.name, os: msg.os })
+  ctx.trust.revokeOthers(msg.machineId, pub, 'client')
   const hpub = ctx.trust.ownKey().pub
   const nonceH = randomBytes(NONCE_LEN)
   const proof = hostProof(ctx.code, hpub, cpub, nonceH, nonceC)

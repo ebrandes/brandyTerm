@@ -35,6 +35,8 @@ interface Entry {
   timer: unknown
   gen: number
   connecting: boolean
+  /** socket of the handshake in flight, so stop()/revoke can close it */
+  sock: Socket | null
 }
 
 export class RemoteHosts extends EventEmitter {
@@ -118,8 +120,12 @@ export class RemoteHosts extends EventEmitter {
       { dial, ownPub: own.pub, me: this.me(), setTimeout: this.setT, clearTimeout: this.clearT },
       address, code
     )
+    const existing = this.entries.get(host.machine.id)
+    if (existing) existing.address = address
     this.addresses.set(host.machine.id, address) // before trust.add: its 'change' makes sync() see the address
-    this.deps.trust.add({ pub: host.pub, machineId: host.machine.id, name: host.machine.name, os: host.machine.os })
+    this.deps.trust.add({ pub: host.pub, role: 'host', machineId: host.machine.id, name: host.machine.name, os: host.machine.os })
+    // a re-paired machine replaces its old key
+    this.deps.trust.revokeOthers(host.machine.id, host.pub, 'host')
     this.sync()
     this.retryNow(host.machine.id, address)
     return host.machine
@@ -127,46 +133,67 @@ export class RemoteHosts extends EventEmitter {
 
   // ---- connection management ----
 
-  /** Brings entries in line with the trust store and the remembered addresses. */
+  /** Brings entries in line with the trusted hosts and the remembered addresses. */
   private sync(): void {
     if (!this.started) return
-    const devices = this.deps.trust.list()
-    let changed = false
-    for (const [id, e] of [...this.entries]) {
-      const still = devices.find(d => d.machineId === id && d.pub === e.device.pub)
-      if (!still) {
-        this.drop(id)
-        // a re-pair under a new key keeps the address; a revoke forgets it
-        if (!devices.some(d => d.machineId === id)) this.addresses.delete(id)
-        changed = true
-      }
+    const chosen = new Map<string, TrustedDevice>()
+    for (const d of this.deps.trust.list('host')) {
+      const cur = chosen.get(d.machineId)
+      // the key already in use wins until it is gone; otherwise the latest listed
+      if (!cur || this.entries.get(d.machineId)?.device.pub !== cur.pub) chosen.set(d.machineId, d)
     }
-    for (const d of devices) {
-      const address = this.addresses.get(d.machineId)
-      if (!address) continue
-      const e = this.entries.get(d.machineId)
+    let changed = false
+    for (const id of [...this.entries.keys()]) {
+      if (chosen.has(id)) continue
+      this.drop(id)
+      this.addresses.delete(id) // revoked
+      changed = true
+    }
+    for (const [id, d] of chosen) {
+      const e = this.entries.get(id)
       if (e) {
-        if (e.device.name !== d.name || e.device.os !== d.os) { e.device = d; changed = true }
+        if (e.device.pub !== d.pub) { this.rekey(e, d); changed = true }
+        else if (e.device.name !== d.name || e.device.os !== d.os) { e.device = d; changed = true }
         continue
       }
-      this.entries.set(d.machineId, {
+      const address = this.addresses.get(id)
+      if (!address) continue
+      this.entries.set(id, {
         device: d, address, ch: null, online: false, since: new Date().toISOString(),
-        attempt: 0, timer: null, gen: 0, connecting: false
+        attempt: 0, timer: null, gen: 0, connecting: false, sock: null
       })
       changed = true
-      this.connect(d.machineId)
+      this.connect(id)
     }
     if (changed) this.emit('hosts', this.list())
+  }
+
+  /** The machine now has another key: forget the old connection and dial with the new one. */
+  private rekey(e: Entry, d: TrustedDevice): void {
+    this.release(e)
+    e.device = d
+    e.attempt = 0
+    e.error = undefined
+    this.connect(d.machineId)
+  }
+
+  private release(e: Entry): void {
+    e.gen++
+    this.cancel(e)
+    e.connecting = false
+    e.online = false
+    e.sock?.close()
+    e.sock = null
+    const ch = e.ch
+    e.ch = null
+    ch?.close('removido')
   }
 
   private drop(id: string): void {
     const e = this.entries.get(id)
     if (!e) return
     this.entries.delete(id)
-    e.gen++
-    this.cancel(e)
-    e.ch?.close('removido')
-    e.ch = null
+    this.release(e)
   }
 
   private cancel(e: Entry): void {
@@ -186,8 +213,7 @@ export class RemoteHosts extends EventEmitter {
     const e = this.entries.get(id)
     if (!e) return
     if (e.address !== address) {
-      e.address = address
-      this.addresses.set(id, address)
+      e.address = address // persisted only once a handshake succeeds there
       this.emit('hosts', this.list())
     }
     if (e.online || e.connecting) return
@@ -202,6 +228,7 @@ export class RemoteHosts extends EventEmitter {
     const gen = ++e.gen
     let sock: Socket
     try { sock = this.deps.dial(e.address) } catch (err) { return this.failed(id, gen, err) }
+    e.sock = sock
     connectChannel(sock, this.deps.own, fromB64(e.device.pub), this.me()).then(
       ch => this.connected(id, gen, ch),
       err => this.failed(id, gen, err)
@@ -212,6 +239,7 @@ export class RemoteHosts extends EventEmitter {
     const e = this.entries.get(id)
     if (!e || e.gen !== gen || !this.started) return ch.close('descartado')
     e.connecting = false
+    e.sock = null
     // the client serves nothing; pushes are the host's state
     ch.serve(() => { throw new Error('sem handler') })
     ch.onPush((topic, payload) => {
@@ -231,6 +259,7 @@ export class RemoteHosts extends EventEmitter {
     e.online = true
     e.error = undefined
     e.attempt = 0
+    this.addresses.set(id, e.address)
     this.emit('hosts', this.list())
   }
 
@@ -249,7 +278,9 @@ export class RemoteHosts extends EventEmitter {
     const e = this.entries.get(id)
     if (!e || e.gen !== gen) return
     e.connecting = false
-    e.error = err instanceof Error ? err.message : String(err)
+    e.sock = null
+    const msg = err instanceof Error ? err.message : String(err)
+    e.error = msg === 'versão diferente' ? `atualize o BrandyTerm em ${e.device.name}` : msg
     this.schedule(e, id)
     this.emit('hosts', this.list())
   }

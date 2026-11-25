@@ -58,7 +58,7 @@ async function withHost(fn: (e: Env) => Promise<void>): Promise<void> {
   })
   await host.start(0)
   const client = newKeyPair()
-  trust.add({ pub: toB64(client.pub), machineId: ME.id, name: ME.name, os: ME.os })
+  trust.add({ pub: toB64(client.pub), role: 'client', machineId: ME.id, name: ME.name, os: ME.os })
   const raw = (): Promise<WebSocket> => new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${host.port()}`)
     ws.once('open', () => resolve(ws))
@@ -148,7 +148,7 @@ test('clients() lists connections and touch records lastSeen', () => withHost(as
   const ch = await e.connect()
   await ch.request('state:get', undefined)
   assert.deepEqual(e.host.clients().map(c => c.pub), [toB64(e.client.pub)])
-  assert.ok(e.trust.get(toB64(e.client.pub))?.lastSeen)
+  assert.ok(e.trust.get(toB64(e.client.pub), 'client')?.lastSeen)
   ch.close()
 }))
 
@@ -180,8 +180,8 @@ test('pairing round trip: right code pairs, host proof verifies, then the key is
   assert.ok(reply)
   assert.ok(verifyHostProof(code, fromB64(reply.hpub), key.pub, fromB64(reply.nonceH), nonceC, reply.proof))
   assert.equal(reply.hpub, toB64(e.trust.ownKey().pub))
-  assert.equal(e.trust.get(toB64(key.pub))?.name, 'Celular')
-  assert.equal(e.trust.get(toB64(key.pub))?.terminal, false)
+  assert.equal(e.trust.get(toB64(key.pub), 'client')?.name, 'Celular')
+  assert.equal(e.trust.get(toB64(key.pub), 'client')?.terminal, false)
   await new Promise(r => ws.once('close', r)) // single-use socket
   const ch = await e.connect(key)
   assert.ok(await ch.request('state:get', undefined))
@@ -199,7 +199,7 @@ test('wrong code three times closes pairing, even for the right code', () => wit
   const ws = await e.raw()
   const r = parsePairFail(await exchange(ws, pairMsg(code, key).text))
   assert.equal(r?.reason, 'pareamento fechado')
-  assert.equal(e.trust.get(toB64(key.pub)), undefined)
+  assert.equal(e.trust.get(toB64(key.pub), 'client'), undefined)
 }))
 
 test('pairing refused when the window was never opened', () => withHost(async e => {
@@ -219,7 +219,7 @@ test('malformed pair counts as a bad attempt: it plus two wrong codes closes pai
   }
   ws = await e.raw()
   assert.equal(parsePairFail(await exchange(ws, pairMsg(code, key).text))?.reason, 'pareamento fechado')
-  assert.equal(e.trust.get(toB64(key.pub)), undefined)
+  assert.equal(e.trust.get(toB64(key.pub), 'client'), undefined)
 }))
 
 test('wrong protocol is reported and does not use up an attempt', () => withHost(async e => {
@@ -259,8 +259,8 @@ test('hiding a project mid-session blocks it and drops it from the next push', (
 test('revoking during the handshake leaves no live channel', () => withHost(async e => {
   const orig = e.trust.get.bind(e.trust)
   let n = 0
-  e.trust.get = pub => {
-    const r = orig(pub)
+  e.trust.get = (pub, role) => {
+    const r = orig(pub, role)
     if (++n === 1) e.trust.revoke(pub) // the accept callback: revoked right after it said yes
     return r
   }

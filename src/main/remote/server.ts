@@ -15,6 +15,7 @@ import { authorize, filterState } from './host-filter.ts'
 import { handlePair, type PairingCtx } from './host-pairing.ts'
 import { acceptLan } from './lan.ts'
 import type { TrustStore } from './trust.ts'
+import { keepAlive, MAX_PAYLOAD } from './ws-keepalive.ts'
 import { wsSocket } from './ws-socket.ts'
 
 export interface HostDeps {
@@ -29,7 +30,6 @@ export interface HostDeps {
   acceptAddress?: (local: string, remote: string) => boolean
 }
 
-const MAX_PAYLOAD = 36 * 1024 * 1024
 const IDLE_MS = 10_000
 const PUSH_DEBOUNCE_MS = 100
 const MAX_UNAUTH = 32
@@ -121,7 +121,7 @@ export class HostServer extends EventEmitter {
   }
 
   clients(): { pub: string; name: string; since: string }[] {
-    return [...this.live].map(l => ({ pub: l.ch.peerPub, name: this.deps.trust.get(l.ch.peerPub)?.name ?? l.ch.peer.name, since: l.since }))
+    return [...this.live].map(l => ({ pub: l.ch.peerPub, name: this.deps.trust.get(l.ch.peerPub, 'client')?.name ?? l.ch.peer.name, since: l.since }))
   }
 
   private upgrade(wss: WebSocketServer, req: http.IncomingMessage, sock: Duplex, head: Buffer): void {
@@ -136,6 +136,7 @@ export class HostServer extends EventEmitter {
     this.unauth.add(ws)
     const idle = setTimeout(() => ws.terminate(), IDLE_MS)
     ws.on('close', () => { clearTimeout(idle); this.unauth.delete(ws) })
+    keepAlive(ws)
     const sock = wsSocket(ws)
     let first: Uint8Array | string | null = null
     let forward: ((d: Uint8Array | string) => void) | null = null
@@ -166,14 +167,14 @@ export class HostServer extends EventEmitter {
   private channel(ws: WebSocket, sock: Socket, idle: ReturnType<typeof setTimeout>): void {
     const trust = this.deps.trust
     clearTimeout(idle) // acceptChannel has its own handshake timeout
-    acceptChannel(sock, trust.ownKey(), pub => !!trust.get(toB64(pub)), this.deps.machine()).then(ch => {
+    acceptChannel(sock, trust.ownKey(), pub => !!trust.get(toB64(pub), 'client'), this.deps.machine()).then(ch => {
       const entry: Live = { ch, since: new Date().toISOString() }
       // registered in the same tick as the handshake result: the host expects no pushes
       ch.serve((channel, arg) => this.dispatch(ch, channel, arg))
       ch.onPush(() => {})
       if (this.stopped) return ch.close('servidor parado')
       // revoked while the handshake was in flight
-      if (!trust.get(ch.peerPub)) return ch.close(REMOVED)
+      if (!trust.get(ch.peerPub, 'client')) return ch.close(REMOVED)
       this.unauth.delete(ws)
       this.live.add(entry)
       ch.onClose(() => { this.live.delete(entry); this.emit('change') })
@@ -183,7 +184,7 @@ export class HostServer extends EventEmitter {
   }
 
   private async dispatch(ch: SecureChannel, channel: string, arg: unknown): Promise<unknown> {
-    const dev = this.deps.trust.get(ch.peerPub)
+    const dev = this.deps.trust.get(ch.peerPub, 'client')
     if (!dev) {
       ch.close(REMOVED)
       throw new Error(REMOVED)
@@ -196,7 +197,7 @@ export class HostServer extends EventEmitter {
   }
 
   private readonly onTrust = (): void => {
-    for (const l of [...this.live]) if (!this.deps.trust.get(l.ch.peerPub)) l.ch.close(REMOVED)
+    for (const l of [...this.live]) if (!this.deps.trust.get(l.ch.peerPub, 'client')) l.ch.close(REMOVED)
   }
 
   private schedulePush(): void {

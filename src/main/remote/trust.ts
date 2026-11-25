@@ -3,9 +3,9 @@ import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import { join } from 'node:path'
 import { newKeyPair, toB64, fromB64, type KeyPair } from '../../shared/remote/crypto.ts'
-import type { TrustedDevice } from '../../shared/remote/machine.ts'
+import type { TrustedDevice, TrustRole } from '../../shared/remote/machine.ts'
 
-export type { TrustedDevice }
+export type { TrustedDevice, TrustRole }
 
 function writeAtomic(file: string, data: string, mode?: number): void {
   const tmp = `${file}.${process.pid}.tmp`
@@ -30,7 +30,8 @@ export class TrustStore extends EventEmitter {
   private load(): TrustedDevice[] {
     try {
       const v = JSON.parse(fs.readFileSync(this.trustFile, 'utf8'))
-      return Array.isArray(v) ? v : []
+      // entries written before roles existed were all clients
+      return Array.isArray(v) ? v.map(d => ({ ...d, role: d.role === 'host' ? 'host' : 'client' })) : []
     } catch { return [] }
   }
 
@@ -51,41 +52,52 @@ export class TrustStore extends EventEmitter {
     return (this.key = k)
   }
 
-  list(): TrustedDevice[] { return this.devices.map(d => ({ ...d })) }
+  list(role?: TrustRole): TrustedDevice[] {
+    return this.devices.filter(d => !role || d.role === role).map(d => ({ ...d }))
+  }
 
-  get(pub: string): TrustedDevice | undefined {
-    const d = this.devices.find(x => x.pub === pub)
+  get(pub: string, role: TrustRole): TrustedDevice | undefined {
+    const d = this.devices.find(x => x.pub === pub && x.role === role)
     return d && { ...d }
   }
 
+  /** Unique per (pub, role): the same machine may be both a client and a host. */
   add(d: Omit<TrustedDevice, 'addedAt' | 'terminal'>): TrustedDevice {
-    const prev = this.devices.find(x => x.pub === d.pub)
+    const prev = this.devices.find(x => x.pub === d.pub && x.role === d.role)
     const next: TrustedDevice = {
-      pub: d.pub, machineId: d.machineId, name: d.name, os: d.os,
+      pub: d.pub, role: d.role, machineId: d.machineId, name: d.name, os: d.os,
       ...(d.lastSeen ? { lastSeen: d.lastSeen } : {}),
       addedAt: prev?.addedAt ?? new Date().toISOString(),
       terminal: prev?.terminal ?? false
     }
-    this.devices = [...this.devices.filter(x => x.pub !== d.pub), next]
+    this.devices = [...this.devices.filter(x => !(x.pub === d.pub && x.role === d.role)), next]
     this.save()
     return { ...next }
   }
 
-  revoke(pub: string): void {
+  /** Role omitted: both roles. */
+  revoke(pub: string, role?: TrustRole): void {
     const n = this.devices.length
-    this.devices = this.devices.filter(x => x.pub !== pub)
+    this.devices = this.devices.filter(x => !(x.pub === pub && (!role || x.role === role)))
+    if (this.devices.length !== n) this.save()
+  }
+
+  /** Drops the other keys of a machine in one role (a re-paired machine replaces its old key). */
+  revokeOthers(machineId: string, keepPub: string, role: TrustRole): void {
+    const n = this.devices.length
+    this.devices = this.devices.filter(x => !(x.machineId === machineId && x.role === role && x.pub !== keepPub))
     if (this.devices.length !== n) this.save()
   }
 
   touch(pub: string, iso: string): void {
-    const d = this.devices.find(x => x.pub === pub)
+    const d = this.devices.find(x => x.pub === pub && x.role === 'client')
     if (!d) return
     d.lastSeen = iso
     this.save()
   }
 
   setTerminal(pub: string, on: boolean): void {
-    const d = this.devices.find(x => x.pub === pub)
+    const d = this.devices.find(x => x.pub === pub && x.role === 'client')
     if (!d || d.terminal === on) return
     d.terminal = on
     this.save()

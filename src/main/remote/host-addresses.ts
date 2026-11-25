@@ -35,8 +35,13 @@ export class HostAddresses {
   }
 
   private save(): void {
-    const tmp = `${this.file}.${process.pid}.tmp`
-    fs.writeFileSync(tmp, JSON.stringify(this.map, null, 2))
-    fs.renameSync(tmp, this.file)
+    // best effort: a disk error must not crash the caller (an mDNS callback, for one)
+    try {
+      const tmp = `${this.file}.${process.pid}.tmp`
+      fs.writeFileSync(tmp, JSON.stringify(this.map, null, 2))
+      fs.renameSync(tmp, this.file)
+    } catch (e) {
+      console.error('[remote] não foi possível salvar os endereços:', e instanceof Error ? e.message : e)
+    }
   }
 }

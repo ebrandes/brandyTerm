@@ -19,8 +19,12 @@ export function defaultName(hostname: string, os: MachineOs): string {
   return name || FALLBACK[os]
 }
 
+/** client: may control this machine; host: this machine controls it. Trust is directional. */
+export type TrustRole = 'client' | 'host'
+
 export interface TrustedDevice {
   pub: string
+  role: TrustRole
   machineId: string
   name: string
   os: MachineOs | 'phone'

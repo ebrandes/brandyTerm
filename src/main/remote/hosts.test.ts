@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
-import { toB64 } from '../../shared/remote/crypto.ts'
+import { newKeyPair, toB64 } from '../../shared/remote/crypto.ts'
 import type { DiscoveredHost, MachineInfo, RemoteHostInfo } from '../../shared/remote/machine.ts'
 import type { AppState } from '../../shared/types.ts'
 import type { Browse } from './browse.ts'
@@ -40,14 +40,18 @@ async function until(cond: () => boolean, what = 'condição'): Promise<void> {
 
 interface Rig { hosts: RemoteHosts; host: FakeHost; trust: TrustStore; hostTrust: TrustStore; timers: Timers; dir: string }
 
-function rig(opts: { trusted?: boolean; claim?: string; browse?: Browse } = {}): Rig {
+function rig(opts: { trusted?: boolean; staleHost?: boolean; claim?: string; browse?: Browse } = {}): Rig {
   const dir = tmp()
   const trust = new TrustStore(dir)
   const hostTrust = new TrustStore(tmp())
   const host = new FakeHost(hostTrust, { ...hostInfo, id: opts.claim ?? hostInfo.id })
   if (opts.trusted !== false) {
-    trust.add({ pub: toB64(hostTrust.ownKey().pub), machineId: 'h1', name: 'Servidor', os: 'linux' })
-    hostTrust.add({ pub: toB64(trust.ownKey().pub), machineId: 'me', name: 'Eu', os: 'mac' })
+    trust.add({ pub: toB64(hostTrust.ownKey().pub), role: 'host', machineId: 'h1', name: 'Servidor', os: 'linux' })
+    hostTrust.add({ pub: toB64(trust.ownKey().pub), role: 'client', machineId: 'me', name: 'Eu', os: 'mac' })
+    fs.writeFileSync(join(dir, 'remote-hosts.json'), JSON.stringify({ h1: '10.0.0.5:7000' }))
+  }
+  if (opts.staleHost) {
+    trust.add({ pub: toB64(newKeyPair().pub), role: 'host', machineId: 'h1', name: 'Servidor', os: 'linux' })
     fs.writeFileSync(join(dir, 'remote-hosts.json'), JSON.stringify({ h1: '10.0.0.5:7000' }))
   }
   const timers = new Timers()
@@ -201,9 +205,69 @@ test('mDNS: only unpaired hosts are discovered; a trusted host seen again is ret
   up({ name: 'Servidor', os: 'linux', address: '192.168.0.7:7001', machineId: 'h1' })
   assert.deepEqual(hosts.discovered().map(d => d.machineId), ['x9'])
   assert.equal(hosts.list()[0].address, '192.168.0.7:7001')
-  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '192.168.0.7:7001' })
   await until(() => online(hosts), 'online without waiting for the timer')
+  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '192.168.0.7:7001' })
   assert.equal(timers.items.length, 0)
   hosts.stop()
   assert.equal(stopped, true)
+})
+
+test('pairing as a client does not let the host control this machine', async () => {
+  const { hosts, host, trust, hostTrust } = rig({ trusted: false })
+  hosts.start()
+  await hosts.pair('10.0.0.5:7000', host.openPairing())
+  const hostPub = hostTrust.ownKey().pub
+  assert.equal(trust.get(toB64(hostPub), 'client'), undefined) // the server's accept predicate
+  assert.equal(trust.get(toB64(hostPub), 'host')?.machineId, 'h1')
+  assert.deepEqual(trust.list('client'), [])
+})
+
+test('a machine trusted in both roles is dialed; revoking the client role keeps the host role', async () => {
+  const { hosts, host, trust } = rig()
+  const pub = trust.list('host')[0].pub
+  trust.add({ pub, role: 'client', machineId: 'h1', name: 'Servidor', os: 'linux' })
+  hosts.start()
+  await until(() => online(hosts) && host.channels.length === 1)
+  assert.equal(trust.get(pub, 'client')?.machineId, 'h1')
+  trust.revoke(pub, 'client')
+  assert.equal(trust.get(pub, 'client'), undefined)
+  assert.ok(trust.get(pub, 'host'))
+  assert.equal(online(hosts), true)
+  trust.revoke(pub)
+  assert.deepEqual(hosts.list(), [])
+})
+
+test('re-pairing a host under a new key replaces the old one and comes online', async () => {
+  const { hosts, host, trust } = rig({ trusted: false, staleHost: true })
+  hosts.start()
+  await until(() => hosts.list().length === 1)
+  await hosts.pair('10.0.0.5:7000', host.openPairing())
+  await until(() => online(hosts), 'online with the new key')
+  assert.equal(trust.list('host').length, 1)
+  assert.equal(hosts.list().length, 1)
+})
+
+test('stop closes a handshake still in flight', async () => {
+  const { hosts, host } = rig()
+  let closed = false
+  host.dial = () => ({ send() {}, onMessage() {}, onClose() {}, close() { closed = true } })
+  const h2 = new RemoteHosts({
+    trust: hosts['deps'].trust, own: hosts['deps'].own, me, dial: host.dial, dir: hosts['deps'].dir
+  })
+  cleanups.push(() => h2.stop())
+  h2.start()
+  h2.stop()
+  assert.equal(closed, true)
+})
+
+test('an mDNS address is kept only after a handshake succeeds there', async () => {
+  let up: (h: DiscoveredHost) => void = () => {}
+  const browse: Browse = onUp => { up = onUp; return { stop() {} } }
+  const { hosts, host, timers, dir } = rig({ browse })
+  host.down = true
+  hosts.start()
+  await until(() => timers.items.length === 1)
+  up({ name: 'Servidor', os: 'linux', address: '192.168.0.99:7001', machineId: 'h1' })
+  await until(() => timers.items.length === 1 && host.dials >= 2)
+  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '10.0.0.5:7000' })
 })

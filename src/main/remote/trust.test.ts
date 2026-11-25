@@ -9,7 +9,7 @@ import { toB64 } from '../../shared/remote/crypto.ts'
 const dirs: string[] = []
 const tmp = () => { const d = fs.mkdtempSync(join(os.tmpdir(), 'trust-')); dirs.push(d); return d }
 after(() => { for (const d of dirs) fs.rmSync(d, { recursive: true, force: true }) })
-const dev = { pub: 'PUB1', machineId: 'm1', name: 'Mac', os: 'mac' as const }
+const dev = { pub: 'PUB1', role: 'client' as const, machineId: 'm1', name: 'Mac', os: 'mac' as const }
 
 test('ownKey is stable across instances', () => {
   const dir = tmp()
@@ -24,8 +24,8 @@ test('add then get; new devices have terminal false; persists', () => {
   const s = new TrustStore(dir)
   const added = s.add(dev)
   assert.equal(added.terminal, false)
-  assert.equal(s.get('PUB1')?.name, 'Mac')
-  assert.equal(new TrustStore(dir).get('PUB1')?.machineId, 'm1')
+  assert.equal(s.get('PUB1', 'client')?.name, 'Mac')
+  assert.equal(new TrustStore(dir).get('PUB1', 'client')?.machineId, 'm1')
 })
 
 test('revoke removes and emits change', () => {
@@ -34,7 +34,7 @@ test('revoke removes and emits change', () => {
   let n = 0
   s.on('change', () => n++)
   s.revoke('PUB1')
-  assert.equal(s.get('PUB1'), undefined)
+  assert.equal(s.get('PUB1', 'client'), undefined)
   assert.equal(n, 1)
 })
 
