@@ -34,7 +34,7 @@ test('redirect goes to the injected handler', async () => {
 
 test('waitForCode resolves the code from the callback, answers in Portuguese and closes the server', async () => {
   const ac = new AbortController()
-  const { redirectUrl, code } = await waitForCode(ac.signal)
+  const { redirectUrl, code } = await waitForCode(ac.signal, 's')
   assert.match(redirectUrl, /^http:\/\/127\.0\.0\.1:\d+\/callback$/)
   const res = await fetch(`${redirectUrl}?code=xyz&state=s`)
   assert.equal(await res.text(), 'Login concluído. Pode voltar ao BrandyTerm.')
@@ -43,18 +43,34 @@ test('waitForCode resolves the code from the callback, answers in Portuguese and
 })
 
 test('waitForCode ignores other paths and rejects on an error callback', async () => {
-  const { redirectUrl, code } = await waitForCode(new AbortController().signal)
+  const { redirectUrl, code } = await waitForCode(new AbortController().signal, 's')
   assert.equal((await fetch(redirectUrl.replace('/callback', '/favicon.ico'))).status, 404)
   const rejected = assert.rejects(code, /access_denied/)
-  await fetch(`${redirectUrl}?error=access_denied`)
+  await fetch(`${redirectUrl}?error=access_denied&state=s`)
   await rejected
 })
 
 test('aborting closes the server and rejects the code', async () => {
   const ac = new AbortController()
-  const { redirectUrl, code } = await waitForCode(ac.signal)
+  const { redirectUrl, code } = await waitForCode(ac.signal, 's')
   const rejected = assert.rejects(code, /cancelado/)
   ac.abort()
   await rejected
   await assert.rejects(fetch(redirectUrl))
+})
+
+test('the provider hands out the login state it was given', async () => {
+  const p = createOAuthProvider('c1', store(), 'http://127.0.0.1:1/callback', () => {}, 'st-1')
+  assert.equal(await p.state!(), 'st-1')
+})
+
+test('a wrong or missing state is refused and the wait keeps running until the right state arrives', async () => {
+  const { redirectUrl, code } = await waitForCode(new AbortController().signal, 'good')
+  assert.equal((await fetch(`${redirectUrl}?code=evil&state=bad`)).status, 400)
+  assert.equal((await fetch(`${redirectUrl}?code=evil`)).status, 400)
+  assert.equal((await fetch(`${redirectUrl}?error=access_denied&state=bad`)).status, 400)
+  assert.equal((await fetch(`${redirectUrl}?error=access_denied`)).status, 400)
+  const res = await fetch(`${redirectUrl}?code=real&state=good`)
+  assert.equal(res.status, 200)
+  assert.equal(await code, 'real')
 })

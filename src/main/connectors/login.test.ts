@@ -261,3 +261,36 @@ test('needsLogin for cli: a passing check means logged in; no check means not as
   assert.equal(await broker.needsLogin(railway), false)
   assert.equal(await broker.needsLogin({ ...railway, auth: { kind: 'cli', command: ['railway', 'login'] } }), false)
 })
+
+test('a bad token that fails hub.test restores the previous good token', async () => {
+  const { broker, secrets, github } = setup({ test: async () => { throw new Error('401') } })
+  secrets.set(github.id, { headers: { Authorization: 'Bearer good' }, env: { E: '1' } })
+  void broker.require(github, { ...p, threadId: 't1' }, new AbortController().signal).catch(() => {})
+  await broker.enter(github.id, { token: 'bad' })
+  assert.equal(broker.panelLogins()[0].phase, 'failed')
+  assert.deepEqual(secrets.get(github.id), { headers: { Authorization: 'Bearer good' }, env: { E: '1' } })
+  broker.cancel(github.id)
+  assert.equal(secrets.get(github.id).headers?.Authorization, 'Bearer good')
+})
+
+test('a bad token with no earlier token leaves nothing stored', async () => {
+  const { broker, secrets, github } = setup({ test: async () => { throw new Error('401') } })
+  void broker.require(github, { ...p, threadId: 't1' }, new AbortController().signal).catch(() => {})
+  await broker.enter(github.id, { token: 'bad' })
+  assert.deepEqual(secrets.get(github.id), {})
+  assert.equal(await broker.needsLogin(github), true)
+  broker.cancel(github.id)
+})
+
+test('Cancelar while the token is being tested restores the previous token', async () => {
+  let release: () => void = () => {}
+  const { broker, secrets, github } = setup({ test: () => new Promise<number>(r => { release = () => r(1) }) })
+  secrets.set(github.id, { headers: { Authorization: 'Bearer good' } })
+  const w = broker.require(github, { ...p, threadId: 't1' }, new AbortController().signal)
+  const run = broker.enter(github.id, { token: 'new' })
+  broker.cancel(github.id)
+  await assert.rejects(w)
+  release()
+  await run
+  assert.equal(secrets.get(github.id).headers?.Authorization, 'Bearer good')
+})

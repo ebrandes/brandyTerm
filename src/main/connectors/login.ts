@@ -1,6 +1,6 @@
 // Login broker: one card per connector that needs a login. Nothing runs until Entrar; Cancelar or the hold timeout releases every waiting thread with an error.
 import { EventEmitter } from 'node:events'
-import type { Connector, PanelLogin, ThreadLogin, ThreadRef, TokenField } from '../../shared/connectors.ts'
+import type { Connector, ConnectorSecrets, PanelLogin, ThreadLogin, ThreadRef, TokenField } from '../../shared/connectors.ts'
 import type { ConnectorHub } from './hub.ts'
 import type { ConnectorStore } from './store.ts'
 import type { SecretStore } from './secrets.ts'
@@ -31,6 +31,8 @@ interface Card {
   panel: boolean
   waiters: Waiter[]
   run?: AbortController
+  /** secrets as they were before a token was saved; null = none stored */
+  backup?: ConnectorSecrets | null
   timer?: NodeJS.Timeout
 }
 
@@ -113,7 +115,7 @@ export class LoginBroker extends EventEmitter {
     const run = (card.run = new AbortController())
     this.emit('change')
     try {
-      if (c.auth.kind === 'token') this.saveFields(c, values ?? {})
+      if (c.auth.kind === 'token') this.saveFields(card, values ?? {})
       else if (c.auth.kind === 'oauth') await this.deps.runners.oauth(c, run.signal)
       else if (c.auth.kind === 'cli') await this.deps.runners.cli(c, loginTerminalId(id), run.signal)
       if (run.signal.aborted) return
@@ -121,17 +123,28 @@ export class LoginBroker extends EventEmitter {
     } catch (e) {
       if (run.signal.aborted || this.cards.get(id) !== card) return
       card.run = undefined
+      this.rollback(card)
       card.phase = 'failed'
       card.error = e instanceof Error ? e.message : String(e)
       this.deps.hub.markLogin(id)
       return void this.emit('change')
     }
     if (run.signal.aborted || this.cards.get(id) !== card) return
+    card.backup = undefined
     this.close(card)
     this.release(card, w => w.resolve())
   }
 
-  private saveFields(c: Connector, values: Record<string, string>): void {
+  /** puts back the secrets from before a token that did not work */
+  private rollback(card: Card): void {
+    if (card.backup === undefined) return
+    if (card.backup) this.deps.secrets.set(card.c.id, card.backup)
+    else this.deps.secrets.remove(card.c.id)
+    card.backup = undefined
+  }
+
+  private saveFields(card: Card, values: Record<string, string>): void {
+    const c = card.c
     const prev = this.deps.secrets.get(c.id)
     const headers = { ...prev.headers }
     const env = { ...prev.env }
@@ -141,6 +154,7 @@ export class LoginBroker extends EventEmitter {
       if ('header' in f.use) headers[f.use.header] = f.use.format.replace('{value}', v)
       else env[f.use.env] = v
     }
+    card.backup = Object.keys(prev).length ? prev : null
     this.deps.secrets.patch(c.id, { headers, env })
   }
 
@@ -148,6 +162,7 @@ export class LoginBroker extends EventEmitter {
     const card = this.cards.get(id)
     if (!card) return
     card.run?.abort()
+    this.rollback(card)
     this.close(card)
     this.deps.hub.markLogin(id)
     this.release(card, w => w.reject(new Error(cancelledMessage(card.c.name))))

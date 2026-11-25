@@ -1,5 +1,6 @@
 // OAuth login for HTTP connectors: a loopback listener catches the redirect, the SDK exchanges the code.
 import http from 'node:http'
+import { randomBytes } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
 import type { Connector } from '../../shared/connectors.ts'
@@ -12,7 +13,7 @@ import { cancelledMessage } from './cli-login.ts'
 const DONE_PAGE = 'Login concluído. Pode voltar ao BrandyTerm.'
 
 /** Login provider: like the stored one, but a client registered for another redirect URL is not reused. */
-export function createOAuthProvider(id: string, secrets: SecretStore, redirectUrl: string, onRedirect: (url: URL) => void): OAuthClientProvider {
+export function createOAuthProvider(id: string, secrets: SecretStore, redirectUrl: string, onRedirect: (url: URL) => void, state?: string): OAuthClientProvider {
   const base = makeOAuthProvider(id, secrets, redirectUrl, onRedirect)
   return {
     get redirectUrl() { return base.redirectUrl },
@@ -22,6 +23,7 @@ export function createOAuthProvider(id: string, secrets: SecretStore, redirectUr
       const uris = (info as { redirect_uris?: string[] } | undefined)?.redirect_uris
       return info && uris?.includes(redirectUrl) ? info : undefined
     },
+    ...(state ? { state: () => state } : {}),
     saveClientInformation: i => base.saveClientInformation!(i),
     tokens: () => base.tokens(),
     saveTokens: t => base.saveTokens(t),
@@ -31,14 +33,16 @@ export function createOAuthProvider(id: string, secrets: SecretStore, redirectUr
   }
 }
 
-/** Listens on 127.0.0.1:<random>/callback until one code (or error) arrives or `signal` aborts; then closes. */
-export async function waitForCode(signal: AbortSignal): Promise<{ redirectUrl: string; code: Promise<string> }> {
+/** Listens on 127.0.0.1:<random>/callback until one code (or error) carrying `state` arrives or `signal` aborts; then closes. */
+export async function waitForCode(signal: AbortSignal, state: string): Promise<{ redirectUrl: string; code: Promise<string> }> {
   let settle: { ok(code: string): void; fail(e: Error): void } = { ok() {}, fail() {} }
   const code = new Promise<string>((ok, fail) => { settle = { ok, fail } })
   code.catch(() => {})
   const server = http.createServer((req, res) => {
     const u = new URL(req.url ?? '/', 'http://127.0.0.1')
     if (u.pathname !== '/callback') { res.statusCode = 404; return void res.end() }
+    // another local process or page can hit this port: only the callback of this login counts
+    if (u.searchParams.get('state') !== state) { res.statusCode = 400; return void res.end() }
     const err = u.searchParams.get('error')
     const got = u.searchParams.get('code')
     if (!err && !got) { res.statusCode = 400; return void res.end() }
@@ -70,9 +74,10 @@ export function makeOAuthRunner(d: OAuthRunnerDeps): (c: Connector, signal: Abor
     const stop = () => inner.abort()
     signal.addEventListener('abort', stop, { once: true })
     try {
-      const { redirectUrl, code } = await waitForCode(inner.signal)
+      const state = randomBytes(16).toString('hex')
+      const { redirectUrl, code } = await waitForCode(inner.signal, state)
       let redirected = false
-      const oauth = createOAuthProvider(c.id, d.secrets, redirectUrl, url => { redirected = true; void d.open(url.href) })
+      const oauth = createOAuthProvider(c.id, d.secrets, redirectUrl, url => { redirected = true; void d.open(url.href) }, state)
       const auth: AuthMaterial = { env: {}, headers: {}, oauth }
       const probe = async () => { await (await factory(c, auth)).close() }
       try {

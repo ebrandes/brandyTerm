@@ -40,14 +40,15 @@ test('redirect, loopback code, token exchange, then a second connect proves the 
         assert.equal(await p.clientInformation(), undefined, 'stale registration is not reused')
         p.saveClientInformation!({ client_id: 'cid', redirect_uris: [String(p.redirectUrl)] } as never)
         p.saveCodeVerifier('v')
-        await p.redirectToAuthorization(new URL(`${base}/auth?redirect_uri=${encodeURIComponent(String(p.redirectUrl))}`))
+        const state = await p.state!()
+        await p.redirectToAuthorization(new URL(`${base}/auth?redirect_uri=${encodeURIComponent(String(p.redirectUrl))}&state=${state}`))
         throw new ConnectorError('Precisa de login.', 'login')
       }
       return live
     }
     const run = makeOAuthRunner({
       secrets, factory,
-      open: url => { opened.push(url); const r = new URL(url).searchParams.get('redirect_uri')!; void fetch(`${r}?code=the-code`) },
+      open: url => { opened.push(url); const r = new URL(url).searchParams.get('redirect_uri')!; const st = new URL(url).searchParams.get('state')!; void fetch(`${r}?code=evil&state=wrong`).then(() => fetch(`${r}?code=the-code&state=${st}`)) },
     })
     await run(conn(`${base}/mcp`), new AbortController().signal)
     assert.equal(connects, 2)
