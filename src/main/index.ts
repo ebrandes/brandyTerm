@@ -1,6 +1,6 @@
 import { app, BrowserWindow, nativeImage, protocol, shell } from 'electron'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { Engine } from './engine.ts'
 import { JsonStore } from './store.ts'
 import { killAll } from './adapters/proc.ts'
@@ -96,8 +96,15 @@ async function refreshLimits(accounts: Accounts): Promise<void> {
   }
 }
 
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) app.quit()
+// A second dev instance on the same Mac: its own data folder and no single-instance lock (nothing reads
+// userData at import time, so setting it here, before whenReady, is early enough)
+const dataOverride = process.env.BRANDY_USER_DATA ? resolve(process.env.BRANDY_USER_DATA) : null
+if (dataOverride) {
+  mkdirSync(dataOverride, { recursive: true })
+  app.setPath('userData', dataOverride)
+}
+
+if (!dataOverride && !app.requestSingleInstanceLock()) app.quit()
 
 app.whenReady().then(async () => {
   const stateFile = join(app.getPath('userData'), 'brandyterm-state.json')

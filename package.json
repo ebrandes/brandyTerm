@@ -30,6 +30,7 @@
   "scripts": {
     "predev": "node scripts/update-sdk.mjs",
     "dev": "electron-vite dev -w",
+    "dev:second": "BRANDY_USER_DATA=$TMPDIR/brandy-second electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
