@@ -1,9 +1,11 @@
-import { ipcMain, net, protocol, shell } from 'electron'
+import { net, protocol, shell } from 'electron'
 import { createReadStream, statSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { mediaType, parseRange } from './artifact-media.ts'
 import { parseArtifactUrl, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
+import { registry } from './rpc/registry.ts'
+import { ruleOf } from './rpc/channels.ts'
 
 /**
  * Artifact viewer access to project files. `artifact:read` returns text for the
@@ -34,15 +36,15 @@ export function registerArtifactIpc(rootOf: RootOf): void {
     if (type) headers.set('Content-Type', type)
     return new Response(file.body, { status: file.status, headers })
   })
-  ipcMain.handle('artifact:read', (_e, a: { projectId: string; path: string }) => {
+  registry.add('artifact:read', (a: { projectId: string; path: string }) => {
     const root = rootOf(String(a?.projectId))
     return root ? readArtifact(root, String(a?.path ?? '')) : { kind: 'missing' }
-  })
-  ipcMain.handle('artifact:open', (_e, a: { projectId: string; path: string }) => {
+  }, ruleOf('artifact:read'))
+  registry.add('artifact:open', (a: { projectId: string; path: string }) => {
     const root = rootOf(String(a?.projectId))
     const abs = root ? resolveInside(root, String(a?.path ?? '')) : null
     if (abs) void shell.openPath(abs)
-  })
+  }, ruleOf('artifact:open'))
 }
 
 /** Video/image bytes with Range support, so the player can seek without loading the whole file. */

@@ -1,7 +1,9 @@
-import { clipboard, ipcMain, type WebContents } from 'electron'
+import { clipboard, type WebContents } from 'electron'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { spawn, type IPty } from '@lydell/node-pty'
+import { registry } from './rpc/registry.ts'
+import { ruleOf } from './rpc/channels.ts'
 
 /**
  * Integrated terminal: one shell per project, started in the project folder on
@@ -77,20 +79,20 @@ function open(sender: WebContents, id: string, cwd: string, cols: number, rows: 
 
 /** the terminal copies and pastes through the system clipboard (no renderer clipboard permission needed) */
 function registerClipboardIpc(): void {
-  ipcMain.handle('clipboard:read', () => clipboard.readText())
-  ipcMain.handle('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
+  registry.add('clipboard:read', () => clipboard.readText(), ruleOf('clipboard:read'))
+  registry.add('clipboard:write', (text: string) => clipboard.writeText(String(text)), ruleOf('clipboard:write'))
 }
 
 export function registerTerminalIpc(cwdOf: (projectId: string) => string | null | undefined): void {
   registerClipboardIpc()
-  ipcMain.handle('term:open', (e, a: { id: string; cols: number; rows: number }) => {
+  registry.add('term:open', (a: { id: string; cols: number; rows: number }, ctx) => {
     const cwd = cwdOf(String(a.id))
     if (!cwd) return false
-    open(e.sender, String(a.id), cwd, Number(a.cols) || 80, Number(a.rows) || 24)
+    open(ctx.sender as WebContents, String(a.id), cwd, Number(a.cols) || 80, Number(a.rows) || 24)
     return true
-  })
-  ipcMain.handle('term:write', (_e, a: { id: string; data: string }) => ptys.get(String(a.id))?.write(String(a.data)))
-  ipcMain.handle('term:resize', (_e, a: { id: string; cols: number; rows: number }) => {
+  }, ruleOf('term:open'))
+  registry.add('term:write', (a: { id: string; data: string }) => ptys.get(String(a.id))?.write(String(a.data)), ruleOf('term:write'))
+  registry.add('term:resize', (a: { id: string; cols: number; rows: number }) => {
     const cols = Math.max(Number(a.cols) || 0, 20)
     const rows = Math.max(Number(a.rows) || 0, 5)
     try {
@@ -99,8 +101,8 @@ export function registerTerminalIpc(cwdOf: (projectId: string) => string | null 
     } catch {
       // the shell may have just exited
     }
-  })
-  ipcMain.handle('term:kill', (_e, id: string) => killTerminal(String(id)))
+  }, ruleOf('term:resize'))
+  registry.add('term:kill', (id: string) => killTerminal(String(id)), ruleOf('term:kill'))
 }
 
 export function killTerminal(id: string): void {

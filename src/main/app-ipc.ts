@@ -1,0 +1,89 @@
+import { dialog, shell, type BrowserWindow } from 'electron'
+import type { Engine } from './engine.ts'
+import { discoverPlugins, installPlugin } from './plugins.ts'
+import { killTerminal } from './terminal.ts'
+import { validAttachments } from './attachments.ts'
+import { setUserPlugin, userPluginsState } from './user-plugins.ts'
+import { updateSettings } from './settings.ts'
+import { registry } from './rpc/registry.ts'
+import { ruleOf } from './rpc/channels.ts'
+import type { AppSettings } from '../shared/types.ts'
+
+export interface AppIpcDeps {
+  engine: Engine
+  getWin: () => BrowserWindow | null
+  pushState: () => void
+}
+
+/** the app-level handlers: state, projects, chat, processes, plugins, settings, threads */
+export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void {
+  registry.add('state:get', () => engine.state, ruleOf('state:get'))
+  registry.add('project:open-folder', async () => {
+    const opts = { title: 'Abrir pasta como projeto', properties: ['openDirectory' as const] }
+    const win = getWin()
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    if (res.canceled || !res.filePaths[0]) return null
+    return engine.addProject(res.filePaths[0])
+  }, ruleOf('project:open-folder'))
+  registry.add('project:remove', (id: string) => {
+    killTerminal(String(id))
+    engine.removeProject(String(id))
+  }, ruleOf('project:remove'))
+  registry.add('chat:send', (a: { projectId: string; text: string; threadId?: string; attachments?: unknown }) =>
+    engine.send(String(a.projectId), String(a.text ?? ''), a.threadId ? String(a.threadId) : undefined, validAttachments(a.attachments)),
+    ruleOf('chat:send'))
+  registry.add('commands:list', (projectId: string) => engine.commands(String(projectId)), ruleOf('commands:list'))
+  registry.add('process:start', (a: { projectId: string; name: string; command: string }) =>
+    engine.startProcess(String(a.projectId), String(a.name ?? ''), String(a.command ?? '')),
+    ruleOf('process:start'))
+  registry.add('process:stop', (a: { projectId: string; processId: string }) =>
+    engine.stopProcess(String(a.projectId), String(a.processId)),
+    ruleOf('process:stop'))
+  registry.add('process:remove', (a: { projectId: string; processId: string }) =>
+    engine.removeProcess(String(a.projectId), String(a.processId)),
+    ruleOf('process:remove'))
+  registry.add('process:open-port', (port: number) => {
+    const n = Number(port)
+    if (Number.isInteger(n) && n > 0 && n < 65536) void shell.openExternal(`http://localhost:${n}`)
+  }, ruleOf('process:open-port'))
+  registry.add('plugin:install', async (a: { id: string; force?: boolean }) => {
+    const p = engine.state.plugins.find((x) => x.id === String(a.id))
+    if (!p || p.dir || p.installing) return
+    p.installing = true
+    p.error = undefined
+    p.review = undefined
+    p.note = a.force ? 'instalando…' : 'Claude Security revisando o plugin…'
+    engine.emit('change')
+    const r = await installPlugin(p.id, !!a.force)
+    const fresh = discoverPlugins()
+    fresh.forEach((x) => {
+      if (x.id !== p.id) return
+      x.review = r.review
+      if (!r.ok && !r.review?.blocked) x.error = r.error
+    })
+    engine.state.plugins = fresh
+    engine.emit('change')
+  }, ruleOf('plugin:install'))
+  registry.add('plugin:open-report', (id: string) => {
+    const report = engine.state.plugins.find((x) => x.id === String(id))?.review?.report
+    if (report) void shell.openPath(report)
+  }, ruleOf('plugin:open-report'))
+  registry.add('thread:approve', (a: { projectId: string; threadId: string; id: string; decision: string }) => {
+    const d = a.decision === 'allow' || a.decision === 'always' || a.decision === 'all' ? a.decision : 'deny'
+    engine.respondApproval(String(a.projectId), String(a.threadId), String(a.id), d)
+  }, ruleOf('thread:approve'))
+  registry.add('thread:allowAll', (a: { projectId: string; threadId: string; on: boolean }) => engine.setAllowAll(String(a.projectId), String(a.threadId), !!a.on), ruleOf('thread:allowAll'))
+  registry.add('settings:set', (patch: Partial<AppSettings>) => {
+    engine.state.settings = updateSettings(patch ?? {})
+    engine.touch()
+  }, ruleOf('settings:set'))
+  registry.add('thread:resolve', (a: { projectId: string; threadId: string }) => engine.resolveThread(String(a.projectId), String(a.threadId)), ruleOf('thread:resolve'))
+  registry.add('thread:cancel', (a: { projectId: string; threadId: string }) =>
+    engine.cancelThread(String(a.projectId), String(a.threadId)),
+    ruleOf('thread:cancel'))
+  registry.add('userPlugins:set', (a: { id: string; on: boolean }) => {
+    setUserPlugin(String(a.id), !!a.on)
+    engine.state.userPlugins = userPluginsState()
+    pushState()
+  }, ruleOf('userPlugins:set'))
+}

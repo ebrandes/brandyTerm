@@ -1,25 +1,24 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, protocol, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, protocol, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { Engine } from './engine.ts'
 import { JsonStore } from './store.ts'
 import { killAll } from './adapters/proc.ts'
 import { closeSdkSessions } from './adapters/claude-sdk.ts'
-import { discoverPlugins, installPlugin } from './plugins.ts'
-import { killAllTerminals, killTerminal, registerTerminalIpc } from './terminal.ts'
+import { killAllTerminals, registerTerminalIpc } from './terminal.ts'
 import { ARTIFACT_SCHEME, registerArtifactIpc } from './artifact-ipc.ts'
-import { ATTACHMENT_SCHEME, registerAttachmentIpc, validAttachments } from './attachments.ts'
+import { ATTACHMENT_SCHEME, registerAttachmentIpc } from './attachments.ts'
 import { registerFsIpc } from './fs-list.ts'
 import { Accounts } from './accounts.ts'
 import { registerAccountIpc } from './account-ipc.ts'
 import { registerArchiveIpc } from './archive-ipc.ts'
 import { archiveDirFor } from './archive.ts'
 import { setClaudeAuth } from './adapters/auth.ts'
-import { setUserPlugin, userPluginsState } from './user-plugins.ts'
-import { updateSettings } from './settings.ts'
 import { loadIdentity } from './remote/identity.ts'
 import { startBackground } from './background.ts'
-import type { AppSettings } from '../shared/types.ts'
+import { registerAppIpc } from './app-ipc.ts'
+import { registry } from './rpc/registry.ts'
+import { bindIpc } from './rpc/ipc.ts'
 
 const isMac = process.platform === 'darwin'
 
@@ -80,72 +79,6 @@ function createWindow(): void {
   }
 }
 
-function registerIpc(): void {
-  ipcMain.handle('state:get', () => engine.state)
-  ipcMain.handle('project:open-folder', async () => {
-    const opts = { title: 'Abrir pasta como projeto', properties: ['openDirectory' as const] }
-    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
-    if (res.canceled || !res.filePaths[0]) return null
-    return engine.addProject(res.filePaths[0])
-  })
-  ipcMain.handle('project:remove', (_e, id: string) => {
-    killTerminal(String(id))
-    engine.removeProject(String(id))
-  })
-  ipcMain.handle('chat:send', (_e, a: { projectId: string; text: string; threadId?: string; attachments?: unknown }) =>
-    engine.send(String(a.projectId), String(a.text ?? ''), a.threadId ? String(a.threadId) : undefined, validAttachments(a.attachments))
-  )
-  ipcMain.handle('commands:list', (_e, projectId: string) => engine.commands(String(projectId)))
-  ipcMain.handle('process:start', (_e, a: { projectId: string; name: string; command: string }) =>
-    engine.startProcess(String(a.projectId), String(a.name ?? ''), String(a.command ?? ''))
-  )
-  ipcMain.handle('process:stop', (_e, a: { projectId: string; processId: string }) =>
-    engine.stopProcess(String(a.projectId), String(a.processId))
-  )
-  ipcMain.handle('process:remove', (_e, a: { projectId: string; processId: string }) =>
-    engine.removeProcess(String(a.projectId), String(a.processId))
-  )
-  ipcMain.handle('process:open-port', (_e, port: number) => {
-    const n = Number(port)
-    if (Number.isInteger(n) && n > 0 && n < 65536) void shell.openExternal(`http://localhost:${n}`)
-  })
-  ipcMain.handle('plugin:install', async (_e, a: { id: string; force?: boolean }) => {
-    const p = engine.state.plugins.find((x) => x.id === String(a.id))
-    if (!p || p.dir || p.installing) return
-    p.installing = true
-    p.error = undefined
-    p.review = undefined
-    p.note = a.force ? 'instalando…' : 'Claude Security revisando o plugin…'
-    engine.emit('change')
-    const r = await installPlugin(p.id, !!a.force)
-    const fresh = discoverPlugins()
-    fresh.forEach((x) => {
-      if (x.id !== p.id) return
-      x.review = r.review
-      if (!r.ok && !r.review?.blocked) x.error = r.error
-    })
-    engine.state.plugins = fresh
-    engine.emit('change')
-  })
-  ipcMain.handle('plugin:open-report', (_e, id: string) => {
-    const report = engine.state.plugins.find((x) => x.id === String(id))?.review?.report
-    if (report) void shell.openPath(report)
-  })
-  ipcMain.handle('thread:approve', (_e, a: { projectId: string; threadId: string; id: string; decision: string }) => {
-    const d = a.decision === 'allow' || a.decision === 'always' || a.decision === 'all' ? a.decision : 'deny'
-    engine.respondApproval(String(a.projectId), String(a.threadId), String(a.id), d)
-  })
-  ipcMain.handle('thread:allowAll', (_e, a: { projectId: string; threadId: string; on: boolean }) => engine.setAllowAll(String(a.projectId), String(a.threadId), !!a.on))
-  ipcMain.handle('settings:set', (_e, patch: Partial<AppSettings>) => {
-    engine.state.settings = updateSettings(patch ?? {})
-    engine.touch()
-  })
-  ipcMain.handle('thread:resolve', (_e, a: { projectId: string; threadId: string }) => engine.resolveThread(String(a.projectId), String(a.threadId)))
-  ipcMain.handle('thread:cancel', (_e, a: { projectId: string; threadId: string }) =>
-    engine.cancelThread(String(a.projectId), String(a.threadId))
-  )
-}
-
 // Electron keeps only the last call: every privileged scheme goes in this one
 protocol.registerSchemesAsPrivileged([ATTACHMENT_SCHEME, ARTIFACT_SCHEME])
 
@@ -176,13 +109,8 @@ app.whenReady().then(async () => {
   registerAccountIpc(accounts)
   registerArchiveIpc(engine, archiveDirFor(stateFile))
   stopBackground = startBackground(engine)
-  ipcMain.handle('userPlugins:set', (_e, a: { id: string; on: boolean }) => {
-    setUserPlugin(String(a.id), !!a.on)
-    engine.state.userPlugins = userPluginsState()
-    pushState()
-  })
   void refreshLimits(accounts)
-  registerIpc()
+  registerAppIpc({ engine, getWin: () => win, pushState })
   registerAttachmentIpc()
   const projectRoot = (id: string) => {
     const p = engine.state.projects.find((x) => x.id === id)
@@ -191,6 +119,7 @@ app.whenReady().then(async () => {
   registerTerminalIpc(projectRoot)
   registerFsIpc(projectRoot)
   registerArtifactIpc(projectRoot)
+  bindIpc(registry)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))
   createWindow()

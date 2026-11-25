@@ -1,4 +1,6 @@
-import { ipcMain } from 'electron'
+import type { WebContents } from 'electron'
+import { registry } from './rpc/registry.ts'
+import { ruleOf } from './rpc/channels.ts'
 import { homedir } from 'node:os'
 import type { Accounts } from './accounts.ts'
 import { resolveCli } from './adapters/proc.ts'
@@ -17,16 +19,16 @@ const TOKEN = /sk-ant-oat\d+-[A-Za-z0-9_-]{20,}(?=\s)/
  * token, and the token is captured from the output and stored encrypted.
  */
 export function registerAccountIpc(accounts: Accounts): void {
-  ipcMain.handle('accounts:activate', (_e, id: string) => accounts.activate(String(id)))
-  ipcMain.handle('accounts:auto', (_e, on: boolean) => accounts.setAutoSwitch(!!on))
-  ipcMain.handle('accounts:rename', (_e, a: { id: string; label: string }) => accounts.rename(String(a.id), String(a.label ?? '')))
-  ipcMain.handle('accounts:remove', (_e, id: string) => accounts.remove(String(id)))
-  ipcMain.handle('accounts:probe', (_e, id: string) => accounts.probe(String(id)))
-  ipcMain.handle('accounts:add-token', (_e, a: { label: string; token: string }) => {
+  registry.add('accounts:activate', (id: string) => accounts.activate(String(id)), ruleOf('accounts:activate'))
+  registry.add('accounts:auto', (on: boolean) => accounts.setAutoSwitch(!!on), ruleOf('accounts:auto'))
+  registry.add('accounts:rename', (a: { id: string; label: string }) => accounts.rename(String(a.id), String(a.label ?? '')), ruleOf('accounts:rename'))
+  registry.add('accounts:remove', (id: string) => accounts.remove(String(id)), ruleOf('accounts:remove'))
+  registry.add('accounts:probe', (id: string) => accounts.probe(String(id)), ruleOf('accounts:probe'))
+  registry.add('accounts:add-token', (a: { label: string; token: string }) => {
     accounts.addToken(String(a.label ?? ''), String(a.token ?? ''))
-  })
+  }, ruleOf('accounts:add-token'))
 
-  ipcMain.handle('accounts:login-start', (e, a: { label: string; rows: number }) => {
+  registry.add('accounts:login-start', (a: { label: string; rows: number }, ctx) => {
     const cli = resolveCli('claude')
     if (!cli) throw new Error('Claude Code não encontrado no PATH')
     const label = String(a.label ?? '').trim() || 'Outra conta'
@@ -35,7 +37,7 @@ export function registerAccountIpc(accounts: Accounts): void {
     accounts.emit('change')
     let out = ''
     let saved = false
-    spawnPty(e.sender, LOGIN_TERM, {
+    spawnPty(ctx.sender as WebContents, LOGIN_TERM, {
       file: cli.cmd,
       args: [...cli.prefix, 'setup-token'],
       cwd: homedir(),
@@ -67,11 +69,11 @@ export function registerAccountIpc(accounts: Accounts): void {
         }
       }
     })
-  })
+  }, ruleOf('accounts:login-start'))
 
-  ipcMain.handle('accounts:login-cancel', () => {
+  registry.add('accounts:login-cancel', () => {
     accounts.state.login = undefined
     killTerminal(LOGIN_TERM)
     accounts.emit('change')
-  })
+  }, ruleOf('accounts:login-cancel'))
 }

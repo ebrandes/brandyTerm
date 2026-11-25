@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process'
 import { lstatSync, readdirSync, realpathSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { promisify } from 'node:util'
-import { ipcMain } from 'electron'
+import { registry } from './rpc/registry.ts'
+import { ruleOf } from './rpc/channels.ts'
 import type { FsEntry } from '../shared/types.ts'
 import { inside } from './paths.ts'
 import { browseDir, isOutside } from './fs-browse.ts'
@@ -110,8 +111,8 @@ export async function listFiles(root: string, query: string): Promise<FsEntry[]>
 }
 
 export function registerFsIpc(rootOf: (projectId: string) => string | null): void {
-  ipcMain.handle('fs:list', async (_e, a: { projectId: string; query: string }) => {
+  registry.add('fs:list', async (a: { projectId: string; query: string }) => {
     const root = rootOf(String(a?.projectId))
     return root ? listFiles(root, String(a?.query ?? '')) : []
-  })
+  }, ruleOf('fs:list'))
 }

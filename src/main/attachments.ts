@@ -1,10 +1,12 @@
-import { app, ipcMain, net, protocol, shell } from 'electron'
+import { app, net, protocol, shell } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { MAX_FILES, type Attachment } from '../shared/types.ts'
 import { inside } from './paths.ts'
+import { registry } from './rpc/registry.ts'
+import { ruleOf } from './rpc/channels.ts'
 
 /**
  * Files the user pastes, drops or picks in the composer. They are copied to
@@ -71,10 +73,10 @@ export function registerAttachmentIpc(): void {
     if (!owned(p)) return new Response('not found', { status: 404 })
     return net.fetch(pathToFileURL(p).toString())
   })
-  ipcMain.handle('attach:save', (_e, a: { projectId: string; name: string; mime: string; data: Uint8Array; marked?: boolean }) =>
-    saveAttachment(String(a.projectId), String(a.name ?? ''), String(a.mime ?? ''), a.data, !!a.marked)
-  )
-  ipcMain.handle('attach:open', (_e, p: string) => {
+  registry.add('attach:save', (a: { projectId: string; name: string; mime: string; data: Uint8Array; marked?: boolean }) =>
+    saveAttachment(String(a.projectId), String(a.name ?? ''), String(a.mime ?? ''), a.data, !!a.marked),
+    ruleOf('attach:save'))
+  registry.add('attach:open', (p: string) => {
     if (owned(String(p))) void shell.openPath(String(p))
-  })
+  }, ruleOf('attach:open'))
 }
