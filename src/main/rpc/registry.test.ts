@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { Registry } from './registry.ts'
-import { EXPECTED_CHANNELS, RULES } from './channels.ts'
+import { EXPECTED_CHANNELS, REMOTE_ONLY, RULES } from './channels.ts'
 
 const remote = (terminal = false) => ({ remote: { deviceId: 'd', terminal } })
 
@@ -45,6 +45,6 @@ test('every channel the preload invokes is in the rule table', () => {
   const used = [...src.matchAll(/ipcRenderer\.invoke\('([^']+)'/g)].map((m) => m[1])
   assert.ok(used.length > 0)
   for (const c of used) assert.ok(EXPECTED_CHANNELS.includes(c), `missing in channels.ts: ${c}`)
-  for (const c of EXPECTED_CHANNELS) assert.ok(used.includes(c), `not used by preload: ${c}`)
+  for (const c of EXPECTED_CHANNELS) assert.ok(used.includes(c) || REMOTE_ONLY.includes(c), `not used by preload: ${c}`)
   assert.equal(Object.keys(RULES).length, EXPECTED_CHANNELS.length)
 })

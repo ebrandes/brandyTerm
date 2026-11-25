@@ -1,5 +1,8 @@
 // Renderer IPC for the multi-machine feature (host and client side). Every channel is `deny` for remotes.
-import { app, type BrowserWindow } from 'electron'
+import { app, shell, type BrowserWindow } from 'electron'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname } from 'node:path'
 import type { Engine } from '../engine.ts'
 import { registry } from '../rpc/registry.ts'
 import { ruleOf } from '../rpc/channels.ts'
@@ -7,6 +10,7 @@ import { browseMdns } from './browse.ts'
 import { RemoteHosts } from './hosts.ts'
 import { loadIdentity, renameMachine } from './identity.ts'
 import type { Remote } from './index.ts'
+import { openDecision, targetPath } from './open-policy.ts'
 import { dialWs } from './ws-dial.ts'
 
 export interface ClientIpcDeps {
@@ -39,6 +43,16 @@ export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHo
   add('remote:states', () => hosts.states())
   add('remote:call', (a: { machineId: string; channel: string; arg: unknown }) =>
     hosts.call(String(a.machineId), String(a.channel), a.arg))
+  add('remote:open-bytes', (a: { machineId: string; name: string; data: Uint8Array }) => {
+    const id = String(a.machineId)
+    if (!hosts.list().some(h => h.machine.id === id)) throw new Error('Máquina desconhecida')
+    if (!(a.data instanceof Uint8Array)) throw new Error('Arquivo inválido')
+    const file = targetPath(tmpdir(), id, a.name)
+    mkdirSync(dirname(file), { recursive: true })
+    writeFileSync(file, a.data, { mode: 0o600 })
+    if (openDecision(file) === 'open') void shell.openPath(file)
+    else shell.showItemInFolder(file)
+  })
   add('remote:open-pairing', () => {
     const server = remote.server()
     if (!server) throw new Error('Acesso remoto desligado')

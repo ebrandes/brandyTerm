@@ -1,6 +1,9 @@
 import { join, resolve } from 'node:path'
 import { inside } from './paths.ts'
 
+/** Largest file a project stores (and a remote caller reads). */
+export const MAX_ATTACHMENT = 25 * 1024 * 1024
+
 /** Folder name of a project's attachments under the attachments root. */
 export const projectDirName = (projectId: string): string => projectId.replace(/[^\w-]/g, '_')
 

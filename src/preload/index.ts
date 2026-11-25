@@ -55,6 +55,7 @@ const api: BrandyApi = {
     onState: (cb) => listen('remote:state', cb),
     states: () => ipcRenderer.invoke('remote:states'),
     call: (a) => ipcRenderer.invoke('remote:call', a),
+    openBytes: (a) => ipcRenderer.invoke('remote:open-bytes', a),
     openPairing: () => ipcRenderer.invoke('remote:open-pairing'),
     closePairing: () => ipcRenderer.invoke('remote:close-pairing'),
     devices: () => ipcRenderer.invoke('remote:devices'),

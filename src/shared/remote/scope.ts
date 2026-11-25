@@ -11,7 +11,8 @@ export const SCOPED: Record<string, Where> = {
   'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
   'thread:resolve': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
   'artifact:read': 'projectId', 'artifact:open': 'projectId', 'process:start': 'projectId',
-  'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId'
+  'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId',
+  'attach:read': 'projectId', 'artifact:bytes': 'projectId'
 }
 
 /** Channels known to name no project (archive:list names several, in an array). Anything not here or in SCOPED is refused by the host. */
@@ -21,7 +22,8 @@ export const UNSCOPED = new Set([
   'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
   'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',
   'remote:hosts', 'remote:states', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
-  'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename'
+  'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename', 'remote:open-bytes',
+  'fs:browse', 'project:add-path'
 ])
 
 /** The project id a scoped call refers to; null when the channel is unscoped or the id is not a string. */

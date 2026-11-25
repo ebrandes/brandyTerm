@@ -5,7 +5,7 @@ import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { MAX_FILES, type Attachment } from '../shared/types.ts'
 import { inside } from './paths.ts'
-import { insideProjectFolder, projectDirName } from './attachment-scope.ts'
+import { MAX_ATTACHMENT, insideProjectFolder, projectDirName } from './attachment-scope.ts'
 import { registry } from './rpc/registry.ts'
 import { ruleOf } from './rpc/channels.ts'
 
@@ -15,7 +15,6 @@ import { ruleOf } from './rpc/channels.ts'
  * served to the renderer through the brandy-att:// scheme for thumbnails.
  */
 
-export const MAX_ATTACHMENT = 25 * 1024 * 1024
 const TEXT_EXT = new Set(
   '.txt .md .markdown .json .jsonc .yaml .yml .toml .ini .env .csv .tsv .xml .html .htm .css .scss .less .js .jsx .ts .tsx .mjs .cjs .py .rb .go .rs .java .kt .swift .c .h .cpp .hpp .cs .php .sh .zsh .bash .sql .graphql .vue .svelte .log .diff .patch'.split(
     ' '

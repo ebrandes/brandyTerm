@@ -114,7 +114,7 @@ function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message
           <span className="msg-author">{label}</span>
           <span className="msg-time">{time(m.time)}</span>
         </div>
-        {m.attachments?.length ? <MessageFiles items={m.attachments} /> : null}
+        {m.attachments?.length ? <MessageFiles items={m.attachments} projectId={project.id} /> : null}
         {m.text && (
           <div className={`bubble${m.isError ? ' msg-error' : ''}`}>
             <Rich text={m.text} projectId={project.demo || !project.path ? undefined : project.id} />

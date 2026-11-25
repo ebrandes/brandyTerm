@@ -7,7 +7,8 @@ import { killAll } from './adapters/proc.ts'
 import { closeSdkSessions } from './adapters/claude-sdk.ts'
 import { killAllTerminals, registerTerminalIpc } from './terminal.ts'
 import { ARTIFACT_SCHEME, registerArtifactIpc } from './artifact-ipc.ts'
-import { ATTACHMENT_SCHEME, registerAttachmentIpc } from './attachments.ts'
+import { registerRemoteCalls } from './remote/remote-calls.ts'
+import { ATTACHMENT_SCHEME, attachmentsRoot, registerAttachmentIpc } from './attachments.ts'
 import { registerFsIpc } from './fs-list.ts'
 import { Accounts } from './accounts.ts'
 import { registerAccountIpc } from './account-ipc.ts'
@@ -126,6 +127,7 @@ app.whenReady().then(async () => {
   registerTerminalIpc(projectRoot)
   registerFsIpc(projectRoot)
   registerArtifactIpc(projectRoot)
+  registerRemoteCalls({ engine, attachmentsRoot, rootOf: projectRoot })
   bindIpc(registry)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))

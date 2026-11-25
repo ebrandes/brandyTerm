@@ -19,6 +19,11 @@ export const RULES = {
   'attach:save': 'pass',
   'userPlugins:set': 'pass',
   'project:remove': 'pass',
+  // local disk only on the host: a remote client reaches these through their remote variants (remote-calls.ts)
+  'fs:browse': 'pass',
+  'project:add-path': 'pass',
+  'attach:read': 'pass',
+  'artifact:bytes': 'pass',
   // local-only: the remote variant arrives with the remote file/open work
   'project:open-folder': 'local-only',
   'attach:open': 'local-only',
@@ -52,10 +57,14 @@ export const RULES = {
   'remote:set-terminal': 'deny',
   'remote:discovered': 'deny',
   'remote:pair': 'deny',
-  'remote:rename': 'deny'
+  'remote:rename': 'deny',
+  'remote:open-bytes': 'deny'
 } as const satisfies Record<string, RemoteRule>
 
 export type Channel = keyof typeof RULES
+
+/** registered on the host but reached only through remote:call, so the preload never invokes them */
+export const REMOTE_ONLY: string[] = ['fs:browse', 'project:add-path', 'attach:read', 'artifact:bytes']
 
 export const EXPECTED_CHANNELS: string[] = Object.keys(RULES)
 

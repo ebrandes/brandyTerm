@@ -6,7 +6,7 @@ export interface BrandyApi {
   getState(): Promise<AppState>
   onState(cb: (s: AppState) => void): () => void
   /** opens the native folder picker; returns the new/existing project id or null */
-  openFolder(): Promise<string | null>
+  openFolder(machineId?: string): Promise<string | null>
   removeProject(projectId: string): Promise<void>
   /** saves app preferences (merged into the current ones) */
   setSettings(patch: Partial<AppSettings>): Promise<void>
@@ -14,7 +14,7 @@ export interface BrandyApi {
   /** stores a pasted/dropped/picked file for the project; images may carry the user's marks */
   saveAttachment(args: { projectId: string; name: string; mime: string; data: Uint8Array; marked?: boolean }): Promise<Attachment>
   /** opens a stored attachment with the system's default app */
-  openAttachment(path: string): Promise<void>
+  openAttachment(path: string, projectId?: string): Promise<void>
   /** a file of the project (relative path) for the artifact viewer */
   readArtifact(args: { projectId: string; path: string }): Promise<ArtifactContent>
   /** opens a project file in the system's default app */
@@ -37,7 +37,7 @@ export interface BrandyApi {
   stopProcess(args: { projectId: string; processId: string }): Promise<void>
   removeProcess(args: { projectId: string; processId: string }): Promise<void>
   /** opens http://localhost:PORT in the default browser */
-  openPort(port: number): Promise<void>
+  openPort(port: number, projectId?: string): Promise<void>
   /** installs an optional plugin through Claude's marketplace */
   installPlugin(args: { id: string; force?: boolean }): Promise<void>
   openPluginReport(id: string): Promise<void>
@@ -63,6 +63,8 @@ export interface BrandyApi {
     /** last state of each paired host (kept while offline) */
     states(): Promise<{ machineId: string; state: AppState }[]>
     call(args: { machineId: string; channel: string; arg: unknown }): Promise<unknown>
+    /** writes bytes a host sent to a temp folder and opens (or, if not a passive format, only reveals) them */
+    openBytes(args: { machineId: string; name: string; data: Uint8Array }): Promise<void>
     /** host side */
     openPairing(): Promise<string>
     closePairing(): Promise<void>

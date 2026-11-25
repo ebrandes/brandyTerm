@@ -4,9 +4,11 @@ import type { ArchivedThreadInfo } from '../../../shared/types.ts'
 import { REMOTE_TERMINAL } from '../../../shared/remote/messages.ts'
 import { createMergedState } from './merged-state.ts'
 import { remoteId, routeCall, splitIds } from './route.ts'
+import { createVariants } from './variants.ts'
 
-export function createRoutedApi(local: BrandyApi): BrandyApi {
+export function createRoutedApi(local: BrandyApi, openUrl: (url: string) => void = () => {}): BrandyApi {
   const state = createMergedState(local)
+  const variants = createVariants(local, openUrl)
 
   const via = <T>(channel: string, arg: unknown, run: (a: any) => Promise<T>): Promise<T> => {
     const r = routeCall(channel, arg)
@@ -39,7 +41,7 @@ export function createRoutedApi(local: BrandyApi): BrandyApi {
     send: a => via('chat:send', a, x => local.send(x)),
     saveAttachment: a => via('attach:save', a, x => local.saveAttachment(x)),
     readArtifact: a => via('artifact:read', a, x => local.readArtifact(x)),
-    openArtifact: a => via('artifact:open', a, x => local.openArtifact(x)),
+    ...variants,
     listCommands: id => via('commands:list', id, x => local.listCommands(x)),
     listFiles: a => via('fs:list', a, x => local.listFiles(x)),
     cancelThread: a => via('thread:cancel', a, x => local.cancelThread(x)),

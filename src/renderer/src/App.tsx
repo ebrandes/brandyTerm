@@ -12,6 +12,7 @@ import { ResizeHandle } from './components/ResizeHandle'
 import logo from './assets/logo.png'
 import { ArtifactViewer } from './components/ArtifactViewer'
 import { api } from './api'
+import { RemoteFolderHost } from './components/RemoteFolderHost'
 
 const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
 
@@ -99,8 +100,9 @@ export function App() {
     }
   }, [project, drafts, draftKey, thread?.id, pending, files])
 
-  const openFolder = async () => {
-    const id = await api.openFolder()
+  /** machineId: a folder of that paired machine (picker); none: this machine's own dialog */
+  const openFolder = async (machineId?: string) => {
+    const id = await api.openFolder(machineId)
     if (id) setActiveId(id)
   }
 
@@ -112,7 +114,7 @@ export function App() {
         <div className="empty-hero">
           <img className="hero-logo" src={logo} alt="BrandyTerm" draggable={false} />
           <p>Abra uma pasta para começar um projeto.</p>
-          <button className="primary" onClick={openFolder}>Abrir pasta</button>
+          <button className="primary" onClick={() => void openFolder()}>Abrir pasta</button>
         </div>
       </div>
     )
@@ -130,7 +132,7 @@ export function App() {
         activeId={project.id}
         lastSeen={state.settings?.lastSeen}
         onSelect={setActiveId}
-        onOpen={openFolder}
+        onOpen={() => void openFolder()}
         onRemove={setRemoving}
       />
       <Chat
@@ -194,6 +196,7 @@ export function App() {
         />
       )}
       <ArtifactViewer />
+      <RemoteFolderHost />
     </div>
   )
 }
