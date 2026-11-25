@@ -158,6 +158,8 @@ interface Role {
   start?: string
   /** Handles the peer's handshake text; returns session keys, an optional reply and the peer key. */
   onText(text: string): { keys: SessionKeys; reply?: string; peerPub: string }
+  /** runs as soon as the peer's hello verifies, before any later frame is read */
+  onReady?: () => void
 }
 
 function establish(sock: Socket, me: MachineInfo, timeoutMs: number, role: Role): Promise<SecureChannel> {
@@ -198,6 +200,7 @@ function establish(sock: Socket, me: MachineInfo, timeoutMs: number, role: Role)
       if (f.protocol !== PROTOCOL_VERSION) return fail('versão diferente')
       settled = true
       clearTimeout(timer)
+      try { role.onReady?.() } catch { /* the channel works without it */ }
       channel = new SecureChannel(sock, c, f.machine, peerPub)
       resolve(channel)
     }
@@ -238,9 +241,11 @@ export function connectChannel(
 }
 
 export function acceptChannel(
-  sock: Socket, own: KeyPair, trusted: (pub: Uint8Array) => boolean, me: MachineInfo, timeoutMs = 2000
+  sock: Socket, own: KeyPair, trusted: (pub: Uint8Array) => boolean, me: MachineInfo, timeoutMs = 2000,
+  onReady?: () => void
 ): Promise<SecureChannel> {
   return establish(sock, me, timeoutMs, {
+    onReady,
     onText(text) {
       const o = parseJson(text)
       if (typeof o.ie !== 'string' || typeof o.is !== 'string') throw new Error('formato')

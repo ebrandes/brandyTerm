@@ -128,3 +128,20 @@ test('text frame after the handshake closes the channel', async () => {
   await sleep(5)
   assert.deepEqual(reasons, ['quadro inválido'])
 })
+
+test('acceptChannel onReady runs once the hello verifies, and never for a refused peer', async () => {
+  const ready: string[] = []
+  const [a, b] = pair()
+  const ck = newKeyPair()
+  const sk = newKeyPair()
+  await Promise.all([
+    connectChannel(a, ck, sk.pub, clientInfo),
+    acceptChannel(b, sk, () => true, serverInfo, 2000, () => ready.push('ok'))
+  ])
+  assert.deepEqual(ready, ['ok'])
+  const [c, d] = pair()
+  const refused = acceptChannel(d, newKeyPair(), () => false, serverInfo, 2000, () => ready.push('bad'))
+  await assert.rejects(Promise.all([connectChannel(c, newKeyPair(), newKeyPair().pub, clientInfo), refused]))
+  await sleep(5)
+  assert.deepEqual(ready, ['ok'])
+})

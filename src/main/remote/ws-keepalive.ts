@@ -2,6 +2,14 @@
 import type { WebSocket } from 'ws'
 
 export const MAX_PAYLOAD = 36 * 1024 * 1024
+/** largest message before the handshake is done (pairing request, Hello1, sealed hello): a few KB */
+export const HANDSHAKE_MAX = 16 * 1024
+
+/** Lifts the message cap of a socket once its peer is authenticated (ws keeps it on the receiver). */
+export function raiseMaxPayload(ws: WebSocket, max: number = MAX_PAYLOAD): void {
+  const r = (ws as unknown as { _receiver?: { _maxPayload?: unknown } })._receiver
+  if (r && typeof r._maxPayload === 'number') r._maxPayload = max
+}
 export const PING_MS = 10_000
 export const PONG_MS = 10_000
 

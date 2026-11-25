@@ -18,7 +18,7 @@ import { adapterDescriptions, loadAdapterDescriptions } from './adapters.ts'
 import { acceptLan } from './lan.ts'
 import type { RemoteGuard } from './read-guard.ts'
 import type { TrustStore } from './trust.ts'
-import { keepAlive, MAX_PAYLOAD } from './ws-keepalive.ts'
+import { HANDSHAKE_MAX, keepAlive, raiseMaxPayload } from './ws-keepalive.ts'
 import { wsSocket } from './ws-socket.ts'
 
 export interface HostDeps {
@@ -68,7 +68,8 @@ export class HostServer extends EventEmitter {
   async start(port: number): Promise<void> {
     if (this.http) throw new Error('já iniciado')
     if (!this.deps.acceptAddress) await loadAdapterDescriptions()
-    const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD })
+    // a few KB until the device is authenticated (raiseMaxPayload): an unknown socket cannot make the host buffer MBs
+    const wss = new WebSocketServer({ noServer: true, maxPayload: HANDSHAKE_MAX })
     const srv = http.createServer((_req, res) => { res.writeHead(404).end() })
     // listening on 0.0.0.0: anything that did not come in on the LAN is cut before a byte of HTTP is read
     srv.on('connection', sock => this.screen(sock))
@@ -190,7 +191,8 @@ export class HostServer extends EventEmitter {
   private channel(ws: WebSocket, sock: Socket, idle: ReturnType<typeof setTimeout>): void {
     const trust = this.deps.trust
     clearTimeout(idle) // acceptChannel has its own handshake timeout
-    acceptChannel(sock, trust.ownKey(), pub => !!trust.get(toB64(pub), 'client'), this.deps.machine()).then(ch => {
+    const trusted = (pub: Uint8Array): boolean => !!trust.get(toB64(pub), 'client')
+    acceptChannel(sock, trust.ownKey(), trusted, this.deps.machine(), undefined, () => raiseMaxPayload(ws)).then(ch => {
       const entry: Live = { ch, since: new Date().toISOString() }
       // registered in the same tick as the handshake result: the host expects no pushes
       ch.serve((channel, arg) => this.dispatch(ch, channel, arg))
