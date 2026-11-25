@@ -56,7 +56,9 @@ test('a pong keeps the connection and schedules the next ping', () => {
 
 test('parseAddress accepts only a private ip:port', () => {
   assert.equal(parseAddress('192.168.1.5:7777'), '192.168.1.5:7777')
-  for (const a of ['example.com:80', '8.8.8.8:80', '100.64.0.1:80', '10.0.0.1', '10.0.0.1:0', '10.0.0.1:70000']) {
+  assert.equal(parseAddress('10.0.0.1:07000'), '10.0.0.1:7000')
+  assert.equal(parseAddress('10.0.0.0:7000'), '10.0.0.0:7000')
+  for (const a of ['example.com:80', '8.8.8.8:80', '100.64.0.1:80', '10.0.0.1', '10.0.0.1:0', '10.0.0.1:70000', '010.0.0.1:7000', '172.016.0.1:7000', '10.00.0.1:7000', '192.168.001.5:80', '10.0.0.1:0x10']) {
     assert.equal(parseAddress(a), null, a)
   }
 })

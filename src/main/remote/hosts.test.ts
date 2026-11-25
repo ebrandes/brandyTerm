@@ -271,3 +271,13 @@ test('an mDNS address is kept only after a handshake succeeds there', async () =
   await until(() => timers.items.length === 1 && host.dials >= 2)
   assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '10.0.0.5:7000' })
 })
+
+test('discovered() hides only machines trusted as hosts; a client-only machine still shows', () => {
+  let up: (h: DiscoveredHost) => void = () => {}
+  const browse: Browse = onUp => { up = onUp; return { stop() {} } }
+  const { hosts, trust } = rig({ trusted: false, browse })
+  trust.add({ pub: 'CLI', role: 'client', machineId: 'c9', name: 'Cel', os: 'mac' })
+  hosts.start()
+  up({ name: 'Cel', os: 'mac', address: '192.168.0.9:7000', machineId: 'c9' })
+  assert.deepEqual(hosts.discovered().map(d => d.machineId), ['c9'])
+})

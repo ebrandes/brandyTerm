@@ -7,11 +7,16 @@ import { wsSocket } from './ws-socket.ts'
 
 export const CONNECT_MS = 2000
 
-/** `ip:port` with a private IPv4 (the local network only), or null. */
+/** `ip:port` with a private IPv4 (the local network only), or null. Output is canonical (no leading zeros: ws would read them as octal). */
 export function parseAddress(address: string): string | null {
-  const m = /^([\d.]+):(\d{1,5})$/.exec(address)
-  if (!m || !isPrivateIPv4(m[1]) || +m[2] < 1 || +m[2] > 65535) return null
-  return `${m[1]}:${+m[2]}`
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$/.exec(address)
+  if (!m) return null
+  const octets = m.slice(1, 5)
+  if (octets.some(o => o.length > 1 && o.startsWith('0'))) return null
+  const ip = octets.map(Number).join('.')
+  const port = Number(m[5])
+  if (!isPrivateIPv4(ip) || port < 1 || port > 65535) return null
+  return `${ip}:${port}`
 }
 
 /** `address` is a private `ip:port`. Throws otherwise; a dead address fails within CONNECT_MS. */

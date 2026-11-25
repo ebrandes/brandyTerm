@@ -95,7 +95,7 @@ export class RemoteHosts extends EventEmitter {
 
   /** Hosts seen on the LAN that are not paired (and not this machine). */
   discovered(): DiscoveredHost[] {
-    const known = new Set(this.deps.trust.list().map(d => d.machineId))
+    const known = new Set(this.deps.trust.list('host').map(d => d.machineId))
     return [...this.seen.values()].filter(h => !known.has(h.machineId) && h.machineId !== this.me().id)
   }
 
