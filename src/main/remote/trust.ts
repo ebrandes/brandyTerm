@@ -1,0 +1,101 @@
+// Trusted devices + this machine's static key. Directory is injected so tests need no Electron.
+import { EventEmitter } from 'node:events'
+import fs from 'node:fs'
+import { join } from 'node:path'
+import { newKeyPair, toB64, fromB64, type KeyPair } from '../../shared/remote/crypto.ts'
+import type { MachineOs } from '../../shared/remote/machine.ts'
+
+export interface TrustedDevice {
+  pub: string
+  machineId: string
+  name: string
+  os: MachineOs | 'phone'
+  addedAt: string
+  lastSeen?: string
+  terminal: boolean
+}
+
+function writeAtomic(file: string, data: string, mode?: number): void {
+  const tmp = `${file}.${process.pid}.tmp`
+  fs.writeFileSync(tmp, data, mode === undefined ? undefined : { mode })
+  fs.renameSync(tmp, file)
+}
+
+export class TrustStore extends EventEmitter {
+  private readonly keyFile: string
+  private readonly trustFile: string
+  private key: KeyPair | null = null
+  private devices: TrustedDevice[]
+
+  constructor(dir: string) {
+    super()
+    fs.mkdirSync(dir, { recursive: true })
+    this.keyFile = join(dir, 'remote-key.json')
+    this.trustFile = join(dir, 'remote-trust.json')
+    this.devices = this.load()
+  }
+
+  private load(): TrustedDevice[] {
+    try {
+      const v = JSON.parse(fs.readFileSync(this.trustFile, 'utf8'))
+      return Array.isArray(v) ? v : []
+    } catch { return [] }
+  }
+
+  private save(): void {
+    writeAtomic(this.trustFile, JSON.stringify(this.devices, null, 2))
+    this.emit('change')
+  }
+
+  ownKey(): KeyPair {
+    if (this.key) return this.key
+    try {
+      const j = JSON.parse(fs.readFileSync(this.keyFile, 'utf8'))
+      const k = { pub: fromB64(j.pub), priv: fromB64(j.priv) }
+      if (k.pub.length === 32 && k.priv.length === 32) return (this.key = k)
+    } catch { /* missing or corrupt: generate */ }
+    const k = newKeyPair()
+    writeAtomic(this.keyFile, JSON.stringify({ pub: toB64(k.pub), priv: toB64(k.priv) }), 0o600)
+    return (this.key = k)
+  }
+
+  list(): TrustedDevice[] { return this.devices.map(d => ({ ...d })) }
+
+  get(pub: string): TrustedDevice | undefined {
+    const d = this.devices.find(x => x.pub === pub)
+    return d && { ...d }
+  }
+
+  add(d: Omit<TrustedDevice, 'addedAt' | 'terminal'>): TrustedDevice {
+    const prev = this.devices.find(x => x.pub === d.pub)
+    const next: TrustedDevice = {
+      pub: d.pub, machineId: d.machineId, name: d.name, os: d.os,
+      ...(d.lastSeen ? { lastSeen: d.lastSeen } : {}),
+      addedAt: prev?.addedAt ?? new Date().toISOString(),
+      terminal: prev?.terminal ?? false
+    }
+    this.devices = [...this.devices.filter(x => x.pub !== d.pub), next]
+    this.save()
+    return { ...next }
+  }
+
+  revoke(pub: string): void {
+    const n = this.devices.length
+    this.devices = this.devices.filter(x => x.pub !== pub)
+    if (this.devices.length !== n) this.save()
+  }
+
+  touch(pub: string, iso: string): void {
+    const d = this.devices.find(x => x.pub === pub)
+    if (!d) return
+    d.lastSeen = iso
+    this.save()
+  }
+
+  setTerminal(pub: string, on: boolean): void {
+    const d = this.devices.find(x => x.pub === pub)
+    if (!d || d.terminal === on) return
+    d.terminal = on
+    this.save()
+  }
+}

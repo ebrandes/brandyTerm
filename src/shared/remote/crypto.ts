@@ -20,13 +20,13 @@ function concat(...parts: Uint8Array[]): Uint8Array {
   return out
 }
 
-function toB64(b: Uint8Array): string {
+export function toB64(b: Uint8Array): string {
   let s = ''
   for (const x of b) s += String.fromCharCode(x)
   return btoa(s)
 }
 
-function fromB64(s: string): Uint8Array {
+export function fromB64(s: string): Uint8Array {
   const bin = atob(s)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
