@@ -14,7 +14,7 @@ import { ArtifactViewer } from './components/ArtifactViewer'
 import { api } from './api'
 import { Notice } from './components/Notice'
 import { useRemoteHosts } from './useRemoteHosts'
-import { groupProjects, showGroups } from './machine-groups'
+import { groupProjects, showGroups, showRemoteToggle } from './machine-groups'
 import { report } from './notice'
 import { RemoteFolderHost } from './components/RemoteFolderHost'
 
@@ -190,6 +190,7 @@ export function App() {
         allowAllThreads={!!state.settings?.allowAllThreads}
         keepAwake={state.settings?.keepAwake !== false}
         idleCompact={state.settings?.idleCompact?.enabled !== false}
+        showRemote={showRemoteToggle(state.settings?.remote?.enabled === true, groups)}
         selectedId={thread?.id}
         onSelect={(id) => setSelected((s) => ({ ...s, [project.id]: s[project.id] === id ? undefined : id }))}
         onCancel={(id) => void api.cancelThread({ projectId: project.id, threadId: id })}

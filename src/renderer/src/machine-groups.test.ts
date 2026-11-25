@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { clock, groupProjects, groupTitle, lastSeenLabel, offlineLabel, roleLabel, secondsLeft, showGroups } from './machine-groups.ts'
+import {
+  clock, groupProjects, groupTitle, lastSeenLabel, offlineLabel, roleLabel, secondsLeft, showGroups, showRemoteToggle
+} from './machine-groups.ts'
 import type { Project } from '../../shared/types.ts'
 import type { RemoteHostInfo } from '../../shared/remote/machine.ts'
 
@@ -64,4 +66,12 @@ test('lastSeenLabel', () => {
 test('roleLabel', () => {
   assert.equal(roleLabel('client'), 'Controla esta máquina')
   assert.equal(roleLabel('host'), 'Esta máquina controla')
+})
+
+test('"Disponível remotamente" shows once remote access is on or another machine is listed', () => {
+  const one = groupProjects([proj('a')], [], me)
+  const two = groupProjects([proj('a')], [{ machine: { id: 'm2', name: 'Outro', os: 'linux' }, online: false }], me)
+  assert.equal(showRemoteToggle(false, one), false, 'the feature off: nothing about it')
+  assert.equal(showRemoteToggle(true, one), true)
+  assert.equal(showRemoteToggle(false, two), true)
 })

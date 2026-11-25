@@ -54,6 +54,9 @@ export function groupProjects(projects: Project[], hosts: RemoteHostInfo[], me?:
 /** Headers only make sense once another machine is in the list. */
 export const showGroups = (groups: MachineGroup[]): boolean => groups.length > 1
 
+/** The overview's "Disponível remotamente": once remote access is on or another machine is listed (as the chip). */
+export const showRemoteToggle = (remoteEnabled: boolean, groups: MachineGroup[]): boolean => remoteEnabled || showGroups(groups)
+
 /** Whole seconds left of a pairing code that expires at `expiresAt` (ms). Never negative. */
 export const secondsLeft = (expiresAt: number, now: number): number => Math.max(0, Math.ceil((expiresAt - now) / 1000))
 

@@ -11,7 +11,8 @@ import './overview-footer.css'
 
 // what the switch really does: listing and the app's file calls, not what a visible project's coordinator can reach
 const REMOTE_TIP =
-  'Desligado: os computadores pareados não veem este projeto nem abrem arquivos dele pelo app. Se um projeto visível contém esta pasta, o coordenador e os comandos de lá ainda alcançam os arquivos'
+  'Desligado: os computadores pareados não veem este projeto nem abrem arquivos dele pelo app. ' +
+  'Se um projeto visível contém esta pasta, o coordenador e os comandos de lá ainda alcançam os arquivos'
 
 interface Props {
   project: Project
@@ -25,9 +26,12 @@ interface Props {
   keepAwake: boolean
   /** app setting: compact an idle coordinator's context */
   idleCompact: boolean
+  /** remote access is on or another machine is paired (showRemoteToggle) */
+  showRemote: boolean
 }
 
-export function Overview({ project, selectedId, onSelect, onCancel, onBoard, allowAllThreads, keepAwake, idleCompact }: Props) {
+export function Overview(props: Props) {
+  const { project, selectedId, onSelect, onCancel, onBoard, allowAllThreads, keepAwake, idleCompact, showRemote } = props
   const count = (s: Thread['state']) => project.threads.filter((t) => t.state === s).length
   const parts: string[] = []
   if (count('running')) parts.push(`${count('running')} em execução`)
@@ -88,7 +92,7 @@ export function Overview({ project, selectedId, onSelect, onCancel, onBoard, all
             <strong className={coordinatorWarn(coordCtx.used, coordCtx.limit) ? 'warn' : undefined}>{contextLabel(coordCtx)}</strong>
           </div>
         )}
-        {!project.machine?.remote && !project.demo && (
+        {showRemote && !project.machine?.remote && !project.demo && (
           <label className="overview-footer-row" title={REMOTE_TIP}>
             <span>Disponível remotamente</span>
             <input
