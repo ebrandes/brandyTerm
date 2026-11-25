@@ -66,3 +66,13 @@ test('creates missing directory', () => {
   new TrustStore(dir).ownKey()
   assert.ok(fs.existsSync(join(dir, 'remote-key.json')))
 })
+
+test('opening the store and listing creates no key: remote-key.json waits for the server or a pairing', () => {
+  const dir = tmp()
+  const s = new TrustStore(dir)
+  s.list()
+  s.get('x', 'client')
+  assert.equal(fs.existsSync(join(dir, 'remote-key.json')), false)
+  s.ownKey()
+  assert.equal(fs.existsSync(join(dir, 'remote-key.json')), true)
+})
