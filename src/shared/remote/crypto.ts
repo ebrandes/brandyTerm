@@ -105,9 +105,9 @@ export class FrameCipher {
     if (this.dead) throw new Error('channel closed after failure')
     try {
       if (sealed.length < 8 + 16) throw new Error('frame too short')
-      const ctr = sealed.slice(0, 8)
-      if (new DataView(ctr.buffer).getBigUint64(0) !== this.recvCtr) throw new Error('unexpected frame counter')
-      const plain = xchacha20poly1305(this.k.recv, nonceFor(ctr)).decrypt(sealed.slice(8))
+      const ctr = sealed.subarray(0, 8)
+      if (new DataView(sealed.buffer, sealed.byteOffset, sealed.byteLength).getBigUint64(0) !== this.recvCtr) throw new Error('unexpected frame counter')
+      const plain = xchacha20poly1305(this.k.recv, nonceFor(ctr)).decrypt(sealed.subarray(8))
       this.recvCtr++
       return plain
     } catch (err) {

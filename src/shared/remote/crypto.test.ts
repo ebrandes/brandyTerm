@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { newKeyPair, initiatorStart, responderReply, initiatorFinish, FrameCipher } from './crypto.ts'
-import type { SessionKeys } from './crypto.ts'
 
 const enc = (s: string) => new TextEncoder().encode(s)
 const dec = (b: Uint8Array) => new TextDecoder().decode(b)
@@ -81,7 +80,11 @@ test('cipher fails closed after a failure', () => {
   assert.throws(() => b.open(f0))
 })
 
-test('keys type is exported', () => {
-  const k: SessionKeys | null = null
-  assert.equal(k, null)
+test('open accepts views at a nonzero offset and Node Buffers', () => {
+  const [a, b] = pair()
+  const f = a.seal(enc('ola'))
+  const backing = new Uint8Array(f.length + 8)
+  backing.set(f, 8)
+  assert.equal(dec(b.open(new Uint8Array(backing.buffer, 8, f.length))), 'ola')
+  assert.equal(dec(b.open(Buffer.from(a.seal(enc('buf'))))), 'buf')
 })
