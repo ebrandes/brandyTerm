@@ -55,8 +55,8 @@ export function terminalFor(id: string): Entry {
   const entry: Entry = { term, fit, host, started: false, alive: false }
   term.onData((data) => {
     if (!entry.alive) {
-      // only project shells restart on Enter; other terminals belong to a flow (account login)
-      if (data === '\r' && !id.startsWith('account-')) void start(id)
+      // only project shells restart on Enter; other terminals belong to a flow (account or connector login)
+      if (data === '\r' && !id.startsWith('account-') && !id.startsWith('connector-')) void start(id)
       return
     }
     void api.term.write({ id, data })

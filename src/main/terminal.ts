@@ -33,7 +33,7 @@ interface PtyOpts {
   /** keep this width: resizes from the renderer are ignored */
   fixedCols?: boolean
   onData?: (data: string) => void
-  onExit?: () => void
+  onExit?: (exitCode: number) => void
 }
 
 /** drops unset variables (an `undefined` value would reach the child as the text "undefined") */
@@ -64,7 +64,7 @@ export function spawnPty(sender: WebContents, id: string, o: PtyOpts): void {
     if (ptys.get(id) === pty) to()?.send('term:data', { id, data })
   })
   pty.onExit(({ exitCode }) => {
-    o.onExit?.()
+    o.onExit?.(exitCode)
     // killed and replaced under the same id: the new one keeps its slot and its window
     if (ptys.has(id) && ptys.get(id) !== pty) return
     ptys.delete(id)
