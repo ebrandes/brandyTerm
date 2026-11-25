@@ -7,6 +7,7 @@ import { Board } from './components/Board'
 import { upload } from './attach'
 import { useDraftFiles } from './useDraftFiles'
 import { useResizablePanel } from './useResizablePanel'
+import { useLastSeen } from './useLastSeen'
 import { ResizeHandle } from './components/ResizeHandle'
 import logo from './assets/logo.png'
 import { ArtifactViewer } from './components/ArtifactViewer'
@@ -70,6 +71,7 @@ export function App() {
   useEffect(() => {
     if (project && project.id !== lastId) void window.brandy.setSettings({ lastProjectId: project.id })
   }, [project?.id, lastId])
+  useLastSeen(project?.id)
   activeRef.current = project && !project.demo ? project.id : null
   const threadId = project ? selected[project.id] : undefined
   const thread = project?.threads.find((t) => t.id === threadId)
@@ -125,6 +127,7 @@ export function App() {
         accounts={state.accounts}
         userPlugins={state.userPlugins}
         activeId={project.id}
+        lastSeen={state.settings?.lastSeen}
         onSelect={setActiveId}
         onOpen={openFolder}
         onRemove={setRemoving}

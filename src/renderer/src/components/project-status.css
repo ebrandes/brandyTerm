@@ -1,0 +1,24 @@
+/* sidebar project status (see shared/project-status.ts) */
+.pstatus-group { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.pstatus { flex: none; border-radius: 50%; }
+
+/* dots are warnings only. aguardando você: amber with a ring, the one asking for action */
+.pstatus-waiting { width: 8px; height: 8px; background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+
+/* novidades: small accent dot, gone once the project is opened */
+.pstatus-news { width: 6px; height: 6px; background: var(--accent); }
+
+/* executando: small spinner, not a dot; quiet muted color */
+.pstatus-spinner { display: inline-flex; color: var(--muted); }
+.pstatus-track { opacity: .3; }
+.pstatus-arc { stroke: var(--accent); transform-origin: 8px 8px; animation: pstatus-spin 1s linear infinite; }
+.pstatus-static { display: none; }
+@keyframes pstatus-spin { to { transform: rotate(360deg); } }
+
+/* reduced motion: static clock icon instead of the spinner */
+@media (prefers-reduced-motion: reduce) {
+  .pstatus-arc, .pstatus-track { display: none; }
+  .pstatus-static { display: inline; }
+  .pstatus-spinner svg { overflow: visible; }
+  .pstatus-spinner circle.pstatus-track { display: inline; opacity: .6; }
+}

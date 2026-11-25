@@ -214,6 +214,8 @@ export interface AppSettings {
   allowAllThreads?: boolean
   /** project selected when the app closed */
   lastProjectId?: string
+  /** projectId -> ISO time the user last had the project open (sidebar "novidades") */
+  lastSeen?: Record<string, string>
 }
 
 export interface AgentInfo {

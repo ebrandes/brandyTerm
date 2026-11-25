@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ChevronRight, Circle, CircleCheck, ListChecks, Loader2, MessageCircleQuestion, Paperclip, Sparkles, SquareTerminal, User } from 'lucide-react'
-import { AGENT_NAMES, EFFORT_LABEL, type AgentId, type Message, type Project, type Thread } from '../types'
+import { AGENT_NAMES, type AgentId, type Message, type Project, type Thread } from '../types'
 import { AgentBadge } from './AgentBadge'
 import { Rich } from './Rich'
 import { TerminalPanel } from './TerminalPanel'
@@ -10,7 +10,8 @@ import { MessageFiles } from './MessageFiles'
 import { ArtifactCards } from './ArtifactCards'
 import { filesForSummary } from '../artifacts'
 import { filesOf, type PendingFile } from '../attach'
-import { ThreadAttention, ThreadChips } from './ThreadAttention'
+import { ThreadAttention } from './ThreadAttention'
+import { ThreadMetaChips } from './ThreadMetaChips'
 
 interface Props {
   project: Project
@@ -275,24 +276,7 @@ export function Chat(props: Props) {
               <ArrowLeft size={13} /> Coordenador
             </button>
             <h1>{thread.title}</h1>
-            <div className="chips">
-              <span className="chip">
-                <AgentBadge agent={thread.agent} size="sm" /> {AGENT_NAMES[thread.agent]}
-                {thread.model ? ` ${thread.model}` : ''}
-              </span>
-              <span className="chip">{EFFORT_LABEL[thread.effort]}</span>
-              {thread.why && (
-                <span className="chip why" title={thread.why}>
-                  {thread.why}
-                </span>
-              )}
-              {thread.skill && (
-                <span className="chip" title="Skill que a thread carregou primeiro">
-                  skill {thread.skill}
-                </span>
-              )}
-              <ThreadChips t={thread} projectId={project.id} />
-            </div>
+            <ThreadMetaChips thread={thread} projectId={project.id} />
           </>
         ) : (
           <>

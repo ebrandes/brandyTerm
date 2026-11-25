@@ -1,0 +1,17 @@
+/* Collapsible chips under the thread title (ThreadMetaChips.tsx). Base .chips/.chip live in styles.css. */
+.meta-chips { align-items: center; }
+.meta-chips:not(.open) { flex-wrap: nowrap; }
+.meta-chips:not(.open) > .chip { flex-shrink: 0; white-space: nowrap; }
+/* on narrow panes the agent/model chip gives way; the alert and the toggle stay whole */
+.meta-chips:not(.open) > .chip:first-child { flex-shrink: 1; min-width: 0; overflow: hidden; }
+
+.meta-toggle {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  font-size: 12px; padding: 3px 8px; border-radius: 999px;
+  color: var(--faint); background: transparent; border: 1px solid transparent;
+}
+.meta-toggle:hover { color: var(--muted); border-color: var(--line); }
+.meta-toggle:focus-visible { outline: none; color: var(--muted); border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.meta-chevron { transition: transform .15s ease; }
+.meta-toggle[aria-expanded='true'] .meta-chevron { transform: rotate(180deg); }
+.meta-toggle[aria-expanded='true'] { color: var(--muted); }

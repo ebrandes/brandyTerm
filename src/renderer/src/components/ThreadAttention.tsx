@@ -60,6 +60,23 @@ export function ThreadAttention({ t, projectId }: { t: Thread; projectId: string
 /** true when the thread is blocked on the user (question or tool approval) */
 export const needsUser = (t: Thread) => t.state === 'waiting' || !!t.approval
 
+/** "Permitindo tudo" badge, with a button to go back to asking. Security alert: keep it visible. */
+export function AllowAllChip({ t, projectId }: { t: Thread; projectId: string }) {
+  return (
+    <span className="chip warn" title="Comandos e edições desta thread rodam sem perguntar">
+      <ShieldCheck size={12} /> Permitindo tudo
+      <button
+        className="chip-x"
+        onClick={() => void window.brandy.setAllowAll({ projectId, threadId: t.id, on: false })}
+        aria-label="Voltar a pedir aprovação nesta thread"
+        title="Voltar a pedir aprovação"
+      >
+        <X size={11} />
+      </button>
+    </span>
+  )
+}
+
 /** Header chips of a thread: "permitindo tudo" (with a way to turn it off) and context in use. */
 export function ThreadChips({ t, projectId }: { t: Thread; projectId: string }) {
   const ctx = t.context && t.context.used > 0 ? t.context : undefined
@@ -67,17 +84,7 @@ export function ThreadChips({ t, projectId }: { t: Thread; projectId: string }) 
   return (
     <>
       {t.allowAll ? (
-        <span className="chip warn" title="Comandos e edições desta thread rodam sem perguntar">
-          <ShieldCheck size={12} /> Permitindo tudo
-          <button
-            className="chip-x"
-            onClick={() => void window.brandy.setAllowAll({ projectId, threadId: t.id, on: false })}
-            aria-label="Voltar a pedir aprovação nesta thread"
-            title="Voltar a pedir aprovação"
-          >
-            <X size={11} />
-          </button>
-        </span>
+        <AllowAllChip t={t} projectId={projectId} />
       ) : (
         rules > 0 && (
           <span className="chip" title={(t.allow ?? []).map((r) => r.replace(/^Bash:/, '')).join(', ')}>

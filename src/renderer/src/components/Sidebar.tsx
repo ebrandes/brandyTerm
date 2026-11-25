@@ -3,6 +3,7 @@ import { Download, Folder, FolderPlus, Loader2, X } from 'lucide-react'
 import type { AccountsState, AgentInfo, PluginInfo, Project, UserPluginsState } from '../types'
 import { UserPluginsPanel } from './UserPluginsPanel'
 import { AccountsPanel } from './AccountsPanel'
+import { ProjectStatusDot } from './ProjectStatusDot'
 import logo from '../assets/logo.png'
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   accounts?: AccountsState
   userPlugins?: UserPluginsState
   activeId: string
+  /** projectId -> ISO time the project was last open */
+  lastSeen?: Record<string, string>
   onSelect: (id: string) => void
   onOpen: () => void
   onRemove: (id: string) => void
@@ -58,7 +61,7 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, agents, plugins, accounts, userPlugins, activeId, onSelect, onOpen, onRemove }: Props) {
+export function Sidebar({ projects, agents, plugins, accounts, userPlugins, activeId, lastSeen, onSelect, onOpen, onRemove }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
   return (
     <aside className="sidebar">
@@ -71,15 +74,13 @@ export function Sidebar({ projects, agents, plugins, accounts, userPlugins, acti
       </div>
       <nav className="project-list">
         {projects.map((p) => {
-          const running = p.busy || p.threads.some((t) => t.state === 'running')
-          const waiting = p.threads.some((t) => t.state === 'waiting' || !!t.approval)
           return (
             <div key={p.id} className={`project-item${p.id === activeId ? ' active' : ''}`}>
               <button className="project-main" onClick={() => onSelect(p.id)} title={p.path ?? 'Projeto de demonstração'}>
                 <Folder size={15} />
                 <span className="project-name">{p.name}</span>
                 {p.demo && <span className="tag">demo</span>}
-                {waiting ? <span className="dot dot-wait" title="Aguardando sua resposta" /> : running && <span className="dot dot-run" title="Em execução" />}
+                <ProjectStatusDot project={p} lastSeen={lastSeen?.[p.id]} selected={p.id === activeId} />
               </button>
               <button className="project-x" aria-label={`Remover ${p.name}`} title="Remover da lista" onClick={() => onRemove(p.id)}>
                 <X size={13} />

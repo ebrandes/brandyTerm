@@ -3,6 +3,7 @@
   --line: #26262f; --line-hi: #34343f; --text: #ececf2; --muted: #8d8d9c; --faint: #60606e;
   --accent: #8b7cf6; --accent-soft: rgba(139,124,246,.14); --accent-line: rgba(139,124,246,.45);
   --yellow: #e9b949; --green: #4cc38a; --red: #ef6a6a;
+  --amber: #f0a33a; --amber-soft: rgba(240,163,58,.2);
   --claude: #e8845a; --codex: #c7c9f2; --antigravity: #6fa8ff;
   font-family: 'Inter','Segoe UI Variable Text','Segoe UI',-apple-system,'SF Pro Text',system-ui,sans-serif;
   font-size: 14px; color-scheme: dark;
@@ -42,7 +43,6 @@ html[data-platform='win32'] .titlebar { right: 140px; }
 .project-x:hover { color: var(--text); }
 .tag { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 1px 6px; border-radius: 5px; background: var(--card-hi); color: var(--faint); }
 .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-.dot-run { background: var(--yellow); box-shadow: 0 0 0 3px rgba(233,185,73,.18); }
 .dot-ok { background: var(--green); }
 .dot-off { background: #444452; }
 .side-section { margin-top: 26px; padding: 0 10px; }
@@ -170,7 +170,6 @@ html[data-platform='win32'] .titlebar { right: 140px; }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
 
 /* waiting / ask */
-.dot-wait { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .st-waiting { color: var(--accent); }
 .ask { margin-top: 10px; border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; max-width: 620px; }
 .ask.answered { border-color: var(--line); background: var(--panel); opacity: .8; }
