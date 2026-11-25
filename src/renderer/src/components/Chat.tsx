@@ -1,16 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowUp, ChevronRight, Circle, CircleCheck, ImagePlus, ListChecks, Loader2, MessageCircleQuestion, Paperclip, Sparkles, User } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Circle, CircleCheck, ListChecks, Loader2, MessageCircleQuestion, Paperclip, Sparkles, SquareTerminal, User } from 'lucide-react'
 import { AGENT_NAMES, EFFORT_LABEL, type AgentId, type Message, type Project, type Thread } from '../types'
 import { AgentBadge } from './AgentBadge'
 import { Rich } from './Rich'
+import { TerminalPanel } from './TerminalPanel'
+import { ThreadChip } from './ThreadChip'
+import { Composer } from './Composer'
+import { MessageFiles } from './MessageFiles'
+import { filesOf, type PendingFile } from '../attach'
+import { ThreadAttention, ThreadChips } from './ThreadAttention'
 
 interface Props {
   project: Project
   thread?: Thread
   draft: string
   onDraft: (text: string) => void
+  files: PendingFile[]
+  onAddFiles: (files: File[]) => void
+  onRemoveFile: (key: string) => void
+  onMarked: (key: string, blob: Blob, marks: NonNullable<PendingFile['marks']>, original: Blob) => void
+  sending: boolean
+  sendError?: string
   onSend: () => void
   onBack: () => void
+  terminalOpen: boolean
+  onToggleTerminal: () => void
+  onOpenThread: (threadId: string) => void
 }
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -64,8 +79,14 @@ function AskCard({ project, ask }: { project: Project; ask: NonNullable<Message[
   )
 }
 
-function MessageView({ m, agent, inThread, project }: { m: Message; agent?: AgentId; inThread: boolean; project: Project }) {
-  if (m.author === 'system') return <div className={`notice${m.isError ? ' notice-error' : ''}`}>{m.text}</div>
+function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message; agent?: AgentId; inThread: boolean; project: Project; onOpenThread: (id: string) => void }) {
+  const linked = (m.threads ?? []).map((id) => project.threads.find((t) => t.id === id)).filter((t): t is Thread => !!t)
+  if (m.author === 'system')
+    return (
+      <div className={`notice${m.isError ? ' notice-error' : ''}`}>
+        <Rich text={m.text} />
+      </div>
+    )
   const label =
     m.author === 'user'
       ? 'Você'
@@ -77,16 +98,26 @@ function MessageView({ m, agent, inThread, project }: { m: Message; agent?: Agen
           ? AGENT_NAMES[agent]
           : 'Thread'
   return (
-    <div className="msg">
+    <div className={`msg${m.author === 'user' ? ' mine' : ''}`}>
       <Avatar m={m} agent={agent} />
       <div className="msg-body">
         <div className="msg-head">
           <span className="msg-author">{label}</span>
           <span className="msg-time">{time(m.time)}</span>
         </div>
-        <div className={m.isError ? 'msg-error' : ''}>
-          <Rich text={m.text} />
-        </div>
+        {m.attachments?.length ? <MessageFiles items={m.attachments} /> : null}
+        {m.text && (
+          <div className={`bubble${m.isError ? ' msg-error' : ''}`}>
+            <Rich text={m.text} projectId={project.demo || !project.path ? undefined : project.id} />
+          </div>
+        )}
+        {linked.length > 0 && (
+          <div className="thread-chips">
+            {linked.map((t) => (
+              <ThreadChip key={t.id} t={t} onOpen={onOpenThread} />
+            ))}
+          </div>
+        )}
         {m.ask && <AskCard project={project} ask={m.ask} />}
         {m.summaries && (
           <div className="summaries">
@@ -94,7 +125,15 @@ function MessageView({ m, agent, inThread, project }: { m: Message; agent?: Agen
               <ListChecks size={14} /> Resumos recebidos
             </div>
             {m.summaries.map((s) => (
-              <div className="summary" key={s.title}>
+              <div
+                className={`summary${s.threadId ? ' clickable' : ''}`}
+                key={s.title}
+                role={s.threadId ? 'button' : undefined}
+                tabIndex={s.threadId ? 0 : undefined}
+                onClick={() => s.threadId && onOpenThread(s.threadId)}
+                onKeyDown={(e) => s.threadId && (e.key === 'Enter' || e.key === ' ') && onOpenThread(s.threadId)}
+                title={s.threadId ? 'Abrir a thread' : undefined}
+              >
                 <AgentBadge agent={s.agent} />
                 <div>
                   <div className="summary-title">
@@ -164,7 +203,10 @@ function RunPanel({ t }: { t: Thread }) {
   )
 }
 
-export function Chat({ project, thread, draft, onDraft, onSend, onBack }: Props) {
+export function Chat(props: Props) {
+  const { project, thread, onBack, terminalOpen, onToggleTerminal, onOpenThread } = props
+  const canTerminal = !project.demo && !!project.path
+  const [dropping, setDropping] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
   const messages = thread ? thread.messages : project.messages
 
@@ -186,8 +228,39 @@ export function Chat({ project, thread, draft, onDraft, onSend, onBack }: Props)
   const target = thread ? `a thread “${thread.title}”` : `o coordenador do ${project.name}`
 
   return (
-    <main className="chat">
+    <main
+      className={`chat${dropping ? ' dropping' : ''}`}
+      onDragOver={(e) => {
+        if (![...e.dataTransfer.types].includes('Files')) return
+        e.preventDefault()
+        setDropping(true)
+      }}
+      onDragLeave={(e) => e.currentTarget === e.target && setDropping(false)}
+      onDrop={(e) => {
+        setDropping(false)
+        const f = filesOf(e.dataTransfer)
+        if (!f.length) return
+        e.preventDefault()
+        props.onAddFiles(f)
+      }}
+    >
+      {dropping && (
+        <div className="drop-hint" aria-hidden>
+          <Paperclip size={22} /> Solte para anexar
+        </div>
+      )}
       <header className="chat-header">
+        {canTerminal && (
+          <button
+            className={`icon-btn term-toggle${terminalOpen ? ' on' : ''}`}
+            onClick={onToggleTerminal}
+            aria-label={terminalOpen ? 'Esconder terminal' : 'Abrir terminal'}
+            aria-pressed={terminalOpen}
+            title={`Terminal na pasta do projeto (⌃\`)`}
+          >
+            <SquareTerminal size={17} />
+          </button>
+        )}
         {thread ? (
           <>
             <button className="back" onClick={onBack}>
@@ -200,12 +273,17 @@ export function Chat({ project, thread, draft, onDraft, onSend, onBack }: Props)
                 {thread.model ? ` ${thread.model}` : ''}
               </span>
               <span className="chip">{EFFORT_LABEL[thread.effort]}</span>
-              <span className="chip warn">somente leitura</span>
               {thread.why && (
                 <span className="chip why" title={thread.why}>
                   {thread.why}
                 </span>
               )}
+              {thread.skill && (
+                <span className="chip" title="Skill que a thread carregou primeiro">
+                  skill {thread.skill}
+                </span>
+              )}
+              <ThreadChips t={thread} projectId={project.id} />
             </div>
           </>
         ) : (
@@ -222,10 +300,11 @@ export function Chat({ project, thread, draft, onDraft, onSend, onBack }: Props)
         )}
         {messages.map((m, i) => (
           <div key={m.id} className="row">
-            <MessageView m={m} agent={thread?.agent} inThread={!!thread} project={project} />
+            <MessageView m={m} agent={thread?.agent} inThread={!!thread} project={project} onOpenThread={onOpenThread} />
             {thread && i === panelAt && <RunPanel t={thread} />}
           </div>
         ))}
+        {thread && <ThreadAttention t={thread} projectId={project.id} />}
         {!thread && project.busy && (
           <div className="working pad">
             <Loader2 size={14} className="spin" /> O coordenador está pensando…
@@ -234,29 +313,20 @@ export function Chat({ project, thread, draft, onDraft, onSend, onBack }: Props)
         <div ref={endRef} />
       </div>
 
-      <form
-        className="composer"
-        onSubmit={(e) => {
-          e.preventDefault()
-          onSend()
-        }}
-      >
-        <input
-          value={draft}
-          onChange={(e) => onDraft(e.target.value)}
-          placeholder={`Fale com ${target}...`}
-          aria-label={`Mensagem para ${target}`}
-        />
-        <button type="button" className="icon-btn" aria-label="Anexar arquivo" disabled title="Anexos chegam em breve">
-          <Paperclip size={16} />
-        </button>
-        <button type="button" className="icon-btn" aria-label="Anexar imagem" disabled title="Anexos chegam em breve">
-          <ImagePlus size={16} />
-        </button>
-        <button type="submit" className="send-btn" aria-label="Enviar" disabled={!draft.trim()}>
-          <ArrowUp size={17} />
-        </button>
-      </form>
+      <Composer
+        projectId={project.id}
+        target={target}
+        draft={props.draft}
+        onDraft={props.onDraft}
+        files={props.files}
+        onAddFiles={props.onAddFiles}
+        onRemoveFile={props.onRemoveFile}
+        onMarked={props.onMarked}
+        sending={props.sending}
+        error={props.sendError}
+        onSend={props.onSend}
+      />
+      {canTerminal && terminalOpen && <TerminalPanel projectId={project.id} path={project.path} onClose={onToggleTerminal} />}
     </main>
   )
 }

@@ -1,0 +1,5 @@
+.overview-footer { display: flex; flex-direction: column; gap: 2px; padding: 8px 4px 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--faint); }
+.overview-footer-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; white-space: nowrap; }
+.overview-footer-row > span { overflow: hidden; text-overflow: ellipsis; }
+.overview-footer strong { color: var(--muted); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.overview-footer strong.warn { color: var(--yellow); }

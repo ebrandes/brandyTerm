@@ -1,6 +1,12 @@
 import { execFile } from 'node:child_process'
 import type { AgentAdapter, AgentEvent, RunHandle, RunOpts } from './types.ts'
 import { resolveCli, spawnCli } from './proc.ts'
+import { attachmentText, claudeUserMessage } from '../attach-content.ts'
+import { LIMIT_RE, claudeAuth } from './auth.ts'
+import { claudeStream } from './claude-events.ts'
+import { runClaudeSdk } from './claude-sdk.ts'
+import { dirname } from 'node:path'
+import { readOnlyBashRules, rtkBin, rtkSettings } from '../rtk.ts'
 
 function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
@@ -10,14 +16,11 @@ function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
   })
 }
 
-function describeTool(name: string, input: Record<string, unknown> | undefined): string {
-  const arg = input?.file_path ?? input?.path ?? input?.pattern ?? input?.command ?? ''
-  return `${name} ${String(arg)}`.trim().slice(0, 140)
-}
+const SCAN_SETTINGS = JSON.stringify({ sandbox: { enabled: true, autoAllowBashIfSandboxed: true } })
 
 export const claudeAdapter: AgentAdapter = {
   id: 'claude',
-  models: ['haiku', 'sonnet', 'opus'],
+  models: ['haiku', 'sonnet', 'opus', 'fable'],
 
   async detect() {
     const cli = resolveCli('claude')
@@ -27,11 +30,14 @@ export const claudeAdapter: AgentAdapter = {
   },
 
   run(opts: RunOpts, onEvent: (e: AgentEvent) => void): RunHandle {
+    // threads (they may ask the user before a tool runs) and the kept-alive coordinator go through the Agent SDK
+    if (opts.tools === 'work' || opts.keepAlive) return runClaudeSdk(opts, onEvent)
     const cli = resolveCli('claude')
     if (!cli) {
       onEvent({ kind: 'done', ok: false, text: '', error: 'Claude CLI não encontrado' })
       return { done: Promise.resolve(), cancel() {} }
     }
+    const rtk = opts.tools === 'readonly' ? rtkBin() : null
     const args = [
       '-p',
       '--output-format',
@@ -40,32 +46,47 @@ export const claudeAdapter: AgentAdapter = {
       // skip the user's global hooks/plugins: they bloat context and change the output style
       '--setting-sources',
       'project',
-      '--tools',
-      opts.tools === 'none' ? '' : 'Read,Grep,Glob,TaskCreate,TaskUpdate,TaskList,TodoWrite',
+      // a scan runs claude-security's workflow and agents, so it keeps Claude Code's default tools
+      ...(opts.tools === 'scan' ? [] : ['--tools', opts.tools === 'none' ? '' : 'Read,Grep,Glob,Bash,Skill,TaskCreate,TaskUpdate,TaskList,TodoWrite']),
       // do not load the user's MCP connectors in headless runs: noise and tokens
       '--strict-mcp-config'
     ]
+    // Bash only for read-only commands (headless mode denies the rest), compressed by RTK when installed
+    // Skill loads plugin skills (superpowers…) on demand; without it threads cannot use them
+    if (opts.tools === 'readonly') args.push('--allowedTools', ['Skill', ...readOnlyBashRules(!!rtk)].join(','))
+    if (rtk) args.push('--settings', rtkSettings(rtk))
+    // scan: edits only inside its throwaway folder, every Bash call inside Claude Code's sandbox
+    if (opts.tools === 'scan') args.push('--permission-mode', 'acceptEdits', '--allowedTools', 'Workflow,Read,Glob,Grep', '--settings', SCAN_SETTINGS)
     if (opts.sessionId) args.push('--resume', opts.sessionId)
     if (opts.model) args.push('--model', opts.model)
     if (opts.effort) args.push('--effort', opts.effort)
     if (opts.schema) args.push('--json-schema', JSON.stringify(opts.schema))
     if (opts.autocompact) args.push('--autocompact', String(opts.autocompact))
     for (const dir of opts.plugins ?? []) args.push('--plugin-dir', dir)
+    const atts = opts.attachments ?? []
+    const prompt = opts.prompt + attachmentText(atts)
+    // images and PDFs travel as content blocks, which only the stream-json input carries
+    const blocks = atts.some((a) => a.kind === 'image' || a.kind === 'pdf')
+    if (blocks) args.push('--input-format', 'stream-json')
+    // threads may re-read an attachment by path
+    if (opts.tools === 'readonly') for (const d of new Set(atts.map((a) => dirname(a.path)))) args.push('--add-dir', d)
 
+    // the account is fixed for the whole run; a token account only changes this child's env
+    const account = claudeAuth().pick()
+    const env: NodeJS.ProcessEnv = { ...process.env, ...account.env }
+    if (account.env.CLAUDE_CODE_OAUTH_TOKEN === undefined) delete env.CLAUDE_CODE_OAUTH_TOKEN
     let finished = false
     const finish = (e: Extract<AgentEvent, { kind: 'done' }>) => {
       if (finished) return
       finished = true
-      onEvent(e)
+      const limited = !e.ok && e.error !== 'cancelado' && (stream.rejected || LIMIT_RE.test(e.error ?? ''))
+      onEvent({ ...e, limited, account: account.id })
     }
-    let lastText = ''
-    // Claude Code 2.1.x plans with TaskCreate/TaskUpdate; ids are sequential per session
-    const tasks: { text: string; status: 'pending' | 'in_progress' | 'completed' }[] = []
-    const emitTasks = () => onEvent({ kind: 'todos', items: tasks.map((t) => ({ ...t })) })
-
+    const stream = claudeStream(onEvent, account.id)
     const run = spawnCli(cli, args, {
       cwd: opts.cwd,
-      input: opts.prompt,
+      env,
+      input: blocks ? claudeUserMessage(prompt, atts) : prompt,
       onLine: (line) => {
         let ev: any
         try {
@@ -73,59 +94,16 @@ export const claudeAdapter: AgentAdapter = {
         } catch {
           return
         }
-        if (ev.session_id && (ev.type === 'system' || ev.type === 'result')) {
-          onEvent({ kind: 'session', sessionId: ev.session_id })
-        }
-        if (ev.type === 'assistant') {
-          for (const b of ev.message?.content ?? []) {
-            if (b.type === 'tool_use' && b.name === 'TaskCreate' && typeof b.input?.subject === 'string') {
-              tasks.push({ text: b.input.subject, status: 'pending' })
-              emitTasks()
-            } else if (b.type === 'tool_use' && b.name === 'TaskUpdate') {
-              const t = tasks[Number(b.input?.taskId) - 1]
-              const st = b.input?.status
-              if (t && (st === 'pending' || st === 'in_progress' || st === 'completed')) t.status = st
-              if (t && typeof b.input?.subject === 'string') t.text = b.input.subject
-              emitTasks()
-            } else if (b.type === 'tool_use' && b.name === 'TaskList') {
-              // read-only listing, nothing to show
-            } else if (b.type === 'tool_use' && b.name === 'TodoWrite' && Array.isArray(b.input?.todos)) {
-              onEvent({
-                kind: 'todos',
-                items: b.input.todos.map((t: any) => ({
-                  text: String(t.status === 'in_progress' && t.activeForm ? t.activeForm : t.content),
-                  status: t.status === 'completed' || t.status === 'in_progress' ? t.status : 'pending'
-                }))
-              })
-            } else if (b.type === 'tool_use') onEvent({ kind: 'activity', text: describeTool(b.name, b.input) })
-            else if (b.type === 'text' && b.text) lastText = b.text
-          }
-        } else if (ev.type === 'result') {
-          const u = ev.usage ?? {}
-          onEvent({
-            kind: 'usage',
-            input: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
-            output: u.output_tokens ?? 0,
-            cached: u.cache_read_input_tokens ?? 0,
-            costUsd: ev.total_cost_usd
-          })
-          const ok = ev.subtype === 'success' && !ev.is_error
-          finish({
-            kind: 'done',
-            ok,
-            text: typeof ev.result === 'string' && ev.result ? ev.result : lastText,
-            structured: ev.structured_output,
-            error: ok ? undefined : String(ev.result ?? ev.subtype ?? 'erro desconhecido')
-          })
-        }
+        const done = stream.handle(ev)
+        if (done) finish(done)
       }
     })
 
     return {
       cancel: run.cancel,
       done: run.done.then(({ code, stderr, cancelled }) => {
-        if (cancelled) finish({ kind: 'done', ok: false, text: lastText, error: 'cancelado' })
-        else finish({ kind: 'done', ok: false, text: lastText, error: stderr.trim() || `claude saiu com código ${code}` })
+        if (cancelled) finish({ kind: 'done', ok: false, text: stream.lastText, error: 'cancelado' })
+        else finish({ kind: 'done', ok: false, text: stream.lastText, error: stderr.trim() || `claude saiu com código ${code}` })
       })
     }
   }

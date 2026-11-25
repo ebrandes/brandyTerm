@@ -1,0 +1,15 @@
+.attn { margin: 10px 0 4px; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--panel, rgba(255, 255, 255, 0.03)); display: grid; gap: 10px; }
+.attn.approval { border-color: color-mix(in srgb, #ffc53d 55%, var(--line)); background: color-mix(in srgb, #ffc53d 7%, transparent); }
+.attn.pending { border-style: dashed; }
+.attn-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+.attn.approval .attn-head svg { color: #ffc53d; flex: none; }
+.attn-detail { margin: 0; max-height: 260px; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; background: rgba(0, 0, 0, 0.25); border-radius: 6px; padding: 8px 10px; }
+.attn-hint { color: var(--muted); font-size: 12.5px; }
+.attn-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.attn-actions button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: transparent; color: inherit; border-radius: 7px; padding: 6px 12px; font: inherit; font-size: 12.5px; cursor: pointer; }
+.attn-actions button:hover { background: rgba(255, 255, 255, 0.06); }
+.attn-actions button.primary { background: var(--accent, #7c5cff); border-color: transparent; color: #fff; }
+.attn-actions button.danger:hover { color: #ff7875; border-color: #ff7875; }
+
+.chip-x { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: -4px; border-radius: 999px; color: inherit; opacity: .7; }
+.chip-x:hover { opacity: 1; background: rgba(255,255,255,.08); }

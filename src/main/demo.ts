@@ -38,10 +38,10 @@ export function demoProjects(): Project[] {
       id: 'd3',
       author: 'coordinator',
       time: iso(10, 29),
-      text: 'As regras e os testes estão revisados. O Gemini ainda verifica a experiência de remarcação.'
+      text: 'As regras e os testes estão revisados. O Antigravity ainda verifica a experiência de remarcação.'
     }
   ]
-  const mk = (id: string, title: string, agent: 'claude' | 'codex' | 'gemini', effort: 'low' | 'medium', state: 'running' | 'done', note?: string) => ({
+  const mk = (id: string, title: string, agent: 'claude' | 'codex' | 'antigravity', effort: 'low' | 'medium', state: 'running' | 'done', note?: string) => ({
     id,
     requestId: 'demo',
     title,
@@ -61,7 +61,7 @@ export function demoProjects(): Project[] {
     // newest last: the overview lists newest first
     mk('dt3', 'Testes de conflito', 'codex', 'medium', 'done'),
     mk('dt2', 'Regras de agenda', 'claude', 'medium', 'done'),
-    mk('dt1', 'Remarcação', 'gemini', 'low', 'running', 'Verificando os avisos ao cliente.')
+    mk('dt1', 'Remarcação', 'antigravity', 'low', 'running', 'Verificando os avisos ao cliente.')
   ]
   return [ink, empty('demo-trainerclub', 'TrainerClub'), empty('demo-atlasfiscal', 'AtlasFiscal')]
 }

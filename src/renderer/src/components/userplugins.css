@@ -1,0 +1,18 @@
+/* "Do seu Claude Code": the user's plugins/skills that threads may load */
+.up-head { width: 100%; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; text-align: left; }
+.up-head h3 { margin-bottom: 0; }
+.up-count { margin-left: auto; font-size: 11px; color: var(--faint); }
+.up-chev { color: var(--faint); transition: transform .15s; }
+.up-chev.open { transform: rotate(90deg); }
+.up-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+.up-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.up-name { font-size: 13px; color: #cfcfda; display: flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.up-sub { font-size: 11px; color: var(--faint); }
+.up-tag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 9.5px; color: var(--muted); border: 1px solid var(--line-hi); border-radius: 5px; padding: 0 4px; }
+.up-tag.warn { color: var(--yellow); border-color: rgba(233,185,73,.4); }
+.up-toggle { flex: none; width: 28px; height: 16px; border-radius: 9px; background: var(--line-hi); position: relative; transition: background .15s; }
+.up-toggle span { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #9a9aa8; transition: transform .15s, background .15s; }
+.up-toggle.on { background: var(--accent); }
+.up-toggle.on span { transform: translateX(12px); background: #fff; }
+.up-toggle:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 2px; }
+.up-hint { font-size: 11px; color: var(--faint); line-height: 1.4; padding-top: 6px; }

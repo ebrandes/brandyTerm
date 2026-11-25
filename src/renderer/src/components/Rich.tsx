@@ -1,35 +1,38 @@
-import { Fragment } from 'react'
+import { memo, useMemo } from 'react'
+import Markdown, { type Components, type Options } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+import { InlineCode, PreBlock } from './CodeBlock'
+import remarkSoftBreaks from './remarkSoftBreaks'
+import './markdown.css'
 
-function inline(text: string) {
-  return text.split(/(`[^`\n]+`|\*\*[^*\n]+\*\*)/g).map((part, i) => {
-    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) return <code key={i}>{part.slice(1, -1)}</code>
-    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <strong key={i}>{part.slice(2, -2)}</strong>
-    return <Fragment key={i}>{part}</Fragment>
-  })
-}
+// Hoisted so every render reuses the same plugin lists. Raw HTML is never rendered
+// (no rehype-raw): react-markdown escapes it, which keeps agent output safe.
+const REMARK: Options['remarkPlugins'] = [remarkGfm, remarkSoftBreaks]
+const REHYPE: Options['rehypePlugins'] = [[rehypeHighlight, { detect: false, ignoreMissing: true }]]
 
-/** Tiny markdown subset: fenced code, inline code, bold, bullet lines. */
-export function Rich({ text }: { text: string }) {
-  const blocks = text.split(/```[^\n]*\n?/)
-  return (
-    <div className="rich">
-      {blocks.map((b, i) =>
-        i % 2 === 1 ? (
-          <pre key={i}>{b.replace(/\n$/, '')}</pre>
-        ) : (
-          b.split('\n').map((line, j) =>
-            /^\s*[-*] /.test(line) ? (
-              <div className="li" key={`${i}-${j}`}>
-                {inline(line.replace(/^\s*[-*] /, ''))}
-              </div>
-            ) : line.trim() === '' ? (
-              <div className="gap" key={`${i}-${j}`} />
-            ) : (
-              <p key={`${i}-${j}`}>{inline(line)}</p>
-            )
-          )
-        )
-      )}
+const STATIC: Components = {
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noreferrer" title={href}>
+      {children}
+    </a>
+  ),
+  code: ({ className, children }) => <InlineCode className={className}>{children}</InlineCode>,
+  table: ({ children }) => (
+    <div className="table-wrap">
+      <table>{children}</table>
     </div>
   )
 }
+
+/** Markdown for agent output: GFM (tables, task lists, links), soft line breaks, highlighted code, runnable shell blocks. */
+export const Rich = memo(function Rich({ text, projectId }: { text: string; projectId?: string }) {
+  const components = useMemo<Components>(() => ({ ...STATIC, pre: ({ children }) => <PreBlock projectId={projectId}>{children}</PreBlock> }), [projectId])
+  return (
+    <div className="rich">
+      <Markdown remarkPlugins={REMARK} rehypePlugins={REHYPE} components={components}>
+        {text}
+      </Markdown>
+    </div>
+  )
+})

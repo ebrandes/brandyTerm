@@ -1,0 +1,36 @@
+/* composer: attachments tray, slash menu, drop target; message attachments */
+.composer-wrap { position: relative; }
+.composer-error { color: var(--red); font-size: 12.5px; padding: 6px 4px 0; }
+
+.tray { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 2px 2px; }
+.tray-img { position: relative; }
+.tray-thumb { display: block; width: 96px; height: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line-hi); background: var(--card); position: relative; }
+.tray-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tray-mark { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 11px; padding: 3px 0; background: rgba(10,10,14,.72); color: var(--text); opacity: .0; transition: opacity .12s; }
+.tray-thumb:hover .tray-mark, .tray-thumb:focus-visible .tray-mark { opacity: 1; }
+.tray-x { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; background: var(--card-hi); border: 1px solid var(--line-hi); color: var(--muted); }
+.tray-x:hover { color: var(--text); background: var(--red); border-color: var(--red); }
+.tray-x.inline { position: static; margin-left: 2px; }
+.tray-file { display: inline-flex; align-items: center; gap: 7px; max-width: 260px; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line-hi); background: var(--card); color: var(--muted); font-size: 12.5px; }
+.tray-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tray-size { color: var(--faint); white-space: nowrap; }
+button.tray-file:hover { border-color: var(--accent-line); }
+
+.slash-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); max-height: 300px; overflow-y: auto; list-style: none; margin: 0; padding: 6px; background: var(--panel); border: 1px solid var(--line-hi); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.45); z-index: 20; }
+.slash-menu li { display: grid; grid-template-columns: 18px auto minmax(0,1fr) auto; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.slash-menu li.on { background: var(--accent-soft); }
+.slash-icon { color: var(--muted); display: grid; place-items: center; }
+.slash-menu li.on .slash-icon { color: var(--accent); }
+.slash-name { font-family: 'JetBrains Mono','Cascadia Code',Menlo,monospace; font-size: 12.5px; color: var(--text); white-space: nowrap; }
+.slash-desc { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.slash-src { color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+
+.chat.dropping { position: relative; }
+.drop-hint { position: absolute; inset: 10px; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 10px; border: 2px dashed var(--accent-line); border-radius: 16px; background: rgba(18,18,22,.82); color: var(--accent); font-size: 15px; pointer-events: none; }
+
+.msg-files { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.msg.mine .msg-files { justify-content: flex-end; }
+.msg-img { position: relative; display: block; max-width: 260px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line-hi); background: var(--card); }
+.msg-img img { display: block; max-width: 260px; max-height: 200px; object-fit: contain; }
+.msg-img:hover { border-color: var(--accent-line); }
+.msg-img-tag { position: absolute; left: 6px; bottom: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: rgba(10,10,14,.75); color: var(--text); }

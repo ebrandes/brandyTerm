@@ -1,52 +1,52 @@
-import { CircleAlert, CircleCheck, Clock3, Loader2, MessageCircleQuestion, Square } from 'lucide-react'
-import { AGENT_NAMES, EFFORT_LABEL, projectTokens, type Project, type Thread } from '../types'
-import { AgentBadge } from './AgentBadge'
+import { LayoutGrid } from 'lucide-react'
+import { projectTokens, type Project, type Thread } from '../types'
+import { ThreadCard } from './ThreadCard'
+import { ResolvedGroup } from './ResolvedGroup'
 import { ProcessPanel } from './ProcessPanel'
+import { contextLabel, formatTokens } from '../health'
+import { coordinatorLimit, coordinatorWarn, rotateAt } from '../../../shared/context-limit.ts'
+import './overview-footer.css'
 
-const STATE: Record<Thread['state'], { label: string; cls: string }> = {
-  running: { label: 'Em execução', cls: 'st-running' },
-  waiting: { label: 'Aguardando você', cls: 'st-waiting' },
-  done: { label: 'Concluída', cls: 'st-done' },
-  queued: { label: 'Em fila', cls: 'st-queued' },
-  failed: { label: 'Falhou', cls: 'st-failed' },
-  interrupted: { label: 'Interrompida', cls: 'st-failed' },
-  cancelled: { label: 'Cancelada', cls: 'st-queued' }
-}
-
-function StateIcon({ state }: { state: Thread['state'] }) {
-  if (state === 'running') return <Loader2 size={13} className="spin" />
-  if (state === 'done') return <CircleCheck size={13} />
-  if (state === 'waiting') return <MessageCircleQuestion size={13} />
-  if (state === 'failed' || state === 'interrupted') return <CircleAlert size={13} />
-  return <Clock3 size={13} />
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1).replace('.', ',')} mil`
-  return String(n)
-}
 
 interface Props {
   project: Project
   selectedId?: string
   onSelect: (id: string) => void
   onCancel: (id: string) => void
+  onBoard: () => void
+  /** app setting: new threads start with "permitir tudo" */
+  allowAllThreads: boolean
 }
 
-export function Overview({ project, selectedId, onSelect, onCancel }: Props) {
+export function Overview({ project, selectedId, onSelect, onCancel, onBoard, allowAllThreads }: Props) {
   const count = (s: Thread['state']) => project.threads.filter((t) => t.state === s).length
   const parts: string[] = []
   if (count('running')) parts.push(`${count('running')} em execução`)
-  if (count('waiting')) parts.push(`${count('waiting')} aguardando você`)
+  const asking = project.threads.filter((t) => t.state === 'waiting' || t.approval).length
+  if (asking) parts.push(`${asking} aguardando você`)
   if (count('queued')) parts.push(`${count('queued')} em fila`)
-  if (count('done')) parts.push(`${count('done')} ${count('done') === 1 ? 'concluída' : 'concluídas'}`)
+  const pending = project.threads.filter((t) => t.state === 'done' && t.pending).length
+  if (pending) parts.push(`${pending} ${pending === 1 ? 'pendente' : 'pendentes'}`)
+  const resolvedCount = project.threads.filter((t) => t.state === 'done' && !t.pending).length
+  if (resolvedCount) parts.push(`${resolvedCount} ${resolvedCount === 1 ? 'resolvida' : 'resolvidas'}`)
   const threads = [...project.threads].reverse()
-  const measured = project.coordinator.usage.measured || project.threads.some((t) => t.usage.measured)
+  // auto-resolve: finished threads with nothing pending fold away; pending ones stay in view
+  const resolved = threads.filter((t) => t.state === 'done' && t.resolved)
+  const active = threads.filter((t) => !(t.state === 'done' && t.resolved))
+  const saved = project.coordinator.context
+  // old saves carry the model's 1M window: the coordinator is held to its own ceiling
+  const coordCtx = saved && saved.used > 0 ? { used: saved.used, limit: coordinatorLimit(saved.limit) } : undefined
+  const measured = project.coordinator.usage.measured || !!project.archived?.usage.measured || project.threads.some((t) => t.usage.measured)
 
   return (
-    <aside className="overview">
+    <aside className="overview" id="overview">
       <header className="overview-header">
-        <h2>Visão do projeto</h2>
+        <div className="overview-title">
+          <h2>Visão do projeto</h2>
+          <button className="icon-btn" onClick={onBoard} aria-label="Abrir quadro dos agentes" title="Quadro dos agentes (⌘B)">
+            <LayoutGrid size={15} />
+          </button>
+        </div>
         <p>{parts.length ? parts.join(' · ') : 'Sem atividade'}</p>
       </header>
 
@@ -54,65 +54,39 @@ export function Overview({ project, selectedId, onSelect, onCancel }: Props) {
         {threads.length === 0 && (
           <p className="empty small">As threads criadas pelo coordenador aparecem aqui. Clique em uma para falar direto com ela.</p>
         )}
-        {threads.map((t) => {
-          const open = t.state === 'running' || t.state === 'queued' || t.state === 'waiting'
-          const todos = t.todos ?? []
-          const done = todos.filter((x) => x.status === 'completed').length
-          return (
-            <article
-              key={t.id}
-              className={`thread-card${t.id === selectedId ? ' selected' : ''}`}
-              onClick={() => !project.demo && onSelect(t.id)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && !project.demo && onSelect(t.id)}
-            >
-              <div className="thread-top">
-                <h3>{t.title}</h3>
-                <span className={`state ${STATE[t.state].cls}`}>
-                  <StateIcon state={t.state} />
-                  {STATE[t.state].label}
-                </span>
-              </div>
-              <div className="thread-meta">
-                <AgentBadge agent={t.agent} size="sm" />
-                <span>
-                  {AGENT_NAMES[t.agent]}
-                  {t.model ? ` ${t.model}` : ''} <span className="sep">·</span> {EFFORT_LABEL[t.effort]}
-                </span>
-                {todos.length > 0 && (
-                  <span className="progress">
-                    {done}/{todos.length}
-                  </span>
-                )}
-              </div>
-              {todos.length > 0 && open && (
-                <div className="bar">
-                  <i style={{ width: `${(done / todos.length) * 100}%` }} />
-                </div>
-              )}
-              {(t.note || t.summary) && <p className="thread-note">{open || t.state !== 'done' ? t.note : t.summary}</p>}
-              {open && !project.demo && (
-                <button
-                  className="cancel"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onCancel(t.id)
-                  }}
-                >
-                  <Square size={10} /> Cancelar
-                </button>
-              )}
-            </article>
-          )
-        })}
+        {active.length > 0 && (
+          <div className="tcard-grid">
+            {active.map((t) => (
+              <ThreadCard key={t.id} t={t} project={project} selected={t.id === selectedId} onSelect={onSelect} onCancel={onCancel} />
+            ))}
+          </div>
+        )}
+        {resolved.length > 0 && (
+          // key: remounts (and folds) the group whenever the user enters another project
+          <ResolvedGroup key={project.id} project={project} threads={resolved} selectedId={selectedId} onSelect={onSelect} onCancel={onCancel} />
+        )}
       </div>
 
       <ProcessPanel project={project} />
 
       <footer className="overview-footer">
-        <span>Tokens do projeto{measured ? '' : ' (sem medição)'}</span>
-        <strong>{formatTokens(projectTokens(project))}</strong>
+        {coordCtx && (
+          <div
+            className="overview-footer-row"
+            title={`Contexto do coordenador: sessão atual, limitada a ${formatTokens(coordCtx.limit)}. Ele troca de sessão sozinho a cada 20 mensagens ou ao passar de ${formatTokens(rotateAt(coordCtx.limit))}, e a memória do projeto carrega o que importa`}
+          >
+            <span>Contexto</span>
+            <strong className={coordinatorWarn(coordCtx.used, coordCtx.limit) ? 'warn' : undefined}>{contextLabel(coordCtx)}</strong>
+          </div>
+        )}
+        <label className="overview-footer-row" title="Threads novas (em qualquer projeto) já começam com permitir tudo: não pedem aprovação de comandos e edições. Fica salvo no app; as threads atuais seguem o que você escolher em cada uma">
+          <span>Threads novas: permitir tudo</span>
+          <input type="checkbox" checked={allowAllThreads} onChange={(e) => void window.brandy.setSettings({ allowAllThreads: e.target.checked })} />
+        </label>
+        <div className="overview-footer-row" title="Tokens gastos no projeto. Soma de tudo que o coordenador e as threads já gastaram neste projeto (entrada nova e saída; leitura de cache não conta)">
+          <span>Tokens do projeto{measured ? '' : ' (sem medição)'}</span>
+          <strong>{formatTokens(projectTokens(project))}</strong>
+        </div>
       </footer>
     </aside>
   )

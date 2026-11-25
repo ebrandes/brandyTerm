@@ -1,19 +1,52 @@
 {
   "name": "brandyterm",
   "version": "0.1.0",
-  "description": "BrandyTerm - coordinator workspace",
+  "description": "Desktop terminal for multi-agent orchestration of AI coding agents: run Claude Code and Codex side by side with a coordinator, kanban board and approvals. Built with Electron.",
+  "keywords": [
+    "ai-agents",
+    "ai-coding-agents",
+    "claude-code",
+    "codex",
+    "multi-agent",
+    "agent-orchestration",
+    "claude-agent-sdk",
+    "electron",
+    "desktop-terminal",
+    "kanban",
+    "react",
+    "typescript"
+  ],
+  "homepage": "https://github.com/ebrandes/brandyTerm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ebrandes/brandyTerm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ebrandes/brandyTerm/issues"
+  },
+  "license": "MIT",
   "main": "./out/main/index.js",
   "private": true,
   "scripts": {
+    "predev": "npm update @anthropic-ai/claude-agent-sdk --no-audit --no-fund --silent || true",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "postinstall": "node scripts/fetch-plugins.mjs",
+    "plugins": "node scripts/fetch-plugins.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "@lydell/node-pty": "^1.1.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
     "lucide-react": "^1.79.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

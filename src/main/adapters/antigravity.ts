@@ -2,23 +2,23 @@ import type { AgentAdapter, RunHandle } from './types.ts'
 import { resolveCli } from './proc.ts'
 
 /**
- * Gemini CLI headless is planned (spec section 6). Until the CLI is installed and its
+ * Antigravity CLI (`agy`) headless is planned (spec section 6). Until the CLI is installed and its
  * capabilities are captured, this adapter only reports availability and never runs.
  */
-export const geminiAdapter: AgentAdapter = {
-  id: 'gemini',
+export const antigravityAdapter: AgentAdapter = {
+  id: 'antigravity',
   models: [],
   async detect() {
-    const found = resolveCli('gemini')
+    const found = resolveCli('agy')
     return {
-      id: 'gemini',
-      name: 'Gemini',
+      id: 'antigravity',
+      name: 'Antigravity',
       installed: false,
       note: found ? 'detectado, adaptador ainda não implementado' : 'não instalado'
     }
   },
   run(_opts, onEvent): RunHandle {
-    onEvent({ kind: 'done', ok: false, text: '', error: 'Gemini ainda não está disponível' })
+    onEvent({ kind: 'done', ok: false, text: '', error: 'Antigravity ainda não está disponível' })
     return { done: Promise.resolve(), cancel() {} }
   }
 }
