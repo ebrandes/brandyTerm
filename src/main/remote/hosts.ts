@@ -43,6 +43,8 @@ export class RemoteHosts extends EventEmitter {
   private readonly deps: HostsDeps
   private readonly addresses: HostAddresses
   private readonly entries = new Map<string, Entry>()
+  /** last state each host pushed: kept while it is offline, dropped when it is unpaired. Not persisted. */
+  private readonly lastState = new Map<string, AppState>()
   private readonly seen = new Map<string, DiscoveredHost>()
   private readonly pairing = new Set<Socket>()
   private browser: BrowseHandle | null = null
@@ -91,6 +93,10 @@ export class RemoteHosts extends EventEmitter {
       address: e.address,
       ...(e.error ? { error: e.error } : {})
     }))
+  }
+
+  states(): { machineId: string; state: AppState }[] {
+    return [...this.lastState].map(([machineId, state]) => ({ machineId, state }))
   }
 
   /** Hosts seen on the LAN that are not paired (and not this machine). */
@@ -193,6 +199,7 @@ export class RemoteHosts extends EventEmitter {
     const e = this.entries.get(id)
     if (!e) return
     this.entries.delete(id)
+    this.lastState.delete(id)
     this.release(e)
   }
 
@@ -244,6 +251,7 @@ export class RemoteHosts extends EventEmitter {
     ch.serve(() => { throw new Error('sem handler') })
     ch.onPush((topic, payload) => {
       if (topic === 'state' && e.ch === ch && typeof payload === 'object' && payload !== null) {
+        this.lastState.set(id, payload as AppState)
         this.emit('state', { machineId: id, state: payload as AppState })
       }
     })

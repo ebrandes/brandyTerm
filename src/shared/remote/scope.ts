@@ -20,7 +20,7 @@ export const UNSCOPED = new Set([
   'project:open-folder', 'attach:open', 'process:open-port', 'clipboard:read', 'clipboard:write',
   'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
   'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',
-  'remote:hosts', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
+  'remote:hosts', 'remote:states', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
   'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename'
 ])
 

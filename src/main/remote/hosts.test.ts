@@ -281,3 +281,17 @@ test('discovered() hides only machines trusted as hosts; a client-only machine s
   up({ name: 'Cel', os: 'mac', address: '192.168.0.9:7000', machineId: 'c9' })
   assert.deepEqual(hosts.discovered().map(d => d.machineId), ['c9'])
 })
+
+test('states() caches the last push, keeps it offline and drops it on revoke', async () => {
+  const { hosts, host, trust } = rig()
+  hosts.start()
+  await until(() => online(hosts) && host.channels.length === 1)
+  host.channels[0].push('state', { projects: [{ id: 'p' }] })
+  await until(() => hosts.states().length === 1, 'cached')
+  assert.deepEqual(hosts.states()[0].machineId, 'h1')
+  host.channels[0].close('x')
+  await until(() => !online(hosts))
+  assert.equal(hosts.states().length, 1)
+  trust.revoke(trust.list()[0].pub)
+  assert.deepEqual(hosts.states(), [])
+})

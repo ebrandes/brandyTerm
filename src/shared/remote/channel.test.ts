@@ -377,3 +377,26 @@ test('decodeFrame validates shape', () => {
   assert.equal(decodeFrame('{"k":"hello","protocol":1,"machine":{"id":"a","name":"b","os":"bsd"}}'), null)
   assert.deepEqual(decodeFrame('{"k":"push","topic":"t","payload":1}'), { k: 'push', topic: 't', payload: 1 })
 })
+
+test('Uint8Array travels as binary at any depth; Buffer with a byteOffset too', async () => {
+  const { client, server } = await connected()
+  server.serve(async (_c, arg) => arg)
+  const buf = Buffer.from('xxhello', 'utf8').subarray(2)
+  assert.notEqual(buf.byteOffset, 0)
+  const out = await client.request('echo', { projectId: 'p', data: new Uint8Array([0, 1, 255]), deep: [{ b: buf }] }) as {
+    data: Uint8Array; deep: { b: Uint8Array }[]
+  }
+  assert.ok(out.data instanceof Uint8Array)
+  assert.deepEqual([...out.data], [0, 1, 255])
+  assert.equal(Buffer.from(out.deep[0].b).toString(), 'hello')
+  client.close()
+})
+
+test('a malformed $b64 tag is an invalid frame; a plain {"$b64": ...} string cannot smuggle bytes', async () => {
+  const { parseBinary } = await import('./binary.ts')
+  assert.throws(() => parseBinary('{"$b64":"@@@"}'))
+  assert.throws(() => parseBinary('{"$b64":5}'))
+  assert.throws(() => parseBinary('{"$b64":"AA==","x":1}'))
+  assert.equal(decodeFrame('{"k":"push","topic":"t","payload":{"$b64":"@@"}}'), null)
+  assert.deepEqual(parseBinary('{"a":"$b64"}'), { a: '$b64' })
+})

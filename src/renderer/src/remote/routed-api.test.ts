@@ -24,6 +24,7 @@ function fake(remoteCall: (c: Call) => Promise<unknown>) {
       hosts: async () => hosts,
       onHosts: (cb: (h: RemoteHostInfo[]) => void) => { listeners.hosts.push(cb); return () => {} },
       onState: (cb: (e: { machineId: string; state: AppState }) => void) => { listeners.rstate.push(cb); return () => {} },
+      states: async () => [] as { machineId: string; state: AppState }[],
       call: (c: Call) => { calls.push(c); return remoteCall(c) }
     }
   } as unknown as BrandyApi
@@ -70,4 +71,44 @@ test('onState is notified with the merged state on remote state and hosts events
   assert.deepEqual(seen.at(-1), ['p1', '@m1/p1'])
   f.listeners.hosts[0]([])
   assert.deepEqual(seen.at(-1), ['p1'])
+})
+
+test('remote terminal: open rejects, write/resize/kill are not routed anywhere', async () => {
+  const f = fake(async () => undefined)
+  const touched: string[] = []
+  ;(f.api.term as unknown as Record<string, unknown>) = {
+    open: async () => { touched.push('open'); return true }, write: async () => { touched.push('write') },
+    resize: async () => { touched.push('resize') }, kill: async () => { touched.push('kill') }
+  }
+  const api = createRoutedApi(f.api)
+  await assert.rejects(api.term.open({ id: '@m1/p1', cols: 1, rows: 1 }), /Terminal remoto chega numa próxima versão/)
+  await api.term.write({ id: '@m1/p1', data: 'x' })
+  await api.term.resize({ id: '@m1/p1', cols: 1, rows: 1 })
+  await api.term.kill('@m1/p1')
+  assert.deepEqual(touched, [])
+  assert.equal(f.calls.length, 0)
+  assert.equal(await api.term.open({ id: 'p1', cols: 1, rows: 1 }), true)
+  assert.deepEqual(touched, ['open'])
+})
+
+test('get() returns local plus the remote states main already holds, and drops hosts that vanish', async () => {
+  const f = fake(async () => undefined)
+  ;(f.api.remote as unknown as Record<string, unknown>).states = async () => [{ machineId: 'm1', state: { projects: [{ id: 'p9' }], agents: [], plugins: [] } }]
+  const api = createRoutedApi(f.api)
+  assert.deepEqual((await api.getState()).projects.map(p => p.id), ['p1', '@m1/p9'])
+  f.setHosts([])
+  f.listeners.hosts[0]([])
+  assert.deepEqual((await api.getState()).projects.map(p => p.id), ['p1'])
+})
+
+test('an older getState snapshot does not overwrite a newer onState', async () => {
+  const f = fake(async () => undefined)
+  let release!: () => void
+  f.api.getState = () => new Promise(r => { release = () => r({ projects: [{ id: 'old' }], agents: [], plugins: [] } as unknown as AppState) })
+  const api = createRoutedApi(f.api)
+  const p = api.getState()
+  await new Promise(r => setImmediate(r))
+  f.listeners.state[0]({ projects: [{ id: 'new' }], agents: [], plugins: [] } as unknown as AppState)
+  release()
+  assert.deepEqual((await p).projects.map(x => x.id), ['new'])
 })

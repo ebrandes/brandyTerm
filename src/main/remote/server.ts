@@ -179,6 +179,8 @@ export class HostServer extends EventEmitter {
       this.live.add(entry)
       ch.onClose(() => { this.live.delete(entry); this.emit('change') })
       trust.touch(ch.peerPub, entry.since)
+      // the client starts from the current state, not from the next change
+      ch.push('state', filterState(this.deps.state()))
       this.emit('change')
     }, () => ws.terminate())
   }

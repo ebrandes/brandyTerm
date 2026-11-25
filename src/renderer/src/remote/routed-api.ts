@@ -1,6 +1,7 @@
 // window.brandy as the renderer sees it: calls about a project go to the machine that owns it. No DOM/Electron.
 import type { BrandyApi } from '../../../shared/api.ts'
 import type { ArchivedThreadInfo } from '../../../shared/types.ts'
+import { REMOTE_TERMINAL } from '../../../shared/remote/messages.ts'
 import { createMergedState } from './merged-state.ts'
 import { remoteId, routeCall, splitIds } from './route.ts'
 
@@ -12,6 +13,8 @@ export function createRoutedApi(local: BrandyApi): BrandyApi {
     if (r.machineId === null) return run(arg)
     return local.remote.call({ machineId: r.machineId, channel, arg: r.arg }) as Promise<T>
   }
+
+  const isRemote = (channel: string, arg: unknown): boolean => routeCall(channel, arg).machineId !== null
 
   /** archive:list over several machines in parallel; an unreachable host adds nothing, a local failure still fails. */
   async function listArchived(ids: string[]): Promise<ArchivedThreadInfo[]> {
@@ -49,10 +52,11 @@ export function createRoutedApi(local: BrandyApi): BrandyApi {
     removeProcess: a => via('process:remove', a, x => local.removeProcess(x)),
     term: {
       ...local.term,
-      open: a => via('term:open', a, x => local.term.open(x)),
-      write: a => via('term:write', a, x => local.term.write(x)),
-      resize: a => via('term:resize', a, x => local.term.resize(x)),
-      kill: id => via('term:kill', id, x => local.term.kill(x))
+      // remote terminals arrive in phase 3: without output events they would be blind
+      open: a => isRemote('term:open', a) ? Promise.reject(new Error(REMOTE_TERMINAL)) : local.term.open(a),
+      write: async a => { if (!isRemote('term:write', a)) await local.term.write(a) },
+      resize: async a => { if (!isRemote('term:resize', a)) await local.term.resize(a) },
+      kill: async id => { if (!isRemote('term:kill', id)) await local.term.kill(id) }
     }
   }
 }

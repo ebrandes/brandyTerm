@@ -17,23 +17,39 @@ export function createMergedState(local: BrandyApi): MergedState {
 
   const merged = (): AppState =>
     mergeStates(localState as AppState, hosts.map(info => ({ info, state: remote.get(info.machine.id) })))
+  const setHosts = (h: RemoteHostInfo[]): void => {
+    hosts = h
+    const ids = new Set(h.map(x => x.machine.id))
+    for (const id of [...remote.keys()]) if (!ids.has(id)) remote.delete(id) // unpaired
+  }
+  let version = 0 // bumped by every local state event, so an older snapshot never overwrites it
   const emit = (): void => {
     if (!localState) return
     const s = merged()
     for (const cb of subs) cb(s)
   }
 
-  local.onState(s => { localState = s; emit() })
+  /** hosts and the states main already holds: a fresh renderer (or a host that has not pushed yet) still sees them */
+  async function seedRemote(): Promise<void> {
+    const [h, states] = await Promise.all([
+      local.remote.hosts().catch(() => hosts),
+      local.remote.states().catch(() => [])
+    ])
+    setHosts(h)
+    for (const e of states) if (!remote.has(e.machineId)) remote.set(e.machineId, e.state) // a push that arrived meanwhile is newer
+  }
+
+  local.onState(s => { version++; localState = s; emit() })
   local.remote.onState(e => { remote.set(e.machineId, e.state); emit() })
-  local.remote.onHosts(h => { hosts = h; emit() })
-  void local.remote.hosts().then(h => { hosts = h; emit() }, () => {})
+  local.remote.onHosts(h => { setHosts(h); emit() })
+  void seedRemote().then(emit)
 
   return {
     async get() {
-      const [s, h] = await Promise.all([local.getState(), local.remote.hosts().catch(() => hosts)])
-      localState = s
-      hosts = h
-      return merged()
+      const seen = version
+      const [s] = await Promise.all([local.getState(), seedRemote()])
+      if (version === seen) localState = s // an onState that arrived meanwhile is newer
+      return localState ? merged() : s
     },
     subscribe(cb) {
       subs.add(cb)

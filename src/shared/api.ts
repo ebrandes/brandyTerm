@@ -60,6 +60,8 @@ export interface BrandyApi {
     hosts(): Promise<RemoteHostInfo[]>
     onHosts(cb: (h: RemoteHostInfo[]) => void): () => void
     onState(cb: (e: { machineId: string; state: AppState }) => void): () => void
+    /** last state of each paired host (kept while offline) */
+    states(): Promise<{ machineId: string; state: AppState }[]>
     call(args: { machineId: string; channel: string; arg: unknown }): Promise<unknown>
     /** host side */
     openPairing(): Promise<string>

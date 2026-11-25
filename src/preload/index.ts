@@ -53,6 +53,7 @@ const api: BrandyApi = {
     hosts: () => ipcRenderer.invoke('remote:hosts'),
     onHosts: (cb) => listen('remote:hosts', cb),
     onState: (cb) => listen('remote:state', cb),
+    states: () => ipcRenderer.invoke('remote:states'),
     call: (a) => ipcRenderer.invoke('remote:call', a),
     openPairing: () => ipcRenderer.invoke('remote:open-pairing'),
     closePairing: () => ipcRenderer.invoke('remote:close-pairing'),

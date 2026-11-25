@@ -1,4 +1,5 @@
 // Wire frames exchanged over an encrypted session. Pure: no Node or Electron APIs.
+import { parseBinary } from './binary.ts'
 import type { MachineInfo } from './machine.ts'
 
 export const PROTOCOL_VERSION = 1
@@ -32,7 +33,7 @@ function machineOf(v: unknown): MachineInfo | null {
 
 export function decodeFrame(json: string): Frame | null {
   let v: unknown
-  try { v = JSON.parse(json) } catch { return null }
+  try { v = parseBinary(json) } catch { return null }
   if (!isObj(v)) return null
   switch (v.k) {
     case 'req':

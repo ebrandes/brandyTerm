@@ -1,4 +1,5 @@
 // Request/response/push channel over an encrypted session. Pure: works over any Socket.
+import { stringifyBinary } from './binary.ts'
 import {
   FrameCipher, fromB64, initiatorFinish, initiatorStart, responderReply, toB64,
   type Hello1, type Hello2, type KeyPair, type SessionKeys
@@ -15,7 +16,7 @@ function asBytes(data: unknown): Uint8Array | null {
 }
 
 const MAX_QUEUED = 256
-const encode = (f: Frame): Uint8Array => enc.encode(JSON.stringify(f))
+const encode = (f: Frame): Uint8Array => enc.encode(stringifyBinary(f))
 
 interface Pending { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
 

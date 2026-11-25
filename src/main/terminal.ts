@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { spawn, type IPty } from '@lydell/node-pty'
 import { registry } from './rpc/registry.ts'
+import { local } from './rpc/local-only-guard.ts'
 import { ruleOf } from './rpc/channels.ts'
 
 /**
@@ -85,14 +86,14 @@ function registerClipboardIpc(): void {
 
 export function registerTerminalIpc(cwdOf: (projectId: string) => string | null | undefined): void {
   registerClipboardIpc()
-  registry.add('term:open', (a: { id: string; cols: number; rows: number }, ctx) => {
+  registry.add('term:open', local((a: { id: string; cols: number; rows: number }, ctx) => {
     const cwd = cwdOf(String(a.id))
     if (!cwd) return false
     open(ctx.sender as WebContents, String(a.id), cwd, Number(a.cols) || 80, Number(a.rows) || 24)
     return true
-  }, ruleOf('term:open'))
-  registry.add('term:write', (a: { id: string; data: string }) => ptys.get(String(a.id))?.write(String(a.data)), ruleOf('term:write'))
-  registry.add('term:resize', (a: { id: string; cols: number; rows: number }) => {
+  }), ruleOf('term:open'))
+  registry.add('term:write', local((a: { id: string; data: string }) => ptys.get(String(a.id))?.write(String(a.data))), ruleOf('term:write'))
+  registry.add('term:resize', local((a: { id: string; cols: number; rows: number }) => {
     const cols = Math.max(Number(a.cols) || 0, 20)
     const rows = Math.max(Number(a.rows) || 0, 5)
     try {
@@ -101,8 +102,8 @@ export function registerTerminalIpc(cwdOf: (projectId: string) => string | null 
     } catch {
       // the shell may have just exited
     }
-  }, ruleOf('term:resize'))
-  registry.add('term:kill', (id: string) => killTerminal(String(id)), ruleOf('term:kill'))
+  }), ruleOf('term:resize'))
+  registry.add('term:kill', local((id: string) => killTerminal(String(id))), ruleOf('term:kill'))
 }
 
 export function killTerminal(id: string): void {

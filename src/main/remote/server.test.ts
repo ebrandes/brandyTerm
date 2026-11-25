@@ -139,8 +139,8 @@ test('state is pushed to connected clients, debounced', () => withHost(async e =
   await ch.request('state:get', undefined)
   e.bus.emit('change'); e.bus.emit('change'); e.bus.emit('change')
   await new Promise(r => setTimeout(r, 300))
-  assert.equal(pushes.length, 1)
-  assert.deepEqual((pushes[0] as AppState).projects.map(p => p.id), ['a'])
+  assert.equal(pushes.length, 2) // one on accept, one debounced for the three changes
+  assert.deepEqual((pushes[1] as AppState).projects.map(p => p.id), ['a'])
   ch.close()
 }))
 
@@ -251,8 +251,8 @@ test('hiding a project mid-session blocks it and drops it from the next push', (
   await assert.rejects(ch.request('chat:send', { projectId: ['a'] }), /^Error: Projeto não disponível remotamente$/)
   e.bus.emit('change')
   await new Promise(r => setTimeout(r, 300))
-  assert.equal(pushes.length, 1)
-  assert.deepEqual(pushes[0].projects, [])
+  assert.equal(pushes.length, 2) // accept + the change after hiding
+  assert.deepEqual(pushes[1].projects, [])
   ch.close()
 }))
 
@@ -278,4 +278,12 @@ test('stop closes channels and sockets', () => withHost(async e => {
   await e.host.stop()
   await done
   await wsClosed
+}))
+
+test('a client gets the filtered state pushed right after the channel is established', () => withHost(async e => {
+  const ch = await e.connect()
+  const pushed = await new Promise<AppState>(resolve => ch.onPush((topic, p) => { if (topic === 'state') resolve(p as AppState) }))
+  assert.deepEqual(pushed.projects.map(p => p.id), ['a'])
+  assert.ok(!JSON.stringify(pushed).includes('sk-ant-xyz'))
+  ch.close()
 }))

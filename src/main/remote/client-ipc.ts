@@ -36,6 +36,7 @@ export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHo
   const add = (ch: Parameters<typeof ruleOf>[0], fn: Parameters<typeof registry.add>[1]): void =>
     registry.add(ch, fn, ruleOf(ch))
   add('remote:hosts', () => hosts.list())
+  add('remote:states', () => hosts.states())
   add('remote:call', (a: { machineId: string; channel: string; arg: unknown }) =>
     hosts.call(String(a.machineId), String(a.channel), a.arg))
   add('remote:open-pairing', () => {

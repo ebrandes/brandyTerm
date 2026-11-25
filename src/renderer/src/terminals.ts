@@ -85,7 +85,14 @@ export async function start(id: string): Promise<void> {
   const e = terminalFor(id)
   if (e.started) return
   e.started = true
-  e.alive = await api.term.open({ id, cols: e.term.cols, rows: e.term.rows })
+  try {
+    e.alive = await api.term.open({ id, cols: e.term.cols, rows: e.term.rows })
+  } catch (err) {
+    e.started = false
+    e.alive = false
+    e.term.write(`\x1b[2m[${err instanceof Error ? err.message : String(err)}]\x1b[0m\r\n`)
+    return
+  }
   if (!e.alive) {
     e.started = false
     e.term.write('\x1b[2m[sem pasta de projeto para abrir o terminal]\x1b[0m\r\n')
