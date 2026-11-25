@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { sep } from 'node:path'
+import { resolve, sep } from 'node:path'
 import { machineDir, openDecision, safeName, targetPath } from './open-policy.ts'
 
 test('safeName keeps only a base name', () => {
@@ -34,7 +34,7 @@ test('safeName: the length cap cannot leave a reserved name behind', () => {
 })
 
 test('targetPath: a hostile machine id or name never leaves the base folder', () => {
-  const base = '/data/remote-open'
+  const base = resolve('/data/remote-open')
   for (const id of ['..', 'a/b', '..\\x', '../../..', '/etc', '']) {
     for (const name of ['f.png', '..', '../../x', '..\\..\\y']) {
       const p = targetPath(base, id, name)

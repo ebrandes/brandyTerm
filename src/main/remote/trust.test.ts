@@ -100,5 +100,6 @@ test('a corrupt key file is kept aside before a new key is made; a missing one i
   const kept = corrupt(dir, 'remote-key.json')
   assert.equal(kept.length, 1)
   assert.equal(fs.readFileSync(join(dir, kept[0]), 'utf8'), '{"pub":"AAAA","priv":"BBBB"}')
-  assert.equal(fs.statSync(join(dir, kept[0])).mode & 0o777, 0o600, 'the copy of a key stays private')
+  // Windows has no POSIX mode bits; the copy is private there through the user's profile folder.
+  if (process.platform !== 'win32') assert.equal(fs.statSync(join(dir, kept[0])).mode & 0o777, 0o600, 'the copy of a key stays private')
 })
