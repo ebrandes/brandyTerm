@@ -40,9 +40,22 @@ export function resolveRelative(fileDir: string, src: string): string | null {
     if (seg === '..') {
       if (!parts.length) return null
       parts.pop()
-    } else if (seg && seg !== '.') parts.push(decodeURIComponent(seg))
+    } else if (seg && seg !== '.') {
+      try {
+        parts.push(decodeURIComponent(seg))
+      } catch {
+        return null
+      }
+    }
   }
   return parts.join('/')
+}
+
+/** An image in a Markdown artifact: inside the project via brandy-art, web and data as they are, anything else blank. */
+export function markdownImageSrc(projectId: string, fileDir: string, src: string): string {
+  if (/^(https?:|data:)/i.test(src)) return src
+  const rel = resolveRelative(fileDir, src)
+  return rel ? artifactUrl(projectId, rel) : ''
 }
 
 /** A fenced block that no backtick run inside `text` can close early. */

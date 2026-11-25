@@ -10,7 +10,8 @@ let seq = 0
 function loadMermaid(): Promise<Mermaid> {
   loader ??= import('mermaid').then(({ default: m }) => {
     // strict: no click handlers or HTML labels; the SVG is sanitized before it is returned
-    m.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark', fontFamily: 'inherit' })
+    // suppressErrorRendering: a parse error would otherwise leave mermaid's error diagram in <body>
+    m.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true, theme: 'dark', fontFamily: 'inherit' })
     return m
   })
   return loader

@@ -61,9 +61,8 @@ export function removeProjectAttachments(projectId: string): void {
   rmSync(join(attachmentsRoot(), projectId.replace(/[^\w-]/g, '_')), { recursive: true, force: true })
 }
 
-export function registerAttachmentScheme(): void {
-  protocol.registerSchemesAsPrivileged([{ scheme: 'brandy-att', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
-}
+/** privileges of brandy-att://; registered with the other schemes in one call (index.ts) */
+export const ATTACHMENT_SCHEME = { scheme: 'brandy-att', privileges: { standard: true, secure: true, supportFetchAPI: true } }
 
 export function registerAttachmentIpc(): void {
   // brandy-att://file/<url-encoded absolute path>

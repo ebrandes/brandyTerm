@@ -17,7 +17,7 @@ export function ArtifactCards({ projectId, files }: { projectId: string; files: 
   const [gone, setGone] = useState<Set<string>>(() => new Set())
   if (!files.length) return null
   const open = async (path: string) => {
-    const c = await window.brandy.readArtifact({ projectId, path })
+    const c = await window.brandy.readArtifact({ projectId, path }).catch(() => ({ kind: 'missing' }) as const)
     if (c.kind === 'missing') setGone((g) => new Set(g).add(path))
     else showArtifact({ projectId, path })
   }

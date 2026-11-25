@@ -12,9 +12,8 @@ export const ARTIFACT_CSP = "default-src 'none'; img-src brandy-art: data:; styl
 
 type RootOf = (projectId: string) => string | null | undefined
 
-export function registerArtifactScheme(): void {
-  protocol.registerSchemesAsPrivileged([{ scheme: 'brandy-art', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
-}
+/** privileges of brandy-art://; registered with the other schemes in one call (index.ts) */
+export const ARTIFACT_SCHEME = { scheme: 'brandy-art', privileges: { standard: true, secure: true, supportFetchAPI: true } }
 
 /** `brandy-art://p/<projectId>/<path>` → [projectId, relative path] */
 function parse(url: string): [string, string] | null {

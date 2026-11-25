@@ -40,11 +40,16 @@ export function resolveInside(root: string, rel: string): string | null {
 export function readArtifact(root: string, rel: string): ArtifactContent {
   const abs = resolveInside(root, rel)
   if (!abs) return { kind: 'missing' }
-  const size = statSync(abs).size
-  if (size > MAX_ARTIFACT) return { kind: 'too-big', size }
-  const { kind, lang } = artifactKind(abs)
-  const text = readFileSync(abs, 'utf8')
-  return lang ? { kind, text, lang } : { kind, text }
+  try {
+    const size = statSync(abs).size
+    if (size > MAX_ARTIFACT) return { kind: 'too-big', size }
+    const { kind, lang } = artifactKind(abs)
+    const text = readFileSync(abs, 'utf8')
+    return lang ? { kind, text, lang } : { kind, text }
+  } catch {
+    // unreadable, or deleted between the check and the read
+    return { kind: 'missing' }
+  }
 }
 
 /** Content type with utf-8 for HTML/SVG, so pages without a <meta charset> keep their accents; null for anything else. */

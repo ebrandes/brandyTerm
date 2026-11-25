@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MAX_ARTIFACT, artifactKind, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
@@ -51,4 +51,15 @@ test('textContentType declares utf-8 for text artifacts served to the iframe', (
   assert.equal(textContentType('p.HTM'), 'text/html; charset=utf-8')
   assert.equal(textContentType('x.svg'), 'image/svg+xml; charset=utf-8')
   assert.equal(textContentType('x.png'), null)
+})
+
+test('readArtifact reads an unreadable file as missing instead of throwing', () => {
+  const { root } = fixture()
+  writeFileSync(join(root, 'locked.md'), 'x')
+  chmodSync(join(root, 'locked.md'), 0o000)
+  try {
+    assert.deepEqual(readArtifact(root, 'locked.md'), { kind: 'missing' })
+  } finally {
+    chmodSync(join(root, 'locked.md'), 0o644)
+  }
 })
