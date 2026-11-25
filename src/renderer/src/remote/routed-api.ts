@@ -6,7 +6,10 @@ import { createMergedState } from './merged-state.ts'
 import { remoteId, routeCall, splitIds } from './route.ts'
 import { createVariants } from './variants.ts'
 
-export function createRoutedApi(local: BrandyApi, openUrl: (url: string) => void = () => {}): BrandyApi {
+/** `onError`: failures the merged answer leaves out (an unreachable host's archived threads), for the Notice. */
+export function createRoutedApi(
+  local: BrandyApi, openUrl: (url: string) => void = () => {}, onError: (e: unknown) => void = () => {}
+): BrandyApi {
   const state = createMergedState(local)
   const variants = createVariants(local, openUrl)
 
@@ -18,7 +21,7 @@ export function createRoutedApi(local: BrandyApi, openUrl: (url: string) => void
 
   const isRemote = (channel: string, arg: unknown): boolean => routeCall(channel, arg).machineId !== null
 
-  /** archive:list over several machines in parallel; an unreachable host adds nothing, a local failure still fails. */
+  /** archive:list over several machines in parallel; an unreachable host adds nothing (reported), a local failure fails. */
   async function listArchived(ids: string[]): Promise<ArchivedThreadInfo[]> {
     const groups = [...splitIds(ids)]
     const parts = await Promise.all(groups.map(async ([machineId, list]) => {
@@ -26,7 +29,10 @@ export function createRoutedApi(local: BrandyApi, openUrl: (url: string) => void
       try {
         const r = (await local.remote.call({ machineId, channel: 'archive:list', arg: list })) as ArchivedThreadInfo[]
         return r.map(a => ({ ...a, projectId: remoteId(machineId, a.projectId) }))
-      } catch { return [] }
+      } catch (e) {
+        onError(e)
+        return []
+      }
     }))
     const all = parts.flat()
     return groups.length > 1 ? all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) : all

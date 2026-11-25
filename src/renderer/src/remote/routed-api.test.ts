@@ -39,10 +39,12 @@ test('listArchived splits ids, merges results, namespaces remote ids', async () 
   assert.deepEqual(out.map(a => a.projectId), ['@m1/p1', 'p1'])
 })
 
-test('listArchived: a failing host contributes nothing', async () => {
+test('listArchived: a failing host contributes nothing and is reported; the local list stays', async () => {
   const f = fake(async () => { throw new Error('m1 está offline') })
-  const out = await createRoutedApi(f.api).listArchived(['p1', '@m1/p1'])
+  const errors: unknown[] = []
+  const out = await createRoutedApi(f.api, () => {}, e => errors.push(e)).listArchived(['p1', '@m1/p1'])
   assert.deepEqual(out.map(a => a.projectId), ['p1'])
+  assert.deepEqual(errors.map(e => (e as Error).message), ['m1 está offline'])
 })
 
 test('a remote call goes through remote.call with the original id; local stays local', async () => {
