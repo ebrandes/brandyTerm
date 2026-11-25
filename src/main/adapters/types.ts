@@ -9,6 +9,8 @@ export interface ApprovalAsk {
   detail?: string
   /** path outside the allowed folders that triggered the request, if any */
   blockedPath?: string
+  /** a call to a connector tool (through the gateway): `id` is the connector id, `name` its label */
+  connector?: { id: string; name: string; tool: string }
   signal: AbortSignal
 }
 

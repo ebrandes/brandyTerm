@@ -1,4 +1,5 @@
 import type { MachineInfo, MachineOs } from './remote/machine.ts'
+import type { ConnectorsState, ThreadLogin } from './connectors.ts'
 export type AgentId = 'claude' | 'codex' | 'antigravity'
 export type ThreadState = 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'interrupted' | 'cancelled'
 export type Effort = 'low' | 'medium' | 'high'
@@ -79,7 +80,7 @@ export interface Todo {
   status: 'pending' | 'in_progress' | 'completed'
 }
 
-export type ApprovalDecision = 'allow' | 'deny' | 'always' | 'all'
+export type ApprovalDecision = 'allow' | 'deny' | 'always' | 'all' | 'forever'
 
 export interface ContextUse {
   used: number
@@ -95,6 +96,8 @@ export interface ToolApproval {
   detail?: string
   /** label of the "always" button: what it will allow from now on */
   always?: string
+  /** a connector call: the card shows the connector's name; "permitir tudo" does not cover it */
+  connector?: { name: string; tool: string }
   createdAt: string
 }
 
@@ -150,6 +153,8 @@ export interface Thread {
   allow?: string[]
   /** the user allowed every tool call in this thread */
   allowAll?: boolean
+  /** connector logins this thread waits on */
+  logins?: ThreadLogin[]
   /** last sign of life of the current run (any agent message); a long silence shows as "parada" */
   aliveAt?: string
   /** context window of the last call: tokens in use and the model's limit */
@@ -335,6 +340,7 @@ export interface AppState {
   userPlugins?: UserPluginsState
   settings?: AppSettings
   machine?: MachineInfo
+  connectors?: ConnectorsState
 }
 
 export const MAX_ACTIVE_THREADS = 2

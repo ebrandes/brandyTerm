@@ -45,7 +45,7 @@ export class Engine extends EventEmitter {
   private procs = new ProcessManager()
   private handles = new Map<string, RunHandle>()
   private chains = new Map<string, Promise<void>>()
-  private approvals = new ThreadApprovals(() => this.touch())
+  readonly approvals = new ThreadApprovals(() => this.touch())
 
   private store: JsonStore
 

@@ -69,13 +69,14 @@ export function commandHeads(command: string): string[] {
 }
 
 /** The rules an "always" answer adds for this call. */
-export function rulesFor(a: Pick<ApprovalAsk, 'tool' | 'input'>): string[] {
+export function rulesFor(a: Pick<ApprovalAsk, 'tool' | 'input' | 'connector'>): string[] {
+  if (a.connector) return [`Conector:${a.connector.id}:${a.connector.tool}`]
   if (a.tool === 'Bash') return commandHeads(String(a.input.command ?? '')).filter((h) => !FREE.has(h)).map((h) => `Bash:${h}`)
   return [EDITS.has(a.tool) ? 'Edits' : a.tool]
 }
 
 /** True when the rules already allowed cover this call. */
-export function covered(rules: readonly string[] | undefined, a: Pick<ApprovalAsk, 'tool' | 'input'>): boolean {
+export function covered(rules: readonly string[] | undefined, a: Pick<ApprovalAsk, 'tool' | 'input' | 'connector'>): boolean {
   if (!rules?.length) return false
   if (a.tool === 'Bash' && HIDDEN.test(String(a.input.command ?? ''))) return false
   const need = rulesFor(a).filter((r) => !FREE.has(r.replace(/^Bash:/, '')))
@@ -83,7 +84,8 @@ export function covered(rules: readonly string[] | undefined, a: Pick<ApprovalAs
 }
 
 /** How the "always" button reads for this call. */
-export function alwaysLabel(a: Pick<ApprovalAsk, 'tool' | 'input'>): string {
+export function alwaysLabel(a: Pick<ApprovalAsk, 'tool' | 'input' | 'connector'>): string {
+  if (a.connector) return 'Sempre nesta thread'
   if (a.tool !== 'Bash') return EDITS.has(a.tool) ? 'Sempre editar arquivos nesta thread' : `Sempre ${a.tool} nesta thread`
   const heads = commandHeads(String(a.input.command ?? '')).filter((h) => !FREE.has(h))
   return heads.length ? `Sempre ${heads.map((h) => `“${h}”`).join(', ')} nesta thread` : 'Sempre este comando nesta thread'

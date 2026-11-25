@@ -24,7 +24,7 @@ export class ThreadApprovals {
   }
 
   ask(t: Thread, a: ApprovalAsk): Promise<ApprovalDecision> {
-    if (t.allowAll || covered(t.allow, a)) return Promise.resolve('allow')
+    if ((t.allowAll && !a.connector) || covered(t.allow, a)) return Promise.resolve('allow')
     return new Promise((resolve) => {
       const id = randomUUID()
       const done = (d: ApprovalDecision) => {
@@ -34,7 +34,7 @@ export class ThreadApprovals {
         if (d === 'always') t.allow = [...new Set([...(t.allow ?? []), ...rulesFor(a)])]
         if (d === 'all') t.allowAll = true
         // calls already queued may be covered now
-        if (d === 'always' || d === 'all') for (const x of list.filter((x) => t.allowAll || covered(t.allow, x.ask))) x.done('allow')
+        if (d === 'always' || d === 'all') for (const x of list.filter((x) => (t.allowAll && !x.ask.connector) || covered(t.allow, x.ask))) x.done('allow')
         this.show(t)
         resolve(d)
       }
@@ -48,7 +48,16 @@ export class ThreadApprovals {
   }
 
   respond(t: Thread, id: string, d: ApprovalDecision): void {
-    this.queue.get(t.id)?.find((x) => x.id === id)?.done(d)
+    const x = this.queue.get(t.id)?.find((x) => x.id === id)
+    if (x?.ask.connector && d === 'all') {
+      // "permitir tudo" never covers a connector call: the card stays, the rest is released
+      t.allowAll = true
+      for (const y of (this.queue.get(t.id) ?? []).filter((y) => !y.ask.connector)) y.done('allow')
+      this.show(t)
+      return
+    }
+    // "Sempre" is for connector cards; other tools have no global store, so it stays per thread
+    x?.done(d === 'forever' && !x.ask.connector ? 'always' : d)
   }
 
   /** the run ended or was cancelled: deny what it was still waiting for (the thread's rules stay) */
@@ -64,6 +73,7 @@ export class ThreadApprovals {
           id: next.id,
           tool: next.ask.tool,
           summary: next.ask.summary,
+          connector: next.ask.connector && { name: next.ask.connector.name, tool: next.ask.connector.tool },
           detail: next.ask.detail,
           always: alwaysLabel(next.ask),
           createdAt: t.approval?.id === next.id ? t.approval.createdAt : new Date().toISOString()

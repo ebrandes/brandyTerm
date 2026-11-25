@@ -2,6 +2,7 @@ import { CircleCheck, CircleDot, ShieldCheck, ShieldQuestion, X } from 'lucide-r
 import type { ApprovalDecision, Thread } from '../types'
 import { contextLabel, contextShare } from '../health'
 import { api } from '../api'
+import { ruleLabel } from '../rule-label'
 import './attention.css'
 
 const TOOL_NAMES: Record<string, string> = {
@@ -19,10 +20,11 @@ export function ThreadAttention({ t, projectId }: { t: Thread; projectId: string
   if (a) {
     const answer = (decision: ApprovalDecision) => void api.approveTool({ projectId, threadId: t.id, id: a.id, decision })
     const head = a.always ?? (a.tool === 'Bash' ? 'Sempre este comando nesta thread' : 'Sempre nesta thread')
+    const conn = a.connector
     return (
       <div className="attn approval" role="alert">
         <div className="attn-head">
-          <ShieldQuestion size={15} /> A thread quer {TOOL_NAMES[a.tool] ?? `usar ${a.tool}`}
+          <ShieldQuestion size={15} /> {conn ? <>A thread quer usar o {conn.name}: {conn.tool}</> : <>A thread quer {TOOL_NAMES[a.tool] ?? `usar ${a.tool}`}</>}
         </div>
         {a.detail && <pre className="attn-detail">{a.detail}</pre>}
         <div className="attn-actions">
@@ -30,9 +32,15 @@ export function ThreadAttention({ t, projectId }: { t: Thread; projectId: string
             Permitir
           </button>
           <button onClick={() => answer('always')}>{head}</button>
-          <button onClick={() => answer('all')} title="Libera todos os comandos e edições desta thread, até você desligar no topo">
-            Permitir tudo nesta thread
-          </button>
+          {conn ? (
+            <button onClick={() => answer('forever')} title="Libera esta ferramenta do conector em todas as threads">
+              Sempre
+            </button>
+          ) : (
+            <button onClick={() => answer('all')} title="Libera todos os comandos e edições desta thread, até você desligar no topo">
+              Permitir tudo nesta thread
+            </button>
+          )}
           <button className="danger" onClick={() => answer('deny')}>
             Negar
           </button>
@@ -79,7 +87,7 @@ export function AllowAllChip({ t, projectId }: { t: Thread; projectId: string })
 }
 
 /** Header chips of a thread: "permitindo tudo" (with a way to turn it off) and context in use. */
-export function ThreadChips({ t, projectId }: { t: Thread; projectId: string }) {
+export function ThreadChips({ t, projectId, connectorNames }: { t: Thread; projectId: string; connectorNames?: Record<string, string> }) {
   const ctx = t.context && t.context.used > 0 ? t.context : undefined
   const rules = t.allow?.length ?? 0
   return (
@@ -88,7 +96,7 @@ export function ThreadChips({ t, projectId }: { t: Thread; projectId: string }) 
         <AllowAllChip t={t} projectId={projectId} />
       ) : (
         rules > 0 && (
-          <span className="chip" title={(t.allow ?? []).map((r) => r.replace(/^Bash:/, '')).join(', ')}>
+          <span className="chip" title={(t.allow ?? []).map((r) => ruleLabel(r, connectorNames)).join(', ')}>
             <ShieldCheck size={12} /> {rules} {rules === 1 ? 'permissão' : 'permissões'} salvas
           </span>
         )
