@@ -4,6 +4,7 @@ import { ADAPTERS } from './adapters/index.ts'
 import { addUsage, runOnce } from './run.ts'
 import { APP_COMMANDS, helpText } from './commands.ts'
 import type { Engine } from './engine.ts'
+import { compactCoordinator } from './compact.ts'
 
 /** `/clear`, `/compact`, `/help` here; any other command runs raw in a Claude thread, which expands it. */
 export function runSlash(e: Engine, p: Project, cmd: { name: string; args: string }, t: Thread | undefined, atts: Attachment[]): void {
@@ -41,12 +42,15 @@ export function runSlash(e: Engine, p: Project, cmd: { name: string; args: strin
   const agent = t ? t.agent : p.coordinator.agent
   if (!s.sessionId || !agent) return note('Nada para compactar ainda.')
   if (agent !== 'claude') return note('O Codex já compacta sozinho ao passar do limite de contexto.')
-  const work = async () => {
-    const r = await runOnce(ADAPTERS.claude, { cwd: p.path!, prompt: '/compact', sessionId: s.sessionId, tools: 'none' }).result
-    addUsage(s.usage, r.usage)
-    if (r.sessionId) s.sessionId = r.sessionId
-    note(r.done?.ok === false ? `Falha ao compactar: ${r.done.error ?? 'sem resposta'}` : 'Contexto compactado.', r.done?.ok === false)
+  if (t) {
+    // thread compaction: its own session, not the coordinator's
+    void (async () => {
+      const r = await runOnce(ADAPTERS.claude, { cwd: p.path!, prompt: '/compact', sessionId: s.sessionId, tools: 'none' }).result
+      addUsage(s.usage, r.usage)
+      if (r.sessionId) s.sessionId = r.sessionId
+      note(r.done?.ok === false ? `Falha ao compactar: ${r.done.error ?? 'sem resposta'}` : 'Contexto compactado.', r.done?.ok === false)
+    })()
+    return
   }
-  if (t) void work()
-  else e.enqueue(p, work)
+  e.enqueue(p, () => compactCoordinator(e, p))
 }

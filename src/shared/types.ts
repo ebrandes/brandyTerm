@@ -184,7 +184,7 @@ export interface Project {
   messages: Message[]
   threads: Thread[]
   /** turns: calls in the current session, which restarts every few dozen (the project memory carries over) */
-  coordinator: { agent?: AgentId; sessionId?: string; usage: Usage; turns?: number; context?: ContextUse }
+  coordinator: { agent?: AgentId; sessionId?: string; usage: Usage; turns?: number; context?: ContextUse; compactedAt?: string }
   /** coordinator call in flight */
   busy: boolean
   synthesized: string[]
@@ -208,6 +208,15 @@ export interface ArchivedThreadInfo {
   updatedAt: string
 }
 
+/** When an idle coordinator gets its context compacted. */
+export interface IdleCompactCfg {
+  enabled: boolean
+  /** idle minutes before compacting (inside the prompt cache window) */
+  minutes: number
+  /** context tokens below which there is nothing worth compacting */
+  minTokens: number
+}
+
 /** app-wide preferences, saved across restarts */
 export interface AppSettings {
   /** new threads (any project) start with "permitir tudo" on */
@@ -216,6 +225,10 @@ export interface AppSettings {
   lastProjectId?: string
   /** projectId -> ISO time the user last had the project open (sidebar "novidades") */
   lastSeen?: Record<string, string>
+  /** keep the machine awake while a thread or the coordinator works (default on) */
+  keepAwake?: boolean
+  /** compact an idle coordinator's context (default on) */
+  idleCompact?: IdleCompactCfg
 }
 
 export interface AgentInfo {

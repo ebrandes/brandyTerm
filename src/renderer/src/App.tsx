@@ -173,6 +173,8 @@ export function App() {
       <Overview
         project={project}
         allowAllThreads={!!state.settings?.allowAllThreads}
+        keepAwake={state.settings?.keepAwake !== false}
+        idleCompact={state.settings?.idleCompact?.enabled !== false}
         selectedId={thread?.id}
         onSelect={(id) => setSelected((s) => ({ ...s, [project.id]: s[project.id] === id ? undefined : id }))}
         onCancel={(id) => void window.brandy.cancelThread({ projectId: project.id, threadId: id })}

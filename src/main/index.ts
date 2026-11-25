@@ -17,6 +17,7 @@ import { archiveDirFor } from './archive.ts'
 import { setClaudeAuth } from './adapters/auth.ts'
 import { setUserPlugin, userPluginsState } from './user-plugins.ts'
 import { updateSettings } from './settings.ts'
+import { startBackground } from './background.ts'
 import type { AppSettings } from '../shared/types.ts'
 
 const isMac = process.platform === 'darwin'
@@ -29,6 +30,8 @@ function iconPath(): string | undefined {
 let engine: Engine
 let win: BrowserWindow | null = null
 let pushTimer: NodeJS.Timeout | null = null
+
+let stopBackground = (): void => {}
 
 function pushState(): void {
   if (pushTimer || !win || win.isDestroyed()) return
@@ -170,6 +173,7 @@ app.whenReady().then(async () => {
   engine.state.accounts = accounts.state
   registerAccountIpc(accounts)
   registerArchiveIpc(engine, archiveDirFor(stateFile))
+  stopBackground = startBackground(engine)
   ipcMain.handle('userPlugins:set', (_e, a: { id: string; on: boolean }) => {
     setUserPlugin(String(a.id), !!a.on)
     engine.state.userPlugins = userPluginsState()
@@ -194,6 +198,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('before-quit', () => {
+  stopBackground()
   engine?.shutdown()
   killAllTerminals()
   closeSdkSessions()
