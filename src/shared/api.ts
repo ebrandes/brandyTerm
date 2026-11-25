@@ -1,4 +1,4 @@
-import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustedDevice } from './remote/machine.ts'
+import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustRole, TrustedDevice } from './remote/machine.ts'
 import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, ArtifactContent, Attachment, FsEntry, SlashCommand } from './types.ts'
 
 export interface BrandyApi {
@@ -70,8 +70,10 @@ export interface BrandyApi {
     /** host side */
     openPairing(): Promise<string>
     closePairing(): Promise<void>
+    /** both directions: devices that control this machine (client) and machines it controls (host) */
     devices(): Promise<TrustedDevice[]>
-    revoke(pub: string): Promise<void>
+    /** forgets one pairing; a host also stops being dialed and its projects leave the sidebar */
+    revoke(args: { pub: string; role: TrustRole }): Promise<void>
     setTerminal(args: { pub: string; on: boolean }): Promise<void>
     /** client side: hosts seen by mDNS that are not paired yet */
     discovered(): Promise<DiscoveredHost[]>

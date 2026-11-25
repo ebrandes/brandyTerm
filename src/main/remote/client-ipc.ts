@@ -7,6 +7,7 @@ import type { Engine } from '../engine.ts'
 import { registry } from '../rpc/registry.ts'
 import { ruleOf } from '../rpc/channels.ts'
 import { browseMdns } from './browse.ts'
+import { deviceCalls } from './device-calls.ts'
 import { RemoteHosts } from './hosts.ts'
 import { loadIdentity, renameMachine } from './identity.ts'
 import type { Remote } from './index.ts'
@@ -64,8 +65,9 @@ export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHo
     return server.openPairing()
   })
   add('remote:close-pairing', () => { remote.server()?.closePairing() })
-  add('remote:devices', () => trust.list('client'))
-  add('remote:revoke', (pub: string) => trust.revoke(String(pub), 'client'))
+  const devices = deviceCalls(trust)
+  add('remote:devices', () => devices.devices())
+  add('remote:revoke', (a: unknown) => devices.revoke(a))
   add('remote:set-terminal', (a: { pub: string; on: boolean }) => trust.setTerminal(String(a.pub), !!a.on))
   add('remote:discovered', () => hosts.discovered())
   add('remote:discover', (on: boolean) => hosts.discover(!!on))

@@ -24,10 +24,10 @@ export function RemoteDevices() {
     }
   }, [])
 
-  const remove = async (pub: string) => {
+  const remove = async ({ pub, role }: TrustedDevice) => {
     try {
-      await api.remote.revoke(pub)
-      setDevices((d) => d.filter((x) => x.pub !== pub))
+      await api.remote.revoke({ pub, role })
+      setDevices((d) => d.filter((x) => !(x.pub === pub && x.role === role)))
     } catch (e) {
       report(e)
     }
@@ -39,18 +39,20 @@ export function RemoteDevices() {
       {failed && <p className="rp-error">Não foi possível ler os aparelhos pareados.</p>}
       {!failed && devices.length === 0 && <p className="rp-hint">Nenhum aparelho pareado.</p>}
       {devices.map((d) => (
-        <div key={d.pub} className="rp-device">
+        <div key={`${d.role}:${d.pub}`} className="rp-device">
           <div className="rp-device-main">
             <span className="rp-device-name">{d.name}</span>
             <span className="rp-device-sub">
               {roleLabel(d.role)} · {lastSeenLabel(d.lastSeen)}
             </span>
-            <label className="rp-check" title="Disponível numa próxima fase">
-              <input type="checkbox" checked={d.terminal} disabled />
-              Terminal remoto (em breve)
-            </label>
+            {d.role === 'client' && (
+              <label className="rp-check" title="Disponível numa próxima fase">
+                <input type="checkbox" checked={d.terminal} disabled />
+                Terminal remoto (em breve)
+              </label>
+            )}
           </div>
-          <button className="rp-link danger" onClick={() => void remove(d.pub)}>
+          <button className="rp-link danger" onClick={() => void remove(d)}>
             Remover
           </button>
         </div>
