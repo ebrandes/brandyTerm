@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ConnectorDraft, ConnectorSecrets } from '../../../shared/connectors.ts'
-import { validateCustom } from './custom-form.ts'
+import { validateCustom } from '../../../shared/custom-form.ts'
 
 type Pairs = { key: string; value: string }[]
 

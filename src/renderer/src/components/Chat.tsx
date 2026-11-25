@@ -321,7 +321,7 @@ export function Chat(props: Props) {
             <ArtifactCards projectId={project.id} files={thread.files} />
           </div>
         ) : null}
-        {thread && <ThreadAttention t={thread} projectId={project.id} />}
+        {thread && <ThreadAttention t={thread} projectId={project.id} machine={project.machine} />}
         {!thread && project.busy && (
           <div className="working pad">
             <Loader2 size={14} className="spin" /> O coordenador está pensando…

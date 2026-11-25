@@ -59,7 +59,9 @@ const api: BrandyApi = {
     test: (a) => ipcRenderer.invoke('connectors:test', a),
     login: (a) => ipcRenderer.invoke('connectors:login', a),
     loginCancel: (a) => ipcRenderer.invoke('connectors:login-cancel', a),
-    revokeAlways: (a) => ipcRenderer.invoke('connectors:revoke-always', a)
+    revokeAlways: (a) => ipcRenderer.invoke('connectors:revoke-always', a),
+    importList: () => ipcRenderer.invoke('connectors:import-list'),
+    import: (a) => ipcRenderer.invoke('connectors:import', a)
   },
   remote: {
     hosts: () => ipcRenderer.invoke('remote:hosts'),

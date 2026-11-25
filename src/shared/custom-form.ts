@@ -1,4 +1,4 @@
-// Validation of the "Personalizado" form. Pure.
+// Validation of a custom or imported connector, shared by the form (renderer) and main. Pure.
 export interface CustomDraft {
   name: string
   transport: 'stdio' | 'http'

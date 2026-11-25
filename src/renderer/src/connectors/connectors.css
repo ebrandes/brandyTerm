@@ -47,3 +47,5 @@
 .conn-preset:hover { border-color: var(--accent-line); }
 .conn-preset span { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
 .conn-modal .conn-actions button, .conn-modal .conn-pairs button { font-size: 13px; padding: 6px 14px; }
+.conn-import { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+.conn-import input { accent-color: var(--accent); }

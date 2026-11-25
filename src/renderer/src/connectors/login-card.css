@@ -1,0 +1,9 @@
+/* Login card (LoginCard.tsx). Base .attn and .attn-actions live in components/attention.css. */
+.login-card { border-color: color-mix(in srgb, var(--accent, #7c5cff) 55%, var(--line)); }
+.login-card .attn-head svg { color: var(--accent, #7c5cff); flex: none; }
+.login-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.login-field input { background: var(--bg); border: 1px solid var(--line-hi); border-radius: 7px; padding: 6px 8px; color: var(--text); font-size: 12.5px; min-width: 0; outline: 0; }
+.login-field input:focus { border-color: var(--accent-line); }
+.login-error { color: #e8845a; }
+.login-term { height: 220px; min-width: 0; border-radius: 8px; overflow: hidden; background: #0c0c10; }
+.login-term .term-host { height: 100%; width: 100%; padding: 4px; }

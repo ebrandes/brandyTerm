@@ -38,7 +38,7 @@ const custom = (over: Partial<ConnectorDraft> = {}): ConnectorDraft => ({
 test('every connectors channel is deny', () => {
   const { reg } = setup()
   const chans = reg.channels()
-  assert.equal(chans.length, 9)
+  assert.equal(chans.length, 11)
   for (const c of chans) assert.equal(reg.rule(c), 'deny')
 })
 
@@ -162,4 +162,10 @@ test('presets lists the shipped presets without secrets', async () => {
   const { call } = setup()
   const list = (await call('connectors:presets')) as { id: string }[]
   assert.ok(list.some(p => p.id === 'railway'))
+})
+
+test('a custom http connector with a non-https, non-localhost url is refused by main', async () => {
+  const { call, store } = setup()
+  await assert.rejects(call('connectors:add', { draft: custom({ transport: 'http', command: undefined, url: 'http://example.com/mcp' }) }), /Use uma URL https/)
+  assert.equal(store.list().length, 0)
 })

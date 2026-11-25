@@ -56,6 +56,8 @@ export const RULES = {
   'connectors:login': 'deny',
   'connectors:login-cancel': 'deny',
   'connectors:revoke-always': 'deny',
+  'connectors:import-list': 'deny',
+  'connectors:import': 'deny',
   'clipboard:read': 'deny',
   'clipboard:write': 'deny',
   // pairing and device management never run on behalf of a remote

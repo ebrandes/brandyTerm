@@ -92,6 +92,8 @@ export interface ImportCandidate {
   envKeys?: string[]
   headerKeys?: string[]
   source: string
+  /** why it cannot be imported (pt-BR) */
+  unsupported?: string
 }
 
 /** The subset of a host's connectors that crosses the remote filter. */

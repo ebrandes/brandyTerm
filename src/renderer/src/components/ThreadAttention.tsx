@@ -3,6 +3,8 @@ import type { ApprovalDecision, Thread } from '../types'
 import { contextLabel, contextShare } from '../health'
 import { api } from '../api'
 import { ruleLabel } from '../rule-label'
+import { LoginCard } from '../connectors/LoginCard'
+import type { Project } from '../types'
 import './attention.css'
 
 const TOOL_NAMES: Record<string, string> = {
@@ -14,8 +16,17 @@ const TOOL_NAMES: Record<string, string> = {
   WebSearch: 'pesquisar na web'
 }
 
-/** What a thread needs from the user right now: a tool to approve, or a pending item to close. */
-export function ThreadAttention({ t, projectId }: { t: Thread; projectId: string }) {
+/** What a thread needs from the user right now: a connector login, a tool to approve, or a pending item to close. */
+export function ThreadAttention({ t, projectId, machine }: { t: Thread; projectId: string; machine?: Project['machine'] }) {
+  return (
+    <>
+      {(t.logins ?? []).map((l) => <LoginCard key={l.connectorId} login={l} remote={machine?.remote === true} machineName={machine?.name} />)}
+      <Attention t={t} projectId={projectId} />
+    </>
+  )
+}
+
+function Attention({ t, projectId }: { t: Thread; projectId: string }) {
   const a = t.approval
   if (a) {
     const answer = (decision: ApprovalDecision) => void api.approveTool({ projectId, threadId: t.id, id: a.id, decision })

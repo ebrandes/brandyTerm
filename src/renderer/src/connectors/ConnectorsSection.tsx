@@ -6,6 +6,8 @@ import type { Project } from '../types'
 import { useRemoteHosts } from '../useRemoteHosts'
 import { AddConnectorDialog } from './AddConnectorDialog'
 import { ConnectorRow } from './ConnectorRow'
+import { ImportConnectors } from './ImportConnectors'
+import { LoginCard } from './LoginCard'
 import { onlyElsewhere } from './elsewhere'
 import { statusClass } from './status'
 import { useHostConnectors } from './useHostConnectors'
@@ -22,6 +24,7 @@ interface Props {
 /** Sidebar "Conectores". Install, configure, login and remove exist only for this machine's own connectors. */
 export function ConnectorsSection({ state, projects, viewing }: Props) {
   const [adding, setAdding] = useState<{ preset?: string } | null>(null)
+  const [importing, setImporting] = useState(false)
   const hosts = useHostConnectors(useRemoteHosts())
 
   if (viewing) {
@@ -50,6 +53,7 @@ export function ConnectorsSection({ state, projects, viewing }: Props) {
     <div className="side-section">
       <h3>Conectores</h3>
       {list.length === 0 && <p className="conn-hint">Nenhum conector. Adicione um para os agentes usarem serviços externos.</p>}
+      {(state?.logins ?? []).map((l) => <LoginCard key={l.connectorId} login={l} remote={false} />)}
       {list.map((c) => <ConnectorRow key={c.id} c={c} projects={projects} />)}
       {elsewhere.map((e) => (
         <div key={e.name} className="conn-else">
@@ -60,8 +64,9 @@ export function ConnectorsSection({ state, projects, viewing }: Props) {
       ))}
       <div className="conn-foot">
         <button onClick={() => setAdding({})}><Plus size={12} /> Adicionar</button>
-        <button disabled title="Em breve">Importar do Claude Code</button>
+        <button onClick={() => setImporting(true)}>Importar do Claude Code</button>
       </div>
+      {importing && <ImportConnectors onClose={() => setImporting(false)} />}
       {adding && <AddConnectorDialog initial={adding.preset} onClose={() => setAdding(null)} />}
     </div>
   )

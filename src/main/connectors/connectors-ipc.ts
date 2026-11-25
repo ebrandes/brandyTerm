@@ -5,6 +5,8 @@ import { registry, type Registry } from '../rpc/registry.ts'
 import type { ConnectorStore } from './store.ts'
 import type { SecretStore } from './secrets.ts'
 import { PRESETS, presetById } from './presets.ts'
+import { validateCustom } from '../../shared/custom-form.ts'
+import { registerImportIpc } from './import-ipc.ts'
 
 export interface ConnectorsIpcDeps {
   store: ConnectorStore
@@ -44,17 +46,16 @@ function build(a: { preset?: string; draft?: ConnectorDraft }, keys: { env: stri
     return { ...base, preset: id, ...user }
   }
   const name = str(d.name).trim()
-  if (!name) throw new Error('Informe o nome')
   const transport = d.transport === 'http' ? 'http' : 'stdio'
+  const problem = validateCustom({ name, transport, command: str(d.command), url: str(d.url) })
+  if (problem) throw new Error(problem)
   const envKeys = union(strList(d.envKeys), keys.env)
   const headerKeys = union(strList(d.headerKeys), keys.headers)
   const common = { name, description: str(d.description), ...user, ...(envKeys ? { envKeys } : {}), ...(headerKeys ? { headerKeys } : {}) }
   if (transport === 'stdio') {
-    if (!str(d.command).trim()) throw new Error('Informe o comando')
     if (d.trusted !== true) throw new Error('Confirme "Confio neste comando" antes de salvar')
     return { ...common, transport, command: str(d.command).trim(), args: strList(d.args) ?? [], auth: { kind: 'none' }, trusted: true }
   }
-  if (!str(d.url).trim()) throw new Error('Informe a URL')
   return { ...common, transport, url: str(d.url).trim(), auth: customAuth(d) }
 }
 
@@ -65,6 +66,7 @@ export function registerConnectorsIpc({ store, secrets, hub, login }: Connectors
     return c
   }
 
+  registerImportIpc({ store, secrets }, reg)
   reg.add('connectors:presets', () => PRESETS, ruleOf('connectors:presets'))
 
   reg.add('connectors:add', (a: { preset?: string; draft: ConnectorDraft; secrets?: ConnectorSecrets }) => {
