@@ -49,13 +49,22 @@ export class LoginBroker extends EventEmitter {
     this.deps = deps
   }
 
+  /**
+   * Whether to hold for a login before reaching the connector. OAuth is never asked here: it logs in on
+   * demand, when the connector refuses (a server that needs no auth just connects).
+   */
   async needsLogin(c: Connector): Promise<boolean> {
     const a = c.auth
-    if (a.kind === 'none') return false
+    if (a.kind === 'cli') return a.check ? (await this.deps.runners.check(a.check)) !== 0 : false
+    return this.needsLoginNow(c)
+  }
+
+  /** The part of needsLogin that runs no command: a token connector without its stored values. */
+  needsLoginNow(c: Connector): boolean {
+    const a = c.auth
+    if (a.kind !== 'token') return false
     const s = this.deps.secrets.get(c.id)
-    if (a.kind === 'oauth') return !s.oauth?.tokens
-    if (a.kind === 'token') return a.fields.some(f => ('header' in f.use ? !s.headers?.[f.use.header] : !s.env?.[f.use.env]))
-    return a.check ? (await this.deps.runners.check(a.check)) !== 0 : false
+    return a.fields.some(f => ('header' in f.use ? !s.headers?.[f.use.header] : !s.env?.[f.use.env]))
   }
 
   private card(c: Connector, panel: boolean): Card {
@@ -131,6 +140,7 @@ export class LoginBroker extends EventEmitter {
     }
     if (run.signal.aborted || this.cards.get(id) !== card) return
     card.backup = undefined
+    this.recordKeys(c)
     this.close(card)
     this.release(card, w => w.resolve())
   }
@@ -156,6 +166,21 @@ export class LoginBroker extends EventEmitter {
     }
     card.backup = Object.keys(prev).length ? prev : null
     this.deps.secrets.patch(c.id, { headers, env })
+  }
+
+  /** A token that worked: its header and env names (never values) go on the connector, so Configurar can replace them. */
+  private recordKeys(c: Connector): void {
+    if (c.auth.kind !== 'token') return
+    const now = this.deps.store.get(c.id)
+    if (!now) return
+    const add = (list: string[] | undefined, names: string[]): string[] | undefined => {
+      const all = [...new Set([...(list ?? []), ...names])]
+      return all.length ? all : undefined
+    }
+    const headerKeys = add(now.headerKeys, c.auth.fields.flatMap(f => ('header' in f.use ? [f.use.header] : [])))
+    const envKeys = add(now.envKeys, c.auth.fields.flatMap(f => ('env' in f.use ? [f.use.env] : [])))
+    if (String(headerKeys) === String(now.headerKeys) && String(envKeys) === String(now.envKeys)) return
+    this.deps.store.update(c.id, { headerKeys, envKeys })
   }
 
   cancel(id: string): void {

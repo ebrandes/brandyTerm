@@ -31,7 +31,7 @@ function setup(o: { holdMs?: number; oauth?: Runners['oauth']; cli?: Runners['cl
   }
   const hub = { test: o.test ?? (async () => { log.tests++; return 1 }), markLogin: (id: string) => { log.marked.push(id) } }
   const broker = new LoginBroker({ store, secrets, hub, runners, holdMs: o.holdMs })
-  return { broker, store, secrets, log, railway, github, linear, none }
+  return { broker, store, secrets, log, railway, github, linear, none, dir }
 }
 
 test('card waits for Entrar: phase ask, nothing runs', () => {
@@ -250,10 +250,45 @@ test('needsLogin per kind', async () => {
   assert.equal(await broker.needsLogin(github), true)
   secrets.set(github.id, { headers: { Authorization: 'Bearer z' } })
   assert.equal(await broker.needsLogin(github), false)
-  assert.equal(await broker.needsLogin(linear), true)
+  // oauth logs in on demand: only a login error from the connector shows its card
+  assert.equal(await broker.needsLogin(linear), false)
   secrets.set(linear.id, { oauth: { tokens: { access_token: 'a' } } })
   assert.equal(await broker.needsLogin(linear), false)
   assert.equal(await broker.needsLogin(railway), true)
+})
+
+test('needsLoginNow: only a token connector without its stored values, with no command run', () => {
+  let checks = 0
+  const { broker, secrets, github, linear, none, railway } = setup({ check: async () => { checks++; return 1 } })
+  assert.equal(broker.needsLoginNow(github), true)
+  secrets.set(github.id, { headers: { Authorization: 'Bearer z' } })
+  assert.equal(broker.needsLoginNow(github), false)
+  assert.equal(broker.needsLoginNow(linear), false)
+  assert.equal(broker.needsLoginNow(none), false)
+  assert.equal(broker.needsLoginNow(railway), false)
+  assert.equal(checks, 0)
+})
+
+test('a token login records the header and env names, never the values', async () => {
+  const { broker, store, dir, github } = setup()
+  const w = broker.require(github, { ...p, threadId: 't1' }, new AbortController().signal)
+  await broker.enter(github.id, { token: 'ghp_segredo' })
+  await w
+  assert.deepEqual(store.get(github.id)?.headerKeys, ['Authorization'])
+  assert.equal(store.get(github.id)?.envKeys, undefined)
+  assert.equal(fs.readFileSync(join(dir, 'c.json'), 'utf8').includes('ghp_segredo'), false)
+  const env = store.add({ name: 'Env', description: '', transport: 'stdio', command: 'x', enabled: true, envKeys: ['OTHER'], auth: { kind: 'token', fields: [{ key: 'k', label: 'Chave', use: { env: 'API_KEY' } }] } })
+  void broker.require(env, { ...p, threadId: 't1' }, new AbortController().signal)
+  await broker.enter(env.id, { k: 'v1' })
+  assert.deepEqual(store.get(env.id)?.envKeys, ['OTHER', 'API_KEY'])
+})
+
+test('a token login that fails records no names', async () => {
+  const { broker, store, github } = setup({ test: async () => { throw new Error('401') } })
+  void broker.require(github, { ...p, threadId: 't1' }, new AbortController().signal).catch(() => {})
+  await broker.enter(github.id, { token: 'ruim' })
+  assert.equal(store.get(github.id)?.headerKeys, undefined)
+  broker.cancel(github.id)
 })
 
 test('needsLogin for cli: a passing check means logged in; no check means not asking', async () => {

@@ -107,3 +107,29 @@ test('killAll signals every live client synchronously', async () => {
   hub.killAll()
   assert.deepEqual(kills.sort(), ['c1', 'c2'])
 })
+
+test('a login error drops the live client: the next use connects again with what the login saved', async () => {
+  let refuse = false
+  let connects = 0
+  let closes = 0
+  const factory: ClientFactory = async () => {
+    connects++
+    return {
+      tools: async () => [],
+      call: async () => { if (refuse) throw new ConnectorError('Precisa de login.', 'login'); return { content: [] } },
+      close: async () => { closes++ },
+      onClose: () => {},
+    }
+  }
+  const hub = new ConnectorHub({ factory, auth })
+  await hub.call(conn, 't', {})
+  refuse = true
+  await assert.rejects(hub.call(conn, 't', {}), (e: unknown) => e instanceof ConnectorError && e.kind === 'login')
+  assert.equal(hub.status('c1').status, 'precisa de login')
+  assert.equal(closes, 1)
+  refuse = false
+  await hub.call(conn, 't', {})
+  assert.equal(connects, 2)
+  assert.equal(hub.status('c1').status, 'conectado')
+  await hub.closeAll()
+})

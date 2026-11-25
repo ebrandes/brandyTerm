@@ -1,9 +1,9 @@
-// What the gateway's three tools do in main: list, tools and call, with login and approval holds.
+// What the gateway's three tools do in main: list, tools and call, with login and approval holds under one deadline.
 import type { Connector, ThreadRef } from '../../shared/connectors.ts'
 import type { ApprovalDecision, Project, Thread } from '../../shared/types.ts'
 import type { ApprovalAsk } from '../adapters/types.ts'
 import type { GwHandler } from './gateway-server.ts'
-import type { ConnectorHub } from './hub.ts'
+import { ConnectorError, LOGIN_NEEDED, type ConnectorHub } from './hub.ts'
 import type { LoginBroker } from './login.ts'
 import type { ConnectorStore } from './store.ts'
 import { HOLD_MS } from './login.ts'
@@ -75,6 +75,22 @@ export function createCalls(d: CallsDeps): GwHandler {
     }
   }
 
+  /**
+   * Runs `fn` on the connector as it is now. The first time in a request that the connector refuses its
+   * credentials, the login card shows (within the deadline) and `fn` runs once more; a second refusal fails.
+   */
+  async function withLogin<T>(c: Connector, ref: ThreadRef, dl: Deadline, retry: { used: boolean }, fn: (c: Connector) => Promise<T>): Promise<T> {
+    try {
+      return await fn(still(c))
+    } catch (e) {
+      if (!(e instanceof ConnectorError && e.kind === 'login')) throw e
+      if (retry.used) throw new Error(LOGIN_NEEDED)
+      retry.used = true
+      await d.login.require(still(c), ref, dl.signal)
+      return fn(still(c))
+    }
+  }
+
   return async (ref, req, signal) => {
     const found = d.findThread(ref)
     if (!found) throw new Error('Thread encerrada')
@@ -85,13 +101,17 @@ export function createCalls(d: CallsDeps): GwHandler {
     if (signal.aborted) throw new Error(CANCELLED)
     // login and approval share one deadline, from the moment the request got here
     const dl = startDeadline(signal, holdMs)
+    const retry = { used: false }
     try {
       if (await d.login.needsLogin(c)) await d.login.require(c, ref, dl.signal)
-      if (req.op === 'tools') return toolsText((await d.hub.tools(c)).map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema })))
+      // reach the connector first: a login it asks for comes before the approval card
+      const tools = await withLogin(c, ref, dl, retry, x => d.hub.tools(x))
+      if (req.op === 'tools') return toolsText(tools.map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema })))
+      if (signal.aborted) throw new Error(CANCELLED)
       await approve(still(c), t, req.tool!, req.args, dl)
       // a cancel that lands with Permitir still wins: the call never starts
       if (signal.aborted) throw new Error(CANCELLED)
-      const res = await d.hub.call(still(c), req.tool!, req.args, signal)
+      const res = await withLogin(c, ref, dl, retry, x => d.hub.call(x, req.tool!, req.args, signal))
       const text = resultText(res.content)
       if (res.isError) throw new Error(text)
       return text

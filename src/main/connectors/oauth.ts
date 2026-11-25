@@ -30,6 +30,7 @@ export function createOAuthProvider(id: string, secrets: SecretStore, redirectUr
     redirectToAuthorization: u => base.redirectToAuthorization(u),
     saveCodeVerifier: v => base.saveCodeVerifier(v),
     codeVerifier: () => base.codeVerifier(),
+    invalidateCredentials: scope => base.invalidateCredentials!(scope),
   }
 }
 

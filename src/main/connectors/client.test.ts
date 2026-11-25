@@ -1,7 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { resolve } from 'node:path'
-import { realFactory } from './client.ts'
+import { createServer } from 'node:http'
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
+import { connectorError, realFactory } from './client.ts'
+import { ConnectorError } from './hub.ts'
 import type { Connector } from '../../shared/connectors.ts'
 
 const echo: Connector = {
@@ -30,4 +34,26 @@ test('an in-flight call rejects with the stderr tail when the process crashes', 
 
 test('a missing command fails to start', async () => {
   await assert.rejects(realFactory({ ...echo, command: 'definitely-not-a-command-xyz' }, auth), /ENOENT/)
+})
+
+test('refused credentials mean a login: HTTP 401 and 403, and the SDK UnauthorizedError', () => {
+  for (const e of [new StreamableHTTPError(401, 'x'), new StreamableHTTPError(403, 'x'), new UnauthorizedError()]) {
+    const ce = connectorError(e)
+    assert.equal(ce.kind, 'login')
+    assert.equal(ce.message, 'Precisa de login.')
+  }
+  assert.equal(connectorError(new StreamableHTTPError(500, 'x')).kind, 'failed')
+  assert.equal(connectorError(new Error('boom')).message, 'boom')
+})
+
+test('a token connector the server answers with 401 fails as needs-login, not as an error', async () => {
+  for (const status of [401, 403]) {
+    const srv = createServer((req, res) => { req.resume(); res.statusCode = status; res.end('{}') })
+    await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+    try {
+      const url = `http://127.0.0.1:${(srv.address() as { port: number }).port}/mcp`
+      const c: Connector = { id: 'g', name: 'GitHub', description: '', transport: 'http', url, auth: { kind: 'token', fields: [] }, enabled: true, alwaysAllow: [] }
+      await assert.rejects(realFactory(c, { env: {}, headers: { Authorization: 'Bearer velho' } }), (e: unknown) => e instanceof ConnectorError && e.kind === 'login')
+    } finally { srv.close() }
+  }
 })

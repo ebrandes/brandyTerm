@@ -16,6 +16,7 @@ export function startDeadline(request: AbortSignal, ms: number): Deadline {
   const ctl = new AbortController()
   let late = false
   const timer = setTimeout(() => { late = true; ctl.abort() }, ms)
+  timer.unref?.()
   const onAbort = () => ctl.abort()
   if (request.aborted) ctl.abort()
   else request.addEventListener('abort', onAbort, { once: true })

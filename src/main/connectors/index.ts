@@ -17,6 +17,7 @@ import { makeRunners } from './connector-runners.ts'
 import { safeCipher } from './safe-cipher.ts'
 import { SecretStore } from './secrets.ts'
 import { ConnectorStore } from './store.ts'
+import { connectorView } from './view.ts'
 
 export interface ConnectorDeps {
   store: ConnectorStore
@@ -44,10 +45,7 @@ export async function startConnectors(d: {
   })
   const login = new LoginBroker({ store, secrets, hub, runners: makeRunners({ getWin: d.getWin, secrets }) })
 
-  const view = (c: Connector): ConnectorView => {
-    const { auth, ...rest } = c
-    return { ...rest, authKind: auth.kind, ...hub.status(c.id) }
-  }
+  const view = (c: Connector): ConnectorView => connectorView(c, hub, login)
   const sync = (): void => {
     engine.state.connectors = { list: store.list().map(view), logins: login.panelLogins() }
     for (const t of engine.state.projects.flatMap(p => p.threads)) {

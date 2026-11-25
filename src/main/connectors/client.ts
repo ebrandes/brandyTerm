@@ -2,15 +2,14 @@
 import os from 'node:os'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { Connector } from '../../shared/connectors.ts'
-import { ConnectorError, type AuthMaterial, type CallResult, type ClientFactory, type LiveClient, type ToolInfo } from './hub.ts'
+import { ConnectorError, LOGIN_NEEDED, type AuthMaterial, type CallResult, type ClientFactory, type LiveClient, type ToolInfo } from './hub.ts'
 import { loginPath } from './shell-path.ts'
 
 const TAIL_MAX = 500
-const LOGIN_MSG = 'Precisa de login.'
 
 function httpTransport(c: Connector, auth: AuthMaterial): StreamableHTTPClientTransport {
   if (!c.url) throw new ConnectorError('Conector sem URL.', 'failed')
@@ -29,11 +28,15 @@ async function stdioTransport(c: Connector, auth: AuthMaterial): Promise<StdioCl
   return new StdioClientTransport({ command: c.command, args: c.args ?? [], env, stderr: 'pipe', cwd: os.homedir() })
 }
 
-function mapError(e: unknown): ConnectorError {
+/** The hub's error for what the connector did: refused credentials (HTTP 401 or 403, the SDK's UnauthorizedError) mean a login. */
+export function connectorError(e: unknown): ConnectorError {
   if (e instanceof ConnectorError) return e
-  if (e instanceof UnauthorizedError) return new ConnectorError(LOGIN_MSG, 'login')
+  if (e instanceof UnauthorizedError) return new ConnectorError(LOGIN_NEEDED, 'login')
+  if (e instanceof StreamableHTTPError && (e.code === 401 || e.code === 403)) return new ConnectorError(LOGIN_NEEDED, 'login')
   return new ConnectorError(e instanceof Error ? e.message : String(e), 'failed')
 }
+
+const refused = (e: unknown): boolean => connectorError(e).kind === 'login'
 
 export const realFactory: ClientFactory = async (c, auth) => {
   const transport: Transport & { stderr?: unknown } = c.transport === 'stdio' ? await stdioTransport(c, auth) : httpTransport(c, auth)
@@ -66,14 +69,14 @@ export const realFactory: ClientFactory = async (c, auth) => {
     await client.connect(transport)
   } catch (e) {
     await client.close().catch(() => {})
-    const ce = mapError(e)
+    const ce = connectorError(e)
     if (ce.kind === 'failed' && tail.trim()) throw new ConnectorError(`${ce.message}\n${tail.trim()}`, 'failed')
     throw ce
   }
 
   const live: LiveClient = {
     async tools(): Promise<ToolInfo[]> {
-      const r = await Promise.race([client.listTools(), dead]).catch(async e => { throw await explain(e) })
+      const r = await Promise.race([client.listTools(), dead]).catch(async e => { throw refused(e) ? connectorError(e) : await explain(e) })
       return r.tools.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
     },
     async call(tool, args, signal): Promise<CallResult> {
@@ -84,7 +87,7 @@ export const realFactory: ClientFactory = async (c, auth) => {
         ])
         return { content: (r.content as unknown[]) ?? [], ...(r.isError ? { isError: true } : {}) }
       } catch (e) {
-        throw e instanceof UnauthorizedError ? mapError(e) : await explain(e)
+        throw refused(e) ? connectorError(e) : await explain(e)
       }
     },
     async close() {
@@ -106,6 +109,6 @@ export async function finishAuth(c: Connector, auth: AuthMaterial, code: string)
   try {
     await httpTransport(c, auth).finishAuth(code)
   } catch (e) {
-    throw mapError(e)
+    throw connectorError(e)
   }
 }

@@ -59,7 +59,7 @@ test('connector_tools is held for login first', async () => {
 test('needs login holds, then continues to approval, then the call', async () => {
   const s = setup({ needsLogin: true })
   assert.equal(await call(s), 'ok')
-  assert.deepEqual(s.log.order, ['login', 'ask', 'call'])
+  assert.deepEqual(s.log.order, ['login', 'tools', 'ask', 'call'])
 })
 
 test('a login that is cancelled rejects the call before approval', async () => {
@@ -80,21 +80,21 @@ test('forever stores the tool, releases the other cards and the call runs', asyn
   assert.equal(await call(s), 'ok')
   assert.deepEqual(s.log.allowed, [['c1', 'get_logs']])
   assert.deepEqual(s.log.released, [['c1', 'get_logs']])
-  assert.deepEqual(s.log.order, ['ask', 'call'])
+  assert.deepEqual(s.log.order, ['tools', 'ask', 'call'])
 })
 
 test('deny', async () => {
   const s = setup()
   s.setAnswer('deny')
   await assert.rejects(call(s), { message: 'Chamada negada pelo usuário' })
-  assert.deepEqual(s.log.order, ['ask'])
+  assert.deepEqual(s.log.order, ['tools', 'ask'])
 })
 
 test('approval hold timeout aborts the ask', async () => {
   const s = setup({ hold: true, holdMs: 50 })
   await assert.rejects(call(s), { message: 'Tempo esgotado esperando aprovação' })
   assert.equal(s.log.asks[0].signal.aborted, true)
-  assert.deepEqual(s.log.order, ['ask'])
+  assert.deepEqual(s.log.order, ['tools', 'ask'])
 })
 
 test('thread cancel while waiting on approval aborts the ask', async () => {
@@ -106,7 +106,7 @@ test('thread cancel while waiting on approval aborts the ask', async () => {
   ctl.abort()
   await assert.rejects(p, { message: 'Chamada cancelada' })
   assert.equal(s.log.asks[0].signal.aborted, true)
-  assert.deepEqual(s.log.order, ['ask'])
+  assert.deepEqual(s.log.order, ['tools', 'ask'])
 })
 
 test('an already aborted request never asks', async () => {

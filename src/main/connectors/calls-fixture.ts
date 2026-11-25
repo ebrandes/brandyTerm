@@ -9,6 +9,14 @@ import type { CallResult, ToolInfo } from './hub.ts'
 export const ref: ThreadRef = { projectId: 'p1', threadId: 't1' }
 export const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 export const sig = () => new AbortController().signal
+/** polls until `cond` holds; fails after `ms` instead of hanging the test */
+export async function until(cond: () => boolean, ms = 2000): Promise<void> {
+  const t0 = Date.now()
+  while (!cond()) {
+    if (Date.now() - t0 > ms) throw new Error('condição não chegou a tempo')
+    await sleep(2)
+  }
+}
 export const mk = (o: Partial<Connector> = {}): Connector => ({
   id: 'c1', name: 'Railway', description: 'Deploys', transport: 'stdio', command: 'secret-cmd', enabled: true,
   auth: { kind: 'none' }, alwaysAllow: [], ...o,

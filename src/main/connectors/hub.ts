@@ -19,6 +19,9 @@ export interface AuthMaterial {
 }
 export type ClientFactory = (c: Connector, auth: AuthMaterial) => Promise<LiveClient>
 
+/** what the agent and the card read when a connector refuses its credentials */
+export const LOGIN_NEEDED = 'Precisa de login.'
+
 export class ConnectorError extends Error {
   readonly kind: 'login' | 'failed'
   constructor(message: string, kind: 'login' | 'failed') {
@@ -110,6 +113,15 @@ export class ConnectorHub extends EventEmitter {
     this.set(id, 'erro', t || 'A conexão com o conector foi encerrada.')
   }
 
+  /** a client whose credentials were refused is closed: the next use connects with what the login saved */
+  private forget(id: string): void {
+    const e = this.entry(id)
+    const client = e.client
+    if (!client) return
+    e.client = undefined
+    void client.close().catch(() => {})
+  }
+
   private arm(id: string): void {
     const e = this.entry(id)
     if (e.timer) clearTimeout(e.timer)
@@ -125,7 +137,10 @@ export class ConnectorHub extends EventEmitter {
     try {
       return await fn(await this.connect(c))
     } catch (err) {
-      if (err instanceof ConnectorError && err.kind === 'login') this.markLogin(c.id)
+      if (err instanceof ConnectorError && err.kind === 'login') {
+        this.markLogin(c.id)
+        this.forget(c.id)
+      }
       throw err
     } finally {
       e.busy--

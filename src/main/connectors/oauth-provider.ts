@@ -1,7 +1,7 @@
 // OAuth provider for HTTP connectors; tokens, dynamic client and PKCE verifier live in the SecretStore.
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
 import type { OAuthClientInformationMixed, OAuthTokens } from '@modelcontextprotocol/sdk/shared/auth.js'
-import { ConnectorError } from './hub.ts'
+import { ConnectorError, LOGIN_NEEDED } from './hub.ts'
 import type { SecretStore } from './secrets.ts'
 
 /** `onRedirect` is only given inside a login flow; without it the provider never opens a browser. */
@@ -31,8 +31,18 @@ export function makeOAuthProvider(
     saveCodeVerifier: v => save({ verifier: v }),
     codeVerifier: () => oauth().verifier ?? '',
     redirectToAuthorization: url => {
-      if (!onRedirect) throw new ConnectorError('Precisa de login.', 'login')
+      if (!onRedirect) throw new ConnectorError(LOGIN_NEEDED, 'login')
       return onRedirect(url)
+    },
+    // the server said these no longer hold: a refresh that failed drops the tokens, so the next call asks for a login
+    invalidateCredentials: scope => {
+      const all = scope === 'all'
+      const drop = { tokens: all || scope === 'tokens', client: all || scope === 'client', verifier: all || scope === 'verifier' }
+      if (!drop.tokens && !drop.client && !drop.verifier) return // 'discovery': nothing of it is stored
+      const { tokens, client, verifier } = oauth()
+      secrets.patch(id, {
+        oauth: { ...(drop.tokens ? {} : tokens !== undefined && { tokens }), ...(drop.client ? {} : client !== undefined && { client }), ...(drop.verifier ? {} : verifier !== undefined && { verifier }) },
+      })
     },
   }
 }
