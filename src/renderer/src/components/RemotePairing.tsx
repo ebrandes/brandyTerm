@@ -3,8 +3,7 @@ import type { DiscoveredHost } from '../../../shared/remote/machine.ts'
 import { OsIcon } from './MachineChip'
 import { PAIRING_SECONDS, clock, secondsLeft } from '../machine-groups'
 import { api } from '../api'
-
-const clean = (e: unknown) => String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+import { errorText } from '../notice'
 
 /** This machine's pairing code (2 minutes), closed when it runs out or the panel goes away. */
 function NewPairing() {
@@ -42,7 +41,7 @@ function NewPairing() {
       open.current = true
       setCode(c)
     } catch (e) {
-      setError(clean(e))
+      setError(errorText(e))
     }
   }
   const cancel = () => {
@@ -54,7 +53,9 @@ function NewPairing() {
     <div className="rp-section">
       {code ? (
         <div className="rp-code-box">
-          <div className="rp-code" aria-label="Código de pareamento">{code}</div>
+          <div className="rp-code" aria-label="Código de pareamento">
+            {code.split('-').map((g, i) => <span key={i}>{g}</span>)}
+          </div>
           <p className="rp-hint">Digite este código no outro computador</p>
           <div className="rp-code-foot">
             <span className="rp-count">{clock(left)}</span>
@@ -80,7 +81,7 @@ function Discovered({ h }: { h: DiscoveredHost }) {
       await api.remote.pair({ address: h.address, code: code.trim() })
       setCode('')
     } catch (e) {
-      setError(clean(e))
+      setError(errorText(e))
     } finally {
       setBusy(false)
     }
@@ -88,7 +89,7 @@ function Discovered({ h }: { h: DiscoveredHost }) {
   return (
     <form className="rp-found" onSubmit={(e) => { e.preventDefault(); if (code.trim() && !busy) void pair() }}>
       <span className="rp-found-name"><OsIcon os={h.os} /> {h.name}</span>
-      <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código" aria-label={`Código de ${h.name}`} inputMode="numeric" />
+      <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código" aria-label={`Código de ${h.name}`} autoCapitalize="characters" spellCheck={false} autoComplete="off" maxLength={19} />
       <button type="submit" className="rp-btn sm" disabled={busy || !code.trim()}>Parear</button>
       {error && <p className="rp-error">{error}</p>}
     </form>
@@ -98,9 +99,15 @@ function Discovered({ h }: { h: DiscoveredHost }) {
 /** Pairing both ways: this machine's code, and the computers on the network that are waiting for one. */
 export function RemotePairing() {
   const [found, setFound] = useState<DiscoveredHost[]>([])
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let alive = true
-    const load = () => void api.remote.discovered().then((d) => alive && setFound(d)).catch(() => {})
+    const load = () =>
+      void api.remote.discovered().then((d) => {
+        if (!alive) return
+        setFound(d)
+        setFailed(false)
+      }).catch(() => alive && setFailed(true))
     load()
     const t = setInterval(load, 3000)
     return () => {
@@ -116,7 +123,8 @@ export function RemotePairing() {
       <NewPairing />
       <div className="rp-section">
         <h4>Computadores na rede</h4>
-        {found.length === 0 && <p className="rp-hint">Nenhum computador encontrado.</p>}
+        {failed && <p className="rp-error">Não foi possível procurar computadores na rede.</p>}
+        {!failed && found.length === 0 && <p className="rp-hint">Nenhum computador encontrado.</p>}
         {found.map((h) => <Discovered key={h.machineId} h={h} />)}
       </div>
     </>

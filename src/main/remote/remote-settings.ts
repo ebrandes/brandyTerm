@@ -1,9 +1,8 @@
 // Pure (no Electron): merging a partial `remote` settings patch.
-import type { AppSettings } from '../../shared/types.ts'
+import { DEFAULT_REMOTE, type RemoteSettings } from '../../shared/remote/remote-settings.ts'
 
-export type RemoteSettings = NonNullable<AppSettings['remote']>
-
-export const DEFAULT_REMOTE: RemoteSettings = { enabled: false, port: 47321 }
+export { DEFAULT_REMOTE }
+export type { RemoteSettings }
 
 const validPort = (p: unknown): p is number => typeof p === 'number' && Number.isInteger(p) && p >= 1024 && p <= 65535
 

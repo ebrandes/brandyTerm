@@ -6,6 +6,7 @@ import { ProcessPanel } from './ProcessPanel'
 import { contextLabel, formatTokens } from '../health'
 import { coordinatorLimit, coordinatorWarn, rotateAt } from '../../../shared/context-limit.ts'
 import { api } from '../api'
+import { report } from '../notice'
 import './overview-footer.css'
 
 
@@ -90,7 +91,7 @@ export function Overview({ project, selectedId, onSelect, onCancel, onBoard, all
             <input
               type="checkbox"
               checked={!project.remoteHidden}
-              onChange={(e) => void api.setRemoteHidden({ projectId: project.id, hidden: !e.target.checked })}
+              onChange={(e) => void api.setRemoteHidden({ projectId: project.id, hidden: !e.target.checked }).catch(report)}
             />
           </label>
         )}

@@ -13,6 +13,9 @@ import logo from './assets/logo.png'
 import { ArtifactViewer } from './components/ArtifactViewer'
 import { api } from './api'
 import { Notice } from './components/Notice'
+import { useRemoteHosts } from './useRemoteHosts'
+import { groupProjects, showGroups } from './machine-groups'
+import { report } from './notice'
 import { RemoteFolderHost } from './components/RemoteFolderHost'
 
 const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
@@ -29,6 +32,7 @@ export function App() {
   const [board, setBoard] = useState(false)
   const [terminals, setTerminals] = useState<Record<string, boolean>>({})
   const toggleTerminal = useCallback((id: string) => setTerminals((t) => ({ ...t, [id]: !t[id] })), [])
+  const hosts = useRemoteHosts()
   const closeBoard = useCallback(() => setBoard(false), [])
 
   // Cmd/Ctrl+B opens the agents board, also when the side panel is hidden on narrow windows
@@ -108,6 +112,7 @@ export function App() {
   }
 
   const removingProject = removing ? state?.projects.find((p) => p.id === removing) : undefined
+  const groups = state ? groupProjects(state.projects, hosts, state.machine) : []
   if (!state) return <div className="app" />
   if (!project) {
     return (
@@ -127,6 +132,7 @@ export function App() {
       <div className="titlebar" />
       <Sidebar
         projects={state.projects}
+        groups={groups}
         agents={state.agents}
         plugins={state.plugins}
         accounts={state.accounts}
@@ -155,6 +161,7 @@ export function App() {
         terminalOpen={!!terminals[project.id]}
         onToggleTerminal={() => toggleTerminal(project.id)}
         onOpenThread={(id) => setSelected((s) => ({ ...s, [project.id]: id }))}
+        showMachine={showGroups(groups)}
       />
       <ResizeHandle handle={panel.handleProps} dragging={panel.dragging} label="Redimensionar a visão do projeto" controls="overview" />
       {removing && (
@@ -168,7 +175,7 @@ export function App() {
               <button
                 className="danger"
                 onClick={() => {
-                  void api.removeProject(removing)
+                  void api.removeProject(removing).catch(report)
                   setRemoving(null)
                 }}
               >

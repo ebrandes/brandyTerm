@@ -7,14 +7,15 @@ import { AccountsPanel } from './AccountsPanel'
 import { ProjectStatusDot } from './ProjectStatusDot'
 import { RemotePanel } from './RemotePanel'
 import { MachineGroupHead } from './MachineGroupHead'
-import { useRemoteHosts } from '../useRemoteHosts'
-import { groupProjects, showGroups } from '../machine-groups'
+import { showGroups, type MachineGroup } from '../machine-groups'
 import logo from '../assets/logo.png'
 import { api } from '../api'
 import './machine.css'
 
 interface Props {
   projects: Project[]
+  /** projects by owning machine (built once in App, which also drives the chat chip) */
+  groups: MachineGroup[]
   agents: AgentInfo[]
   plugins: PluginInfo[]
   accounts?: AccountsState
@@ -72,10 +73,8 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, agents, plugins, accounts, userPlugins, machine, settings, activeId, lastSeen, onSelect, onOpen, onRemove }: Props) {
+export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, machine, settings, activeId, lastSeen, onSelect, onOpen, onRemove }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
-  const hosts = useRemoteHosts()
-  const groups = groupProjects(projects, hosts, machine)
   const grouped = showGroups(groups)
   return (
     <aside className="sidebar">

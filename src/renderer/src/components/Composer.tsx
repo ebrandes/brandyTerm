@@ -160,10 +160,10 @@ export function Composer({ projectId, target, draft, onDraft, files, onAddFiles,
         />
         <input ref={anyFile} type="file" multiple hidden onChange={picked} />
         <input ref={imageFile} type="file" accept="image/*" multiple hidden onChange={picked} />
-        <button type="button" className="icon-btn" aria-label="Anexar arquivo" title="Anexar arquivo" onClick={() => anyFile.current?.click()}>
+        <button type="button" className="icon-btn" aria-label="Anexar arquivo" title="Anexar arquivo" disabled={!!offline} onClick={() => anyFile.current?.click()}>
           <Paperclip size={16} />
         </button>
-        <button type="button" className="icon-btn" aria-label="Anexar imagem" title="Anexar imagem (ou cole com ⌘V)" onClick={() => imageFile.current?.click()}>
+        <button type="button" className="icon-btn" aria-label="Anexar imagem" title="Anexar imagem (ou cole com ⌘V)" disabled={!!offline} onClick={() => imageFile.current?.click()}>
           <ImagePlus size={16} />
         </button>
         <button type="submit" className="send-btn" aria-label="Enviar" disabled={!canSend}>

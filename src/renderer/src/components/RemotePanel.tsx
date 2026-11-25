@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { AppSettings } from '../../../shared/types.ts'
 import type { MachineInfo } from '../../../shared/remote/machine.ts'
-import { DEFAULT_REMOTE } from '../../../main/remote/remote-settings.ts'
+import { DEFAULT_REMOTE } from '../../../shared/remote/remote-settings.ts'
 import { RemotePairing } from './RemotePairing'
 import { RemoteDevices } from './RemoteDevices'
 import { api } from '../api'
+import { report } from '../notice'
 import './machine.css'
 
 const TIP = 'Deixa seus outros computadores pareados verem e comandarem os projetos desta máquina. Só aceita aparelhos que você pareou'
@@ -15,7 +16,10 @@ function MachineName({ machine }: { machine?: MachineInfo }) {
   useEffect(() => setName(machine?.name ?? ''), [machine?.name])
   const save = () => {
     const v = name.trim()
-    if (v && v !== machine?.name) void api.remote.rename(v).catch(() => setName(machine?.name ?? ''))
+    if (v && v !== machine?.name) void api.remote.rename(v).catch((e) => {
+      setName(machine?.name ?? '')
+      report(e)
+    })
     else setName(machine?.name ?? '')
   }
   return (
@@ -41,7 +45,7 @@ export function RemotePanel({ machine, settings }: { machine?: MachineInfo; sett
         <div className="rp-body">
           <label className="rp-row" title={TIP}>
             <span>Acesso remoto (rede local)</span>
-            <input type="checkbox" checked={remote.enabled} onChange={(e) => void api.setSettings({ remote: { ...remote, enabled: e.target.checked } })} />
+            <input type="checkbox" checked={remote.enabled} onChange={(e) => void api.setSettings({ remote: { ...remote, enabled: e.target.checked } }).catch(report)} />
           </label>
           <MachineName machine={machine} />
           <RemotePairing />

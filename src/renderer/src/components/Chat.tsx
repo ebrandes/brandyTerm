@@ -31,6 +31,8 @@ interface Props {
   terminalOpen: boolean
   onToggleTerminal: () => void
   onOpenThread: (threadId: string) => void
+  /** another machine is paired or visible: conversations say which one they run on */
+  showMachine?: boolean
 }
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
@@ -236,13 +238,14 @@ export function Chat(props: Props) {
     }
   }
 
+  const offline = project.machine?.online === false ? `${project.machine.name} está offline` : undefined
   const target = thread ? `a thread “${thread.title}”` : `o coordenador do ${project.name}`
 
   return (
     <main
       className={`chat${dropping ? ' dropping' : ''}`}
       onDragOver={(e) => {
-        if (![...e.dataTransfer.types].includes('Files')) return
+        if (offline || ![...e.dataTransfer.types].includes('Files')) return
         e.preventDefault()
         setDropping(true)
       }}
@@ -252,6 +255,7 @@ export function Chat(props: Props) {
         const f = filesOf(e.dataTransfer)
         if (!f.length) return
         e.preventDefault()
+        if (offline) return
         props.onAddFiles(f)
       }}
     >
@@ -277,12 +281,12 @@ export function Chat(props: Props) {
             <button className="back" onClick={onBack}>
               <ArrowLeft size={13} /> Coordenador
             </button>
-            <h1>{thread.title}<MachineChip machine={project.machine} /></h1>
+            <h1>{thread.title}<MachineChip machine={props.showMachine ? project.machine : undefined} /></h1>
             <ThreadMetaChips thread={thread} projectId={project.id} />
           </>
         ) : (
           <>
-            <h1>{project.name}<MachineChip machine={project.machine} /></h1>
+            <h1>{project.name}<MachineChip machine={props.showMachine ? project.machine : undefined} /></h1>
             <p>Terminal do coordenador{project.path ? ` · ${project.path}` : ''}</p>
           </>
         )}
@@ -324,7 +328,7 @@ export function Chat(props: Props) {
         sending={props.sending}
         error={props.sendError}
         onSend={props.onSend}
-        offline={project.machine?.online === false ? `${project.machine.name} está offline` : undefined}
+        offline={offline}
       />
       {canTerminal && terminalOpen && <TerminalPanel projectId={project.id} path={project.path} onClose={onToggleTerminal} />}
     </main>
