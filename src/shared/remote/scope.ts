@@ -24,6 +24,7 @@ export const UNSCOPED = new Set([
   'remote:hosts', 'remote:states', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
   'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename', 'remote:open-bytes',
   'remote:discover',
+  'remote:status',
   'fs:browse', 'project:add-path'
 ])
 

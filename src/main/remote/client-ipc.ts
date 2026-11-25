@@ -13,6 +13,7 @@ import { loadIdentity, renameMachine } from './identity.ts'
 import type { Remote } from './index.ts'
 import { openDecision, targetPath } from './open-policy.ts'
 import { dialWs } from './ws-dial.ts'
+import { portFailed } from '../../shared/remote/status.ts'
 
 export interface ClientIpcDeps {
   engine: Engine
@@ -59,9 +60,11 @@ export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHo
       if (err) throw new Error(err)
     } else shell.showItemInFolder(file)
   })
+  add('remote:status', () => remote.status())
   add('remote:open-pairing', () => {
     const server = remote.server()
-    if (!server) throw new Error('Acesso remoto desligado')
+    const s = remote.status()
+    if (!server) throw new Error(s.state === 'failed' ? portFailed(s.port) : 'Acesso remoto desligado')
     return server.openPairing()
   })
   add('remote:close-pairing', () => { remote.server()?.closePairing() })

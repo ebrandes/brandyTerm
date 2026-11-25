@@ -1,4 +1,5 @@
 import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustRole, TrustedDevice } from './remote/machine.ts'
+import type { RemoteStatus } from './remote/status.ts'
 import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, ArtifactContent, Attachment, FsEntry, SlashCommand } from './types.ts'
 
 export interface BrandyApi {
@@ -67,7 +68,8 @@ export interface BrandyApi {
     call(args: { machineId: string; channel: string; arg: unknown }): Promise<unknown>
     /** writes bytes a host sent to a temp folder and opens (or, if not a passive format, only reveals) them */
     openBytes(args: { machineId: string; name: string; data: Uint8Array }): Promise<void>
-    /** host side */
+    /** host side: whether the server runs, or the port it could not open */
+    status(): Promise<RemoteStatus>
     openPairing(): Promise<string>
     closePairing(): Promise<void>
     /** both directions: devices that control this machine (client) and machines it controls (host) */

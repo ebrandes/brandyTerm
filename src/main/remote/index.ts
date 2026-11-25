@@ -9,10 +9,14 @@ import { TrustStore } from './trust.ts'
 import { loadIdentity } from './identity.ts'
 import { readGuard } from './read-guard.ts'
 import { attachmentsRoot } from '../attachments.ts'
+import type { RemoteStatus } from '../../shared/remote/status.ts'
+import { hostRunner } from './runner.ts'
 
 export interface Remote {
   trust: TrustStore
   server(): HostServer | null
+  /** running, off, or the port that could not be opened */
+  status(): RemoteStatus
   stop(): Promise<void>
 }
 
@@ -20,29 +24,12 @@ export interface Remote {
 export function startRemote(engine: Engine): Remote {
   const trust = new TrustStore(app.getPath('userData'))
   const guard = readGuard({ userData: () => app.getPath('userData'), attachmentsRoot })
-  let server: HostServer | null = null
-  let port = 0
-  let applying: Promise<void> = Promise.resolve()
-  let closed = false
-  let failed: number | null = null
-
-  const desired = (): number | null => {
-    const r = { ...DEFAULT_REMOTE, ...appSettings().remote }
-    return r.enabled ? r.port : null
-  }
-
-  const apply = async (): Promise<void> => {
-    const want = closed ? null : desired()
-    if (server && want === port) return
-    if (!server && want !== null && want === failed) return // already failed on this port: retry only after a change
-    if (server) {
-      const old = server
-      server = null
-      await old.stop()
-    }
-    if (want !== failed) failed = null
-    if (want === null) return
-    const next = new HostServer({
+  const runner = hostRunner({
+    desired: () => {
+      const r = { ...DEFAULT_REMOTE, ...appSettings().remote }
+      return r.enabled ? r.port : null
+    },
+    make: () => new HostServer({
       state: () => engine.state,
       invoke: (channel, arg, ctx) => registry.invoke(channel, arg, ctx),
       onChange: cb => {
@@ -54,30 +41,18 @@ export function startRemote(engine: Engine): Remote {
       publish: publishMdns,
       guard
     })
-    try {
-      await next.start(want)
-      server = next
-      port = want
-      failed = null
-    } catch (e) {
-      console.error('[remote] não foi possível iniciar o servidor:', e instanceof Error ? e.message : e)
-      failed = want
-      await next.stop()
-    }
-  }
-
-  const sync = (): void => { applying = applying.then(apply, apply) }
+  })
+  const sync = (): void => void runner.sync()
   engine.on('change', sync)
   sync()
 
   return {
     trust,
-    server: () => server,
+    server: runner.server,
+    status: runner.status,
     async stop() {
-      closed = true
       engine.off('change', sync)
-      sync()
-      await applying
+      await runner.stop()
     }
   }
 }

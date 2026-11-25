@@ -61,7 +61,8 @@ export const RULES = {
   'remote:discover': 'deny',
   'remote:pair': 'deny',
   'remote:rename': 'deny',
-  'remote:open-bytes': 'deny'
+  'remote:open-bytes': 'deny',
+  'remote:status': 'deny'
 } as const satisfies Record<string, RemoteRule>
 
 export type Channel = keyof typeof RULES
