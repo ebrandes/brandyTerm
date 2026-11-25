@@ -1,0 +1,37 @@
+/* Compact file row under a thread summary (ArtifactCards) and its '+N…' list (FileChipsMenu). */
+.summary > div { flex: 1 1 auto; min-width: 0; }
+
+.fchips { position: relative; margin-top: 8px; }
+.fchips-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; overflow: hidden; }
+
+.fchip { display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 200px; height: 24px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.fchip svg { flex: none; color: var(--faint); }
+.fchip:hover:not(:disabled) { border-color: var(--accent-line); color: var(--text); }
+.fchip:hover:not(:disabled) svg { color: var(--muted); }
+.fchip:disabled { opacity: .45; cursor: default; }
+.fchip:disabled .fchip-name { text-decoration: line-through; }
+.fchip-name { overflow: hidden; text-overflow: ellipsis; }
+
+/* created = filled accent dot, edited = hollow faint ring, deleted = faint dash */
+.fstate { flex: none; width: 6px; height: 6px; border-radius: 50%; }
+.fstate.criado { background: var(--accent); }
+.fstate.editado { box-shadow: inset 0 0 0 1.5px var(--faint); }
+.fstate.apagado { width: 7px; height: 1.5px; border-radius: 1px; background: var(--faint); }
+
+.fchips-more { flex: none; height: 24px; padding: 0 8px; border-radius: 7px; border: 1px dashed var(--line-hi); background: none; color: var(--muted); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; cursor: pointer; }
+.fchips-more:hover, .fchips-more[aria-expanded='true'] { color: var(--text); border-color: var(--accent-line); border-style: solid; }
+
+/* hidden copies used only to measure chip widths; clipped so they never widen the layout */
+.fchips-measure { position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: hidden; visibility: hidden; display: flex; gap: 4px; pointer-events: none; }
+.fchips-measure > * { flex: none; }
+
+.fchips-menu { position: fixed; z-index: 90; width: 360px; max-width: calc(100vw - 16px); overflow-y: auto; padding: 4px; background: var(--panel); border: 1px solid var(--line-hi); border-radius: 10px; box-shadow: 0 12px 32px rgba(0,0,0,.45); outline: none; }
+.fchips-item { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; column-gap: 9px; width: 100%; padding: 6px 8px; border: 0; border-radius: 6px; background: none; color: var(--text); font-size: 12.5px; text-align: left; cursor: pointer; }
+.fchips-item svg { color: var(--faint); }
+.fchips-item:hover:not(:disabled), .fchips-item:focus-visible { background: var(--card-hi); outline: none; }
+.fchips-item:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-line); }
+.fchips-item:disabled { opacity: .45; cursor: default; }
+.fchips-item-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.fchips-item-name, .fchips-item-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fchips-item-path { color: var(--faint); font-size: 11px; font-family: 'JetBrains Mono','Cascadia Code',Menlo,monospace; }
+.fchips-item-state { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }

@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type { ThreadFile } from './types'
 
 /** What the artifact viewer shows: a project file, or a diagram taken from an answer. */
-export type ArtifactTarget = { projectId: string; path: string } | { inline: 'mermaid'; code: string }
+export type ArtifactTarget = { projectId: string; path: string; threadId?: string } | { inline: 'mermaid'; code: string }
 
 let current: ArtifactTarget | null = null
 const subs = new Set<() => void>()

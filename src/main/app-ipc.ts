@@ -1,7 +1,6 @@
 import { dialog, shell, type BrowserWindow } from 'electron'
 import type { Engine } from './engine.ts'
 import { discoverPlugins, installPlugin } from './plugins.ts'
-import { killTerminal } from './terminal.ts'
 import { validAttachments } from './attachments.ts'
 import { setUserPlugin, userPluginsState } from './user-plugins.ts'
 import { updateSettings } from './settings.ts'
@@ -26,10 +25,6 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     if (res.canceled || !res.filePaths[0]) return null
     return engine.addProject(res.filePaths[0])
   }, ruleOf('project:open-folder'))
-  registry.add('project:remove', (id: string) => {
-    killTerminal(String(id))
-    engine.removeProject(String(id))
-  }, ruleOf('project:remove'))
   registry.add('project:set-remote-hidden', (a: { projectId: string; hidden: boolean }) => {
     const p = engine.state.projects.find((x) => x.id === String(a.projectId))
     if (!p || p.demo) return

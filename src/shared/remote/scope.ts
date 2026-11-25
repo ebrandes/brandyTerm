@@ -10,9 +10,11 @@ export const SCOPED: Record<string, Where> = {
   'term:open': 'id', 'term:write': 'id', 'term:resize': 'id', 'term:kill': 'arg-or-id',
   'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
   'thread:resolve': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
-  'artifact:read': 'projectId', 'artifact:open': 'projectId', 'process:start': 'projectId',
+  'artifact:read': 'projectId', 'artifact:diff': 'projectId', 'artifact:open': 'projectId', 'process:start': 'projectId',
   'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId',
-  'attach:read': 'projectId', 'artifact:bytes': 'projectId'
+  'attach:read': 'projectId', 'artifact:bytes': 'projectId',
+  'project:rename': 'projectId', 'project:archive': 'projectId', 'project:clear-context': 'projectId',
+  'project:reveal': 'projectId'
 }
 
 /** Channels known to name no project (archive:list names several, in an array). Anything not here or in SCOPED is refused by the host. */

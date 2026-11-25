@@ -43,3 +43,12 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   save()
   return settings
 }
+
+/** a project removed from the app: its lastSeen entry goes, and it is no longer the one reopened at startup */
+export function forgetProjectSettings(projectId: string, lastSeen: Record<string, string>): AppSettings {
+  const next: AppSettings = { ...settings, lastSeen }
+  if (next.lastProjectId === projectId) next.lastProjectId = undefined
+  settings = next
+  save()
+  return settings
+}

@@ -1,6 +1,13 @@
+import type { FileDiff } from './diff-summary.ts'
 import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustRole, TrustedDevice } from './remote/machine.ts'
 import type { RemoteStatus } from './remote/status.ts'
 import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, ArtifactContent, Attachment, FsEntry, SlashCommand } from './types.ts'
+
+/** answer of an action the main may refuse (unknown project, empty name, threads running) */
+export interface ActionResult {
+  ok: boolean
+  error?: string
+}
 
 export interface BrandyApi {
   platform: string
@@ -8,7 +15,16 @@ export interface BrandyApi {
   onState(cb: (s: AppState) => void): () => void
   /** opens the native folder picker; returns the new/existing project id or null */
   openFolder(machineId?: string): Promise<string | null>
-  removeProject(projectId: string): Promise<void>
+  /** removes the project from the app (never its folder); refused while it has threads running */
+  removeProject(projectId: string): Promise<ActionResult>
+  /** display name only; the folder keeps its name */
+  renameProject(args: { projectId: string; name: string }): Promise<ActionResult>
+  /** moves the project to (or back from) the sidebar's "Arquivados" section */
+  setProjectArchived(args: { projectId: string; archived: boolean }): Promise<ActionResult>
+  /** the coordinator starts a new session on the next message; memory, threads and chat stay */
+  clearCoordinatorContext(args: { projectId: string }): Promise<ActionResult>
+  /** opens the project folder in Finder (this machine only) */
+  revealProject(args: { projectId: string }): Promise<ActionResult>
   /** saves app preferences (merged into the current ones) */
   setSettings(patch: Partial<AppSettings>): Promise<void>
   send(args: { projectId: string; text: string; threadId?: string; attachments?: Attachment[] }): Promise<void>
@@ -18,6 +34,8 @@ export interface BrandyApi {
   openAttachment(path: string, projectId: string): Promise<void>
   /** a file of the project (relative path) for the artifact viewer */
   readArtifact(args: { projectId: string; path: string }): Promise<ArtifactContent>
+  /** short read-only `git diff` of a project file (counts and hunks) for the viewer's Diff tab */
+  diffArtifact(args: { projectId: string; path: string }): Promise<FileDiff>
   /** opens a project file in the system's default app */
   openArtifact(args: { projectId: string; path: string }): Promise<void>
   /** slash commands for the composer: app commands, plugin skills/commands, project commands */

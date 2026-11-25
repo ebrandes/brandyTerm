@@ -21,11 +21,23 @@ export function rotateSession(p: Project): boolean {
   c.turns = (c.turns ?? 0) + 1
   const limit = coordinatorLimit(c.context?.limit)
   if (c.sessionId && (c.turns > SESSION_TURNS || shouldCompact(c.context?.used, limit))) {
-    c.sessionId = undefined
+    resetSession(p)
     c.turns = 1
   }
   if (c.context) c.context = { used: c.sessionId ? c.context.used : 0, limit }
   return !c.sessionId
+}
+
+/**
+ * Drops the coordinator's session: the next call starts a new one, exactly like the rotation above
+ * (the prompt then carries the project memory and the recent chat). Used by "Limpar contexto".
+ * The memory file, the threads and the visible chat are not touched.
+ */
+export function resetSession(p: Project): void {
+  const c = p.coordinator
+  c.sessionId = undefined
+  c.turns = 0
+  if (c.context) c.context = { used: 0, limit: coordinatorLimit(c.context.limit) }
 }
 
 /** Saves the coordinator's notes; over the budget, a one-off call rewrites the memory compactly. */

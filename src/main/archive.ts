@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchivedThreadInfo, Project, Thread, Usage } from '../shared/types.ts'
 
@@ -64,6 +64,14 @@ export function readArchive(dir: string, projectId: string): Thread[] {
   } catch {
     return []
   }
+}
+
+/** Deletes a removed project's archive file (only that file, inside the archive folder). True when one was deleted. */
+export function deleteArchive(dir: string, projectId: string): boolean {
+  const f = fileOf(dir, projectId)
+  if (!existsSync(f)) return false
+  rmSync(f, { force: true })
+  return true
 }
 
 /** atomic: a crash leaves either the old file or the new one, never half of it */

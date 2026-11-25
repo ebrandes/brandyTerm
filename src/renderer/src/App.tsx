@@ -17,6 +17,8 @@ import { useRemoteHosts } from './useRemoteHosts'
 import { groupProjects, showGroups, showRemoteToggle } from './machine-groups'
 import { report } from './notice'
 import { RemoteFolderHost } from './components/RemoteFolderHost'
+import { ProjectDialogs } from './components/ProjectDialogs'
+import type { ProjectAsk } from './components/ProjectRow'
 
 const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
 
@@ -28,7 +30,8 @@ export function App() {
   const files = useDraftFiles()
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string>()
-  const [removing, setRemoving] = useState<string | null>(null)
+  const [ask, setAsk] = useState<{ kind: ProjectAsk; id: string } | null>(null)
+  const closeAsk = useCallback(() => setAsk(null), [])
   const [board, setBoard] = useState(false)
   const [terminals, setTerminals] = useState<Record<string, boolean>>({})
   const toggleTerminal = useCallback((id: string) => setTerminals((t) => ({ ...t, [id]: !t[id] })), [])
@@ -73,7 +76,10 @@ export function App() {
   }, [])
 
   const lastId = state?.settings?.lastProjectId
-  const project = state?.projects.find((p) => p.id === (activeId ?? lastId)) ?? state?.projects[0]
+  // an archived project leaves the list, so it is not the one shown (unless every project is archived)
+  const listed = state?.projects.filter((p) => !p.archivedAt) ?? []
+  const project = listed.find((p) => p.id === (activeId ?? lastId)) ?? listed[0]
+    ?? state?.projects.find((p) => p.id === (activeId ?? lastId)) ?? state?.projects[0]
   // reopen on the project used last
   useEffect(() => {
     if (project && project.id !== lastId) void api.setSettings({ lastProjectId: project.id })
@@ -111,8 +117,8 @@ export function App() {
     if (id) setActiveId(id)
   }
 
-  const removingProject = removing ? state?.projects.find((p) => p.id === removing) : undefined
-  const groups = state ? groupProjects(state.projects, hosts, state.machine) : []
+  const askProject = ask ? state?.projects.find((p) => p.id === ask.id) : undefined
+  const groups = state ? groupProjects(listed.length ? state.projects.filter((p) => !p.archivedAt) : [], hosts, state.machine) : []
   if (!state) return <div className="app" />
   if (!project) {
     return (
@@ -143,7 +149,7 @@ export function App() {
         lastSeen={state.settings?.lastSeen}
         onSelect={setActiveId}
         onOpen={(machineId) => void openFolder(machineId)}
-        onRemove={setRemoving}
+        onAsk={(kind, id) => setAsk({ kind, id })}
       />
       <Chat
         project={project}
@@ -164,27 +170,7 @@ export function App() {
         showMachine={showGroups(groups)}
       />
       <ResizeHandle handle={panel.handleProps} dragging={panel.dragging} label="Redimensionar a visão do projeto" controls="overview" />
-      {removing && (
-        <div className="modal-back" role="dialog" aria-modal="true" aria-label="Remover projeto">
-          <div className="modal">
-            <h3>Remover “{removingProject?.name}” da lista?</h3>
-            {removingProject?.machine?.remote && <p>Este projeto fica em {removingProject.machine.name}: ele será removido de lá também.</p>}
-            <p>As conversas e threads salvas do projeto serão apagadas. A pasta no disco não é alterada.</p>
-            <div className="modal-actions">
-              <button onClick={() => setRemoving(null)} autoFocus>Cancelar</button>
-              <button
-                className="danger"
-                onClick={() => {
-                  void api.removeProject(removing).catch(report)
-                  setRemoving(null)
-                }}
-              >
-                Remover
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ProjectDialogs ask={ask && askProject ? { kind: ask.kind, project: askProject } : null} onClose={closeAsk} />
       <Overview
         project={project}
         allowAllThreads={!!state.settings?.allowAllThreads}
@@ -208,7 +194,7 @@ export function App() {
           }}
         />
       )}
-      <ArtifactViewer />
+      <ArtifactViewer projects={state.projects} />
       <RemoteFolderHost />
       <Notice />
     </div>

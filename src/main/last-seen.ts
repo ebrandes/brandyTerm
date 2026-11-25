@@ -40,3 +40,10 @@ export function seedLastSeen(current: LastSeen | undefined, projects: Pick<Proje
   }
   return changed ? out : null
 }
+
+/** a removed project leaves no entry behind */
+export function dropLastSeen(current: LastSeen | undefined, projectId: string): LastSeen {
+  const out: LastSeen = { ...current }
+  delete out[projectId]
+  return out
+}

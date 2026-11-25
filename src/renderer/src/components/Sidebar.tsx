@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Download, Folder, FolderPlus, Loader2, X } from 'lucide-react'
+import { Download, FolderPlus, Loader2 } from 'lucide-react'
 import type { AccountsState, AgentInfo, AppSettings, PluginInfo, Project, UserPluginsState } from '../types'
 import type { MachineInfo } from '../../../shared/remote/machine.ts'
 import { UserPluginsPanel } from './UserPluginsPanel'
 import { AccountsPanel } from './AccountsPanel'
-import { ProjectStatusDot } from './ProjectStatusDot'
+import { ProjectRow, type ProjectAsk } from './ProjectRow'
+import { ArchivedProjects } from './ArchivedProjects'
 import { RemotePanel } from './RemotePanel'
 import { MachineGroupHead } from './MachineGroupHead'
 import { showGroups, type MachineGroup } from '../machine-groups'
@@ -29,7 +30,8 @@ interface Props {
   onSelect: (id: string) => void
   /** machineId: a folder of that paired machine; none: this machine's own dialog */
   onOpen: (machineId?: string) => void
-  onRemove: (id: string) => void
+  /** a project action that needs a confirmation (clear the coordinator's context, remove) */
+  onAsk: (kind: ProjectAsk, id: string) => void
 }
 
 function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: boolean; onToggle: () => void }) {
@@ -73,7 +75,7 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, machine, settings, activeId, lastSeen, onSelect, onOpen, onRemove }: Props) {
+export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
   const grouped = showGroups(groups)
   return (
@@ -90,20 +92,11 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
           <div key={g.id} className={`machine-group${g.online ? '' : ' offline'}`}>
             {grouped && <MachineGroupHead group={g} onOpen={onOpen} />}
             {g.projects.map((p) => (
-              <div key={p.id} className={`project-item${p.id === activeId ? ' active' : ''}`}>
-                <button className="project-main" onClick={() => onSelect(p.id)} title={p.path ?? 'Projeto de demonstração'}>
-                  <Folder size={15} />
-                  <span className="project-name">{p.name}</span>
-                  {p.demo && <span className="tag">demo</span>}
-                  <ProjectStatusDot project={p} lastSeen={lastSeen?.[p.id]} selected={p.id === activeId} />
-                </button>
-                <button className="project-x" aria-label={`Remover ${p.name}`} title="Remover da lista" onClick={() => onRemove(p.id)}>
-                  <X size={13} />
-                </button>
-              </div>
+              <ProjectRow key={p.id} project={p} active={p.id === activeId} lastSeen={lastSeen?.[p.id]} onSelect={onSelect} onAsk={onAsk} />
             ))}
           </div>
         ))}
+        <ArchivedProjects projects={projects.filter((p) => p.archivedAt)} />
       </nav>
 
       {accounts && <AccountsPanel state={accounts} />}

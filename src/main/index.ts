@@ -14,6 +14,7 @@ import { Accounts } from './accounts.ts'
 import { registerAccountIpc } from './account-ipc.ts'
 import { registerArchiveIpc } from './archive-ipc.ts'
 import { archiveDirFor } from './archive.ts'
+import { registerProjectActionsIpc } from './project-actions-ipc.ts'
 import { setClaudeAuth } from './adapters/auth.ts'
 import { loadIdentity } from './remote/identity.ts'
 import { startBackground } from './background.ts'
@@ -121,6 +122,7 @@ app.whenReady().then(async () => {
   engine.state.accounts = accounts.state
   registerAccountIpc(accounts)
   registerArchiveIpc(engine, archiveDirFor(stateFile))
+  registerProjectActionsIpc(engine, archiveDirFor(stateFile))
   stopBackground = startBackground(engine)
   remote = startRemote(engine)
   hosts = startClient({ engine, remote, getWin: () => win })

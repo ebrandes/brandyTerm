@@ -195,6 +195,8 @@ export interface Project {
   archived?: { count: number; usage: Usage }
   /** never shown to remote devices */
   remoteHidden?: boolean
+  /** the user archived the project: listed under "Arquivados" at the end of the sidebar (the folder is untouched) */
+  archivedAt?: string
   /** which machine owns the project: set only in the renderer's merged state, never saved */
   machine?: { id: string; name: string; os: MachineOs; remote: boolean; online: boolean; since?: string }
 }

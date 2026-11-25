@@ -1,0 +1,42 @@
+/* Project context menu, inline rename, "Arquivados" section and the menu's dialogs */
+
+/* Windows: the .titlebar drag strip (top 38px) is hit-tested by the OS, above the page. A click there
+   moves the window and a right-click opens the system menu, so whatever can sit under it (a menu opened
+   near the top, rows scrolled up) opts out. Harmless on macOS. */
+.ctx-menu, .side-head, .project-list, .archived-projects { -webkit-app-region: no-drag; }
+
+.ctx-menu { position: fixed; z-index: 50; min-width: 228px; padding: 5px; background: var(--panel); border: 1px solid var(--line-hi); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.ctx-item { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 7px; font-size: 13px; color: var(--text); text-align: left; }
+.ctx-item svg { flex: none; color: var(--muted); }
+.ctx-item:hover, .ctx-item:focus-visible, .ctx-item:focus { outline: none; background: var(--accent-soft); }
+.ctx-item.danger { color: var(--red); }
+.ctx-item.danger svg { color: var(--red); }
+.ctx-item[aria-disabled='true'] { color: var(--faint); cursor: default; }
+.ctx-item[aria-disabled='true'] svg { color: var(--faint); }
+.ctx-item[aria-disabled='true']:hover, .ctx-item[aria-disabled='true']:focus { background: var(--card); }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--line-hi); }
+.ctx-note { margin: 4px 6px 2px; padding-top: 6px; border-top: 1px solid var(--line-hi); max-width: 240px; font-size: 11.5px; line-height: 1.4; color: var(--amber); }
+
+.project-item.menu-open { background: var(--card); color: var(--text); }
+.project-x:disabled { cursor: default; color: var(--faint); }
+.project-rename { padding: 5px 8px 5px 10px; }
+.project-rename input { flex: 1; min-width: 0; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--accent); background: var(--card); color: var(--text); font-size: 14px; outline: none; }
+.project-rename input.invalid { border-color: var(--red); }
+
+.archived-projects { margin-top: 10px; }
+.archived-head { width: 100%; display: flex; align-items: center; gap: 6px; padding: 4px 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--faint); text-align: left; border-radius: 6px; }
+.archived-head:hover { color: var(--muted); }
+.archived-chev { transition: transform .15s; }
+.archived-chev.open { transform: rotate(90deg); }
+.archived-count { margin-left: auto; font-weight: 400; letter-spacing: 0; }
+.archived-list { list-style: none; margin: 2px 0 0; padding: 0; }
+.archived-row { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 24px; font-size: 13px; color: var(--muted); }
+.archived-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.archived-restore { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 6px; font-size: 11.5px; color: var(--muted); background: var(--card-hi); }
+.archived-restore:hover { color: var(--text); background: var(--accent-soft); }
+
+.modal-warn { margin-top: 8px; color: var(--amber) !important; }
+.modal code { font-size: 12px; color: var(--text); word-break: break-all; }
+.modal-actions .primary { padding: 8px 16px; font-size: 13.5px; border-color: var(--accent); }
+.modal-actions button:disabled { opacity: .5; cursor: default; }
+.toast.ok { background: var(--panel); border-color: var(--accent-line); color: var(--text); }

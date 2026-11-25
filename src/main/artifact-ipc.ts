@@ -4,6 +4,7 @@ import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { mediaType, parseRange } from './artifact-media.ts'
 import { parseArtifactUrl, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
+import { fileDiff } from './git-diff.ts'
 import { registry } from './rpc/registry.ts'
 import { ruleOf } from './rpc/channels.ts'
 
@@ -40,6 +41,11 @@ export function registerArtifactIpc(rootOf: RootOf): void {
     const root = rootOf(String(a?.projectId))
     return root ? readArtifact(root, String(a?.path ?? '')) : { kind: 'missing' }
   }, ruleOf('artifact:read'))
+  // read-only git diff; the path must stay inside the project's real folder (git-diff.ts)
+  registry.add('artifact:diff', (a: { projectId: string; path: string }) => {
+    const root = rootOf(String(a?.projectId))
+    return root ? fileDiff(root, String(a?.path ?? '')) : { kind: 'invalid' }
+  }, ruleOf('artifact:diff'))
   registry.add('artifact:open', (a: { projectId: string; path: string }) => {
     const root = rootOf(String(a?.projectId))
     const abs = root ? resolveInside(root, String(a?.path ?? '')) : null

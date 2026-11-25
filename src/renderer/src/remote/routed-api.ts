@@ -44,9 +44,17 @@ export function createRoutedApi(
     onState: cb => state.subscribe(cb),
     listArchived,
     removeProject: id => via('project:remove', id, a => local.removeProject(a)),
+    renameProject: a => via('project:rename', a, x => local.renameProject(x)),
+    setProjectArchived: a => via('project:archive', a, x => local.setProjectArchived(x)),
+    clearCoordinatorContext: a => via('project:clear-context', a, x => local.clearCoordinatorContext(x)),
+    // the folder lives on the other machine: nothing to open here
+    revealProject: a => isRemote('project:reveal', a)
+      ? Promise.resolve({ ok: false, error: 'A pasta está em outra máquina.' })
+      : local.revealProject(a),
     send: a => via('chat:send', a, x => local.send(x)),
     saveAttachment: a => via('attach:save', a, x => local.saveAttachment(x)),
     readArtifact: a => via('artifact:read', a, x => local.readArtifact(x)),
+    diffArtifact: a => via('artifact:diff', a, x => local.diffArtifact(x)),
     ...variants,
     listCommands: id => via('commands:list', id, x => local.listCommands(x)),
     listFiles: a => via('fs:list', a, x => local.listFiles(x)),
