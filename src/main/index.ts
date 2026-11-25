@@ -17,6 +17,7 @@ import { archiveDirFor } from './archive.ts'
 import { setClaudeAuth } from './adapters/auth.ts'
 import { setUserPlugin, userPluginsState } from './user-plugins.ts'
 import { updateSettings } from './settings.ts'
+import { loadIdentity } from './remote/identity.ts'
 import { startBackground } from './background.ts'
 import type { AppSettings } from '../shared/types.ts'
 
@@ -170,6 +171,7 @@ app.whenReady().then(async () => {
   engine.state.accounts = accounts.state
   accounts.on('change', pushState)
   await engine.init()
+  engine.state.machine = loadIdentity()
   engine.state.accounts = accounts.state
   registerAccountIpc(accounts)
   registerArchiveIpc(engine, archiveDirFor(stateFile))

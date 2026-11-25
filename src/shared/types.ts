@@ -1,3 +1,4 @@
+import type { MachineInfo } from './remote/machine.ts'
 export type AgentId = 'claude' | 'codex' | 'antigravity'
 export type ThreadState = 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'interrupted' | 'cancelled'
 export type Effort = 'low' | 'medium' | 'high'
@@ -327,6 +328,7 @@ export interface AppState {
   accounts?: AccountsState
   userPlugins?: UserPluginsState
   settings?: AppSettings
+  machine?: MachineInfo
 }
 
 export const MAX_ACTIVE_THREADS = 2
