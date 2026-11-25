@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Clapperboard, FileCode, FileText, Globe, Image, Workflow, type LucideIcon } from 'lucide-react'
 import type { ThreadFile } from '../types'
 import { showArtifact } from '../artifacts'
+import { api } from '../api'
 
 const ICONS: [RegExp, LucideIcon][] = [
   [/\.(md|markdown)$/i, FileText],
@@ -21,7 +22,7 @@ export function ArtifactCards({ projectId, files }: { projectId: string; files: 
   const key = (f: ThreadFile) => `${f.path}@${f.at}`
   const open = async (f: ThreadFile) => {
     const path = f.path
-    const c = await window.brandy.readArtifact({ projectId, path }).catch(() => ({ kind: 'missing' }) as const)
+    const c = await api.readArtifact({ projectId, path }).catch(() => ({ kind: 'missing' }) as const)
     if (c.kind === 'missing') setGone((g) => new Set(g).add(key(f)))
     else showArtifact({ projectId, path })
   }

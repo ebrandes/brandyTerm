@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from 'react'
 import type { FsEntry } from './types'
+import { api } from './api'
 
 export interface MentionToken {
   /** index of the "@" */
@@ -45,7 +46,7 @@ export function useMention(projectId: string, draft: string, onDraft: (t: string
     if (query === undefined) return setItems([])
     let alive = true
     const t = setTimeout(() => {
-      void window.brandy.listFiles({ projectId, query }).then((r) => {
+      void api.listFiles({ projectId, query }).then((r) => {
         if (!alive) return
         setItems(r)
         setPick(0)

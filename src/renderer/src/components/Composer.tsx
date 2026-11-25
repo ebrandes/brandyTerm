@@ -6,6 +6,7 @@ import { ImageMarkup } from './ImageMarkup'
 import { SlashMenu, matchCommands } from './SlashMenu'
 import { MentionMenu } from './MentionMenu'
 import { useMention } from '../mention'
+import { api } from '../api'
 import './attach.css'
 
 interface Props {
@@ -39,7 +40,7 @@ export function Composer({ projectId, target, draft, onDraft, files, onAddFiles,
   // re-read on every menu open: plugins can be turned on/off for threads meanwhile
   useEffect(() => {
     let alive = true
-    void window.brandy.listCommands(projectId).then((c) => alive && setCommands(c))
+    void api.listCommands(projectId).then((c) => alive && setCommands(c))
     return () => {
       alive = false
     }

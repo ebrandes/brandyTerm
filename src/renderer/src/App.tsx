@@ -11,6 +11,7 @@ import { useLastSeen } from './useLastSeen'
 import { ResizeHandle } from './components/ResizeHandle'
 import logo from './assets/logo.png'
 import { ArtifactViewer } from './components/ArtifactViewer'
+import { api } from './api'
 
 const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
 
@@ -57,8 +58,8 @@ export function App() {
 
   useEffect(() => {
     let alive = true
-    void window.brandy.getState().then((s) => alive && setState(s))
-    const off = window.brandy.onState((s) => setState(s))
+    void api.getState().then((s) => alive && setState(s))
+    const off = api.onState((s) => setState(s))
     return () => {
       alive = false
       off()
@@ -69,7 +70,7 @@ export function App() {
   const project = state?.projects.find((p) => p.id === (activeId ?? lastId)) ?? state?.projects[0]
   // reopen on the project used last
   useEffect(() => {
-    if (project && project.id !== lastId) void window.brandy.setSettings({ lastProjectId: project.id })
+    if (project && project.id !== lastId) void api.setSettings({ lastProjectId: project.id })
   }, [project?.id, lastId])
   useLastSeen(project?.id)
   activeRef.current = project && !project.demo ? project.id : null
@@ -90,7 +91,7 @@ export function App() {
       // only what was sent leaves the composer: text typed or files added during the upload stay
       setDrafts((d) => ((d[draftKey] ?? '').trim() === text ? { ...d, [draftKey]: '' } : d))
       for (const f of pending) files.remove(draftKey, f.key)
-      await window.brandy.send({ projectId: project.id, text, threadId: thread?.id, attachments })
+      await api.send({ projectId: project.id, text, threadId: thread?.id, attachments })
     } catch (e) {
       setSendError(String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
     } finally {
@@ -99,7 +100,7 @@ export function App() {
   }, [project, drafts, draftKey, thread?.id, pending, files])
 
   const openFolder = async () => {
-    const id = await window.brandy.openFolder()
+    const id = await api.openFolder()
     if (id) setActiveId(id)
   }
 
@@ -160,7 +161,7 @@ export function App() {
               <button
                 className="danger"
                 onClick={() => {
-                  void window.brandy.removeProject(removing)
+                  void api.removeProject(removing)
                   setRemoving(null)
                 }}
               >
@@ -177,7 +178,7 @@ export function App() {
         idleCompact={state.settings?.idleCompact?.enabled !== false}
         selectedId={thread?.id}
         onSelect={(id) => setSelected((s) => ({ ...s, [project.id]: s[project.id] === id ? undefined : id }))}
-        onCancel={(id) => void window.brandy.cancelThread({ projectId: project.id, threadId: id })}
+        onCancel={(id) => void api.cancelThread({ projectId: project.id, threadId: id })}
         onBoard={() => setBoard(true)}
       />
       {board && (

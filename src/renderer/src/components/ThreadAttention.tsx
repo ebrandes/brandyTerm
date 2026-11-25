@@ -1,6 +1,7 @@
 import { CircleCheck, CircleDot, ShieldCheck, ShieldQuestion, X } from 'lucide-react'
 import type { ApprovalDecision, Thread } from '../types'
 import { contextLabel, contextShare } from '../health'
+import { api } from '../api'
 import './attention.css'
 
 const TOOL_NAMES: Record<string, string> = {
@@ -16,7 +17,7 @@ const TOOL_NAMES: Record<string, string> = {
 export function ThreadAttention({ t, projectId }: { t: Thread; projectId: string }) {
   const a = t.approval
   if (a) {
-    const answer = (decision: ApprovalDecision) => void window.brandy.approveTool({ projectId, threadId: t.id, id: a.id, decision })
+    const answer = (decision: ApprovalDecision) => void api.approveTool({ projectId, threadId: t.id, id: a.id, decision })
     const head = a.always ?? (a.tool === 'Bash' ? 'Sempre este comando nesta thread' : 'Sempre nesta thread')
     return (
       <div className="attn approval" role="alert">
@@ -47,7 +48,7 @@ export function ThreadAttention({ t, projectId }: { t: Thread; projectId: string
         </div>
         <p className="attn-hint">Responda aqui para a thread continuar, ou feche se já resolveu.</p>
         <div className="attn-actions">
-          <button onClick={() => void window.brandy.resolveThread({ projectId, threadId: t.id })}>
+          <button onClick={() => void api.resolveThread({ projectId, threadId: t.id })}>
             <CircleCheck size={13} /> Marcar como resolvida
           </button>
         </div>
@@ -67,7 +68,7 @@ export function AllowAllChip({ t, projectId }: { t: Thread; projectId: string })
       <ShieldCheck size={12} /> Permitindo tudo
       <button
         className="chip-x"
-        onClick={() => void window.brandy.setAllowAll({ projectId, threadId: t.id, on: false })}
+        onClick={() => void api.setAllowAll({ projectId, threadId: t.id, on: false })}
         aria-label="Voltar a pedir aprovação nesta thread"
         title="Voltar a pedir aprovação"
       >

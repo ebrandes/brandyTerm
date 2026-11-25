@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import type { AccountsState, ClaudeAccount, LimitWindow } from '../types'
 import { AccountLogin } from './AccountLogin'
+import { api } from '../api'
 import './accounts.css'
 
 const pct = (w?: LimitWindow) => (w ? Math.round(w.utilization * 100) : undefined)
@@ -47,7 +48,7 @@ function AccountRow({ a, active }: { a: ClaudeAccount; active: boolean }) {
     <div className={`acct${active ? ' active' : ''}${limited || a.error ? ' blocked' : ''}`}>
       <button
         className="acct-main"
-        onClick={() => !active && void window.brandy.accounts.activate(a.id)}
+        onClick={() => !active && void api.accounts.activate(a.id)}
         onDoubleClick={() => setEditing(true)}
         title={active ? 'Conta em uso (duplo clique para renomear)' : 'Usar esta conta (duplo clique para renomear)'}
         aria-pressed={active}
@@ -61,7 +62,7 @@ function AccountRow({ a, active }: { a: ClaudeAccount; active: boolean }) {
               autoFocus
               onClick={(e) => e.stopPropagation()}
               onBlur={(e) => {
-                void window.brandy.accounts.rename({ id: a.id, label: e.target.value })
+                void api.accounts.rename({ id: a.id, label: e.target.value })
                 setEditing(false)
               }}
               onKeyDown={(e) => {
@@ -88,11 +89,11 @@ function AccountRow({ a, active }: { a: ClaudeAccount; active: boolean }) {
         </span>
       </button>
       <div className="acct-actions">
-        <button onClick={() => void window.brandy.accounts.probe(a.id)} disabled={a.checking} title="Atualizar limites" aria-label="Atualizar limites">
+        <button onClick={() => void api.accounts.probe(a.id)} disabled={a.checking} title="Atualizar limites" aria-label="Atualizar limites">
           <RefreshCw size={12} className={a.checking ? 'spin' : ''} />
         </button>
         {a.kind === 'token' && (
-          <button onClick={() => void window.brandy.accounts.remove(a.id)} title="Remover conta" aria-label={`Remover ${a.label}`}>
+          <button onClick={() => void api.accounts.remove(a.id)} title="Remover conta" aria-label={`Remover ${a.label}`}>
             <Trash2 size={12} />
           </button>
         )}
@@ -116,7 +117,7 @@ export function AccountsPanel({ state }: { state: AccountsState }) {
         <AccountRow key={a.id} a={a} active={a.id === state.activeId} />
       ))}
       <label className="acct-auto" title="Quando a conta em uso chega no limite (5h ou semanal), as próximas execuções vão para a outra conta">
-        <input type="checkbox" checked={state.autoSwitch} onChange={(e) => void window.brandy.accounts.setAuto(e.target.checked)} />
+        <input type="checkbox" checked={state.autoSwitch} onChange={(e) => void api.accounts.setAuto(e.target.checked)} />
         Trocar sozinho no limite
       </label>
       {state.lastSwitch && <p className="acct-switch">{state.lastSwitch}</p>}

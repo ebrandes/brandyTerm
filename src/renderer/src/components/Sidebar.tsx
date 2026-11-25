@@ -5,6 +5,7 @@ import { UserPluginsPanel } from './UserPluginsPanel'
 import { AccountsPanel } from './AccountsPanel'
 import { ProjectStatusDot } from './ProjectStatusDot'
 import logo from '../assets/logo.png'
+import { api } from '../api'
 
 interface Props {
   projects: Project[]
@@ -37,7 +38,7 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
           disabled={p.installing}
           aria-label={`Instalar ${p.name}`}
           title={`Instalar ${p.name}`}
-          onClick={() => void window.brandy.installPlugin({ id: p.id })}
+          onClick={() => void api.installPlugin({ id: p.id })}
         >
           {p.installing ? <Loader2 size={13} className="spin" /> : <Download size={13} />}
         </button>
@@ -48,9 +49,9 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
           Claude Security: {p.review.summary}
           {blocked && ' — instalação parada até você revisar.'}
           <div className="plugin-actions">
-            {p.review.report && <button onClick={() => void window.brandy.openPluginReport(p.id)}>Ver relatório</button>}
+            {p.review.report && <button onClick={() => void api.openPluginReport(p.id)}>Ver relatório</button>}
             {blocked && !p.installing && (
-              <button className="danger" onClick={() => void window.brandy.installPlugin({ id: p.id, force: true })}>
+              <button className="danger" onClick={() => void api.installPlugin({ id: p.id, force: true })}>
                 Instalar mesmo assim
               </button>
             )}

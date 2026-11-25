@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import type { ArchivedThreadInfo, ThreadState } from '../types'
 import { ago } from './BoardDetail'
+import { api } from '../api'
 
 const STATE_LABEL: Partial<Record<ThreadState, string>> = {
   done: 'Concluída',
@@ -27,7 +28,7 @@ export function BoardArchive({ projectIds, showProject, now, onClose, onReopened
   useEffect(() => {
     let live = true
     setList(null)
-    void window.brandy.listArchived(ids ? ids.split(',') : []).then((l) => live && setList(l))
+    void api.listArchived(ids ? ids.split(',') : []).then((l) => live && setList(l))
     return () => {
       live = false
     }
@@ -35,7 +36,7 @@ export function BoardArchive({ projectIds, showProject, now, onClose, onReopened
 
   const reopen = async (a: ArchivedThreadInfo) => {
     setBusy(a.id)
-    const ok = await window.brandy.reopenArchived({ projectId: a.projectId, threadId: a.id })
+    const ok = await api.reopenArchived({ projectId: a.projectId, threadId: a.id })
     setBusy(null)
     if (ok) onReopened(a.id)
   }

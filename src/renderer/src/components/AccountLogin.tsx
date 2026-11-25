@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { LogIn, X } from 'lucide-react'
 import type { AccountsState } from '../types'
 import { attach, dispose } from '../terminals'
+import { api } from '../api'
 
 const TERM = 'account-login'
 
@@ -23,7 +24,7 @@ export function AccountLogin({ login, count, onClose }: Props) {
   const box = useRef<HTMLDivElement>(null)
 
   const close = () => {
-    void window.brandy.accounts.loginCancel()
+    void api.accounts.loginCancel()
     dispose(TERM)
     onClose()
   }
@@ -54,7 +55,7 @@ export function AccountLogin({ login, count, onClose }: Props) {
     setError(undefined)
     setRunning(true)
     try {
-      await window.brandy.accounts.loginStart({ label: label || 'Outra conta', rows: 18 })
+      await api.accounts.loginStart({ label: label || 'Outra conta', rows: 18 })
     } catch (err) {
       setError(String((err as Error).message))
       setRunning(false)
@@ -64,7 +65,7 @@ export function AccountLogin({ login, count, onClose }: Props) {
   const saveToken = async () => {
     setError(undefined)
     try {
-      await window.brandy.accounts.addToken({ label: label || 'Outra conta', token })
+      await api.accounts.addToken({ label: label || 'Outra conta', token })
     } catch (err) {
       setError(String((err as Error).message).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
     }

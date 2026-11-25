@@ -5,6 +5,7 @@ import { ResolvedGroup } from './ResolvedGroup'
 import { ProcessPanel } from './ProcessPanel'
 import { contextLabel, formatTokens } from '../health'
 import { coordinatorLimit, coordinatorWarn, rotateAt } from '../../../shared/context-limit.ts'
+import { api } from '../api'
 import './overview-footer.css'
 
 
@@ -85,15 +86,15 @@ export function Overview({ project, selectedId, onSelect, onCancel, onBoard, all
         )}
         <label className="overview-footer-row" title="Threads novas (em qualquer projeto) já começam com permitir tudo: não pedem aprovação de comandos e edições. Fica salvo no app; as threads atuais seguem o que você escolher em cada uma">
           <span>Threads novas: permitir tudo</span>
-          <input type="checkbox" checked={allowAllThreads} onChange={(e) => void window.brandy.setSettings({ allowAllThreads: e.target.checked })} />
+          <input type="checkbox" checked={allowAllThreads} onChange={(e) => void api.setSettings({ allowAllThreads: e.target.checked })} />
         </label>
         <label className="overview-footer-row" title="Enquanto uma thread ou o coordenador estiver trabalhando, o computador não entra em repouso. Com a tampa do MacBook fechada, ele ainda dorme se não houver monitor externo">
           <span>Manter acordado enquanto trabalha</span>
-          <input type="checkbox" checked={keepAwake} onChange={(e) => void window.brandy.setSettings({ keepAwake: e.target.checked })} />
+          <input type="checkbox" checked={keepAwake} onChange={(e) => void api.setSettings({ keepAwake: e.target.checked })} />
         </label>
         <label className="overview-footer-row" title="Quando o coordenador fica parado por alguns minutos, o contexto dele é compactado sozinho (como o /compact), para a próxima mensagem começar menor e mais barata">
           <span>Compactar coordenador ocioso</span>
-          <input type="checkbox" checked={idleCompact} onChange={(e) => void window.brandy.setSettings({ idleCompact: { enabled: e.target.checked, minutes: 4, minTokens: 40_000 } })} />
+          <input type="checkbox" checked={idleCompact} onChange={(e) => void api.setSettings({ idleCompact: { enabled: e.target.checked, minutes: 4, minTokens: 40_000 } })} />
         </label>
         <div className="overview-footer-row" title="Tokens gastos no projeto. Soma de tudo que o coordenador e as threads já gastaram neste projeto (entrada nova e saída; leitura de cache não conta)">
           <span>Tokens do projeto{measured ? '' : ' (sem medição)'}</span>

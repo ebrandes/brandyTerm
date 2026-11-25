@@ -1,6 +1,7 @@
 import { CircleCheck, CircleDot, Circle, MessageSquare, Square, X } from 'lucide-react'
 import { AGENT_NAMES, EFFORT_LABEL, type Todo } from '../types'
 import type { BoardItem } from './Board'
+import { api } from '../api'
 
 /** "há 12 s", "há 3 min", "há 2 h", "há 9 d" */
 export function ago(iso: string, now: number): string {
@@ -112,7 +113,7 @@ export function BoardDetail({ item, now, onClose, onOpen }: Props) {
           </button>
         )}
         {active && !project.demo && (
-          <button className="danger" onClick={() => void window.brandy.cancelThread({ projectId: project.id, threadId: t.id })}>
+          <button className="danger" onClick={() => void api.cancelThread({ projectId: project.id, threadId: t.id })}>
             <Square size={11} /> Cancelar
           </button>
         )}

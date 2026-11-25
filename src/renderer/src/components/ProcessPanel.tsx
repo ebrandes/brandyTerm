@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { ExternalLink, Play, Plus, Square, Trash2 } from 'lucide-react'
 import type { Project } from '../types'
+import { api } from '../api'
 
 export function ProcessPanel({ project }: { project: Project }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [command, setCommand] = useState('')
-  const api = window.brandy
   const canStart = !project.demo && !!project.path
 
   const start = () => {

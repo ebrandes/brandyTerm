@@ -12,6 +12,7 @@ import { filesForSummary } from '../artifacts'
 import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention } from './ThreadAttention'
 import { ThreadMetaChips } from './ThreadMetaChips'
+import { api } from '../api'
 
 interface Props {
   project: Project
@@ -45,7 +46,7 @@ function AskCard({ project, ask }: { project: Project; ask: NonNullable<Message[
   const open = t?.state === 'waiting' && t.question?.text === ask.question
   const answer = (value: string) => {
     if (!value.trim()) return
-    void window.brandy.send({ projectId: project.id, text: value.trim(), threadId: ask.threadId })
+    void api.send({ projectId: project.id, text: value.trim(), threadId: ask.threadId })
     setText('')
   }
   return (

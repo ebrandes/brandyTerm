@@ -1,4 +1,5 @@
 import type { Attachment } from './types'
+import { api } from './api'
 
 /** A file waiting in the composer; uploaded to the main process when the message is sent. */
 export interface PendingFile {
@@ -80,7 +81,7 @@ export function release(items: PendingFile[]): void {
 export async function upload(projectId: string, items: PendingFile[]): Promise<Attachment[]> {
   return Promise.all(
     items.map(async (i) =>
-      window.brandy.saveAttachment({
+      api.saveAttachment({
         projectId,
         name: i.name,
         mime: i.mime,

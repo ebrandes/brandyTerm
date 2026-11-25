@@ -1,5 +1,8 @@
 // What a remote device may see of the app state, and which calls it may make about which projects. Pure.
 import type { AppState } from '../../shared/types.ts'
+import { SCOPED, UNSCOPED, projectOf } from '../../shared/remote/scope.ts'
+
+export { projectOf }
 
 export const HIDDEN = 'Projeto não disponível remotamente'
 export const OUTSIDE = 'Fora do projeto'
@@ -45,37 +48,6 @@ function queryInside(arg: unknown): boolean {
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
-
-/** Where a project-scoped channel carries its project id. */
-const SCOPED: Record<string, 'arg' | 'id' | 'arg-or-id' | 'projectId'> = {
-  'commands:list': 'arg', 'project:remove': 'arg',
-  'term:open': 'id', 'term:write': 'id', 'term:resize': 'id', 'term:kill': 'arg-or-id',
-  'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
-  'thread:resolve': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
-  'artifact:read': 'projectId', 'artifact:open': 'projectId', 'process:start': 'projectId',
-  'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId'
-}
-
-/** Channels known to name no project. Anything not here or in SCOPED is refused. */
-const UNSCOPED = new Set([
-  'state:get', 'archive:list', 'settings:set', 'plugin:install', 'plugin:open-report',
-  'project:open-folder', 'attach:open', 'process:open-port', 'clipboard:read', 'clipboard:write',
-  'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
-  'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',
-  'remote:hosts', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
-  'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename'
-])
-
-/** The project id a scoped call refers to; null when the channel is unscoped or the id is not a string. */
-export function projectOf(channel: string, arg: unknown): string | null {
-  const where = SCOPED[channel]
-  if (!where) return null
-  const pick = (v: unknown): string | null => (typeof v === 'string' ? v : null)
-  if (where === 'arg') return pick(arg)
-  if (where === 'arg-or-id') return typeof arg === 'string' ? arg : isObj(arg) ? pick(arg.id) : null
-  if (!isObj(arg)) return null
-  return pick(where === 'id' ? arg.id : arg.projectId)
-}
 
 export type Authorized = { ok: true; arg: unknown } | { ok: false; error: string }
 

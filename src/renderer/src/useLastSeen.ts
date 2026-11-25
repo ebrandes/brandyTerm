@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
+import { api } from './api'
 
-const markSeen = (projectId: string) => void window.brandy.setSettings({ lastSeen: { [projectId]: new Date().toISOString() } })
+const markSeen = (projectId: string) => void api.setSettings({ lastSeen: { [projectId]: new Date().toISOString() } })
 
 /**
  * Records when the user had a project open, for the sidebar "novidades":

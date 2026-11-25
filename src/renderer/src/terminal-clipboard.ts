@@ -1,4 +1,5 @@
 import type { Terminal } from '@xterm/xterm'
+import { api } from './api'
 
 const MAC = navigator.platform.toUpperCase().includes('MAC')
 
@@ -11,11 +12,11 @@ export function wireClipboard(term: Terminal, host: HTMLElement): void {
   let pastedAt = 0
   const copy = () => {
     const text = term.getSelection()
-    if (text) void window.brandy.term.writeClipboard(text)
+    if (text) void api.term.writeClipboard(text)
   }
   const paste = () => {
     pastedAt = Date.now()
-    void window.brandy.term.readClipboard().then((text) => text && term.paste(text))
+    void api.term.readClipboard().then((text) => text && term.paste(text))
   }
 
   term.attachCustomKeyEventHandler((ev) => {

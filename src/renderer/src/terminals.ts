@@ -2,6 +2,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { wireClipboard } from './terminal-clipboard'
+import { api } from './api'
 
 /**
  * xterm instances live outside React, one per project, so the scrollback
@@ -23,8 +24,8 @@ let wired = false
 function wire(): void {
   if (wired) return
   wired = true
-  window.brandy.term.onData(({ id, data }) => entries.get(id)?.term.write(data))
-  window.brandy.term.onExit(({ id, exitCode }) => {
+  api.term.onData(({ id, data }) => entries.get(id)?.term.write(data))
+  api.term.onExit(({ id, exitCode }) => {
     const e = entries.get(id)
     if (!e) return
     e.alive = false
@@ -58,9 +59,9 @@ export function terminalFor(id: string): Entry {
       if (data === '\r' && !id.startsWith('account-')) void start(id)
       return
     }
-    void window.brandy.term.write({ id, data })
+    void api.term.write({ id, data })
   })
-  term.onResize(({ cols, rows }) => entry.alive && void window.brandy.term.resize({ id, cols, rows }))
+  term.onResize(({ cols, rows }) => entry.alive && void api.term.resize({ id, cols, rows }))
   entries.set(id, entry)
   return entry
 }
@@ -84,7 +85,7 @@ export async function start(id: string): Promise<void> {
   const e = terminalFor(id)
   if (e.started) return
   e.started = true
-  e.alive = await window.brandy.term.open({ id, cols: e.term.cols, rows: e.term.rows })
+  e.alive = await api.term.open({ id, cols: e.term.cols, rows: e.term.rows })
   if (!e.alive) {
     e.started = false
     e.term.write('\x1b[2m[sem pasta de projeto para abrir o terminal]\x1b[0m\r\n')
@@ -96,6 +97,6 @@ export function runInTerminal(projectId: string, command: string): void {
   window.dispatchEvent(new CustomEvent('brandy:terminal', { detail: { projectId } }))
   void start(projectId).then(() => {
     const e = entries.get(projectId)
-    if (e?.alive) void window.brandy.term.write({ id: projectId, data: command.replace(/\n+$/, '') + '\r' })
+    if (e?.alive) void api.term.write({ id: projectId, data: command.replace(/\n+$/, '') + '\r' })
   })
 }

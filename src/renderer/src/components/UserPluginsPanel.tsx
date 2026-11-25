@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { UserPlugin, UserPluginsState } from '../types'
+import { api } from '../api'
 import './userplugins.css'
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -37,7 +38,7 @@ function Row({ p }: { p: UserPlugin }) {
         </span>
         <span className="up-sub">{summary(p)}</span>
       </span>
-      <Toggle on={p.on} label={`Usar ${p.name} nas threads`} onChange={(on) => void window.brandy.setUserPlugin({ id: p.id, on })} />
+      <Toggle on={p.on} label={`Usar ${p.name} nas threads`} onChange={(on) => void api.setUserPlugin({ id: p.id, on })} />
     </div>
   )
 }
@@ -63,7 +64,7 @@ export function UserPluginsPanel({ state }: { state: UserPluginsState }) {
             <span className="up-name">Suas skills</span>
             <span className="up-sub">{summary({ skills: state.personal.skills, commands: state.personal.commands, agents: 0 })}</span>
           </span>
-          <Toggle on={state.personal.on} label="Usar suas skills nas threads" onChange={(v) => void window.brandy.setUserPlugin({ id: 'personal', on: v })} />
+          <Toggle on={state.personal.on} label="Usar suas skills nas threads" onChange={(v) => void api.setUserPlugin({ id: 'personal', on: v })} />
         </div>
       )}
       {open && (

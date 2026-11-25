@@ -5,6 +5,7 @@ import { artifactUrl, closeArtifact, fenced, markdownImageSrc, resolveRelative, 
 import { Rich } from './Rich'
 import { CodeBlock } from './CodeBlock'
 import { MermaidBlock } from './MermaidBlock'
+import { api } from '../api'
 import './artifact.css'
 
 /** A diagram at full size; invalid code shows as a plain block. */
@@ -49,7 +50,7 @@ function FileView({ target }: { target: FileTarget }) {
   useEffect(() => {
     let live = true
     setContent(null)
-    window.brandy
+    api
       .readArtifact(target)
       .then((c) => live && setContent(c))
       .catch(() => live && setContent({ kind: 'missing' }))
@@ -73,7 +74,7 @@ function FileView({ target }: { target: FileTarget }) {
           <button onClick={copy} title="Copiar caminho">
             <Copy size={14} /> {copied ? 'Copiado' : 'Copiar caminho'}
           </button>
-          <button onClick={() => void window.brandy.openArtifact(target)} title="Abrir no app padrão">
+          <button onClick={() => void api.openArtifact(target)} title="Abrir no app padrão">
             <ExternalLink size={14} /> Abrir no app padrão
           </button>
         </>

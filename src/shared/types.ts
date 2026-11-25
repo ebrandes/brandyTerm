@@ -1,4 +1,4 @@
-import type { MachineInfo } from './remote/machine.ts'
+import type { MachineInfo, MachineOs } from './remote/machine.ts'
 export type AgentId = 'claude' | 'codex' | 'antigravity'
 export type ThreadState = 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'interrupted' | 'cancelled'
 export type Effort = 'low' | 'medium' | 'high'
@@ -195,6 +195,8 @@ export interface Project {
   archived?: { count: number; usage: Usage }
   /** never shown to remote devices */
   remoteHidden?: boolean
+  /** which machine owns the project: set only in the renderer's merged state, never saved */
+  machine?: { id: string; name: string; os: MachineOs; remote: boolean; online: boolean; since?: string }
 }
 
 /** One archived thread, as listed on demand by the board (no messages). */
