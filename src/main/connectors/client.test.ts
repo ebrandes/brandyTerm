@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { createServer } from 'node:http'
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { connectorError, realFactory } from './client.ts'
 import { ConnectorError } from './hub.ts'
 import type { Connector } from '../../shared/connectors.ts'
@@ -55,5 +56,31 @@ test('a token connector the server answers with 401 fails as needs-login, not as
       const c: Connector = { id: 'g', name: 'GitHub', description: '', transport: 'http', url, auth: { kind: 'token', fields: [] }, enabled: true, alwaysAllow: [] }
       await assert.rejects(realFactory(c, { env: {}, headers: { Authorization: 'Bearer velho' } }), (e: unknown) => e instanceof ConnectorError && e.kind === 'login')
     } finally { srv.close() }
+  }
+})
+
+test('a tool call gets 10 minutes, kept alive by progress, and the request signal; listing gets 60 s', async () => {
+  const seen: Record<string, Record<string, unknown> | undefined> = {}
+  const call = Client.prototype.callTool
+  const list = Client.prototype.listTools
+  Client.prototype.callTool = function (this: Client, ...a: Parameters<Client['callTool']>) { seen.call = a[2] as never; return call.apply(this, a) }
+  Client.prototype.listTools = function (this: Client, ...a: Parameters<Client['listTools']>) { seen.list = a[1] as never; return list.apply(this, a) }
+  try {
+    const c = await realFactory(echo, auth)
+    try {
+      const ctl = new AbortController()
+      await c.tools(ctl.signal)
+      await c.call('echo', { text: 'oi' }, ctl.signal)
+      assert.equal(seen.call?.timeout, 600_000)
+      assert.equal(seen.call?.resetTimeoutOnProgress, true)
+      // without a progress handler the SDK asks for no progress, and nothing could extend the timeout
+      assert.equal(typeof seen.call?.onprogress, 'function')
+      assert.equal(seen.call?.signal, ctl.signal)
+      assert.equal(seen.list?.timeout, 60_000)
+      assert.equal(seen.list?.signal, ctl.signal)
+    } finally { await c.close() }
+  } finally {
+    Client.prototype.callTool = call
+    Client.prototype.listTools = list
   }
 })

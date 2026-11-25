@@ -5,7 +5,7 @@ import type { Connector, ConnectorStatus } from '../../shared/connectors.ts'
 export interface ToolInfo { name: string; description?: string; inputSchema: unknown }
 export interface CallResult { content: unknown[]; isError?: boolean }
 export interface LiveClient {
-  tools(): Promise<ToolInfo[]>
+  tools(signal?: AbortSignal): Promise<ToolInfo[]>
   call(tool: string, args: unknown, signal?: AbortSignal): Promise<CallResult>
   close(): Promise<void>
   onClose(cb: (stderrTail: string) => void): void
@@ -148,9 +148,9 @@ export class ConnectorHub extends EventEmitter {
     }
   }
 
-  async tools(c: Connector): Promise<ToolInfo[]> {
+  async tools(c: Connector, signal?: AbortSignal): Promise<ToolInfo[]> {
     return this.use(c, async cl => {
-      const list = await cl.tools()
+      const list = await cl.tools(signal)
       const e = this.entry(c.id)
       if (e.toolCount !== list.length) { e.toolCount = list.length; this.emit('change', c.id) }
       return list

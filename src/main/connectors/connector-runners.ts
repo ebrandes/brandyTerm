@@ -4,6 +4,7 @@ import { shell, type WebContents } from 'electron'
 import { killTerminal, spawnPty } from '../terminal.ts'
 import { runCliLogin, type CliLoginDeps } from './cli-login.ts'
 import { makeOAuthRunner } from './oauth.ts'
+import { loginUrlProblem } from './login-url.ts'
 import { loginPath } from './shell-path.ts'
 import type { Runners } from './login.ts'
 import type { SecretStore } from './secrets.ts'
@@ -31,7 +32,15 @@ export function ptyDeps(getWin: () => WebContents | undefined): CliLoginDeps {
 export function makeRunners(o: { getWin: () => WebContents | undefined; secrets: SecretStore }): Runners {
   const deps = ptyDeps(o.getWin)
   return {
-    oauth: makeOAuthRunner({ secrets: o.secrets, open: url => shell.openExternal(url) }),
+    oauth: makeOAuthRunner({
+      secrets: o.secrets,
+      // the runner already refused anything else; checked again right where the OS gets the URL
+      open: url => {
+        const bad = loginUrlProblem(url)
+        if (bad) throw new Error(bad)
+        return shell.openExternal(url)
+      },
+    }),
     cli: (c, terminalId, signal) => runCliLogin(c, terminalId, signal, deps),
     check: deps.exec,
   }

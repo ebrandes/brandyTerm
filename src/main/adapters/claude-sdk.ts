@@ -78,7 +78,8 @@ export function buildOptions(opts: RunOpts, env: Record<string, string | undefin
     strictMcpConfig: true,
     tools: work ? TOOLS : [],
     allowedTools: work ? [...FREE, ...(gw ? BRANDY_TOOLS : []), ...readOnlyBashRules(!!rtk)] : [],
-    ...(gw ? { mcpServers: { brandy: { type: 'stdio' as const, command: gw.command, args: gw.args, env: gw.env } } } : {}),
+    // alwaysLoad: the three tools are in the turn-1 prompt, never deferred behind tool search
+    ...(gw ? { mcpServers: { brandy: { type: 'stdio' as const, command: gw.command, args: gw.args, env: gw.env, alwaysLoad: true, timeout: Number(MCP_TOOL_TIMEOUT_MS) } } } : {}),
     permissionMode: 'default',
     ...(work ? { canUseTool } : {}),
     plugins: (opts.plugins ?? []).map((path) => ({ type: 'local' as const, path })),

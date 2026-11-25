@@ -12,7 +12,8 @@ const thread = { projectId: 'p', threadId: 't' }
 test('claude work thread gets brandy', () => {
   const o = buildOptions({ cwd: '/w', prompt: 'x', tools: 'work', thread }, {}, canUse)
   assert.equal(o.strictMcpConfig, true)
-  assert.deepEqual(o.mcpServers?.brandy, { type: 'stdio', command: '/e', args: ['/g.js'], env })
+  // always loaded (never deferred behind tool search, there on turn 1) and allowed as long as the agent's own timeout
+  assert.deepEqual(o.mcpServers?.brandy, { type: 'stdio', command: '/e', args: ['/g.js'], env, alwaysLoad: true, timeout: 960000 })
   for (const n of ['list_connectors', 'connector_tools', 'call_connector']) assert.ok(o.allowedTools?.includes(`mcp__brandy__${n}`))
   assert.equal(o.env?.MCP_TOOL_TIMEOUT, '960000')
 })

@@ -10,6 +10,9 @@ import { ConnectorError, LOGIN_NEEDED, type AuthMaterial, type CallResult, type 
 import { loginPath } from './shell-path.ts'
 
 const TAIL_MAX = 500
+/** a connector tool may run long (a deploy, a performance trace): 10 min, extended while it reports progress */
+export const CALL_TIMEOUT_MS = 600_000
+export const LIST_TIMEOUT_MS = 60_000
 
 function httpTransport(c: Connector, auth: AuthMaterial): StreamableHTTPClientTransport {
   if (!c.url) throw new ConnectorError('Conector sem URL.', 'failed')
@@ -75,14 +78,20 @@ export const realFactory: ClientFactory = async (c, auth) => {
   }
 
   const live: LiveClient = {
-    async tools(): Promise<ToolInfo[]> {
-      const r = await Promise.race([client.listTools(), dead]).catch(async e => { throw refused(e) ? connectorError(e) : await explain(e) })
+    async tools(signal): Promise<ToolInfo[]> {
+      const r = await Promise.race([client.listTools(undefined, { timeout: LIST_TIMEOUT_MS, ...(signal ? { signal } : {}) }), dead]).catch(async e => { throw refused(e) ? connectorError(e) : await explain(e) })
       return r.tools.map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
     },
     async call(tool, args, signal): Promise<CallResult> {
       try {
         const r = await Promise.race([
-          client.callTool({ name: tool, arguments: (args ?? {}) as Record<string, unknown> }, undefined, { signal }),
+          client.callTool({ name: tool, arguments: (args ?? {}) as Record<string, unknown> }, undefined, {
+            signal,
+            timeout: CALL_TIMEOUT_MS,
+            resetTimeoutOnProgress: true,
+            // the SDK asks the server for progress only when there is a handler; without it nothing resets the timeout
+            onprogress: () => {},
+          }),
           dead,
         ])
         return { content: (r.content as unknown[]) ?? [], ...(r.isError ? { isError: true } : {}) }

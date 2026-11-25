@@ -5,7 +5,8 @@ import type { AddressInfo } from 'node:net'
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js'
 import type { Connector } from '../../shared/connectors.ts'
 import { finishAuth, realFactory } from './client.ts'
-import type { AuthMaterial, ClientFactory } from './hub.ts'
+import { ConnectorError, type AuthMaterial, type ClientFactory } from './hub.ts'
+import { loginUrlProblem } from './login-url.ts'
 import { makeOAuthProvider } from './oauth-provider.ts'
 import type { SecretStore } from './secrets.ts'
 import { cancelledMessage } from './cli-login.ts'
@@ -78,7 +79,12 @@ export function makeOAuthRunner(d: OAuthRunnerDeps): (c: Connector, signal: Abor
       const state = randomBytes(16).toString('hex')
       const { redirectUrl, code } = await waitForCode(inner.signal, state)
       let redirected = false
-      const oauth = createOAuthProvider(c.id, d.secrets, redirectUrl, url => { redirected = true; void d.open(url.href) }, state)
+      const oauth = createOAuthProvider(c.id, d.secrets, redirectUrl, url => {
+        const bad = loginUrlProblem(url.href)
+        if (bad) throw new ConnectorError(bad, 'failed')
+        redirected = true
+        void d.open(url.href)
+      }, state)
       const auth: AuthMaterial = { env: {}, headers: {}, oauth }
       const probe = async () => { await (await factory(c, auth)).close() }
       try {

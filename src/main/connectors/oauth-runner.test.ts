@@ -81,3 +81,16 @@ test('Cancelar while the browser step is open rejects with the cancelado text an
   await assert.rejects(run(conn('http://127.0.0.1:1/mcp'), ac.signal), /login do Linear cancelado/)
   await assert.rejects(fetch(redirect))
 })
+
+test('an authorization URL that is not https (or http on this machine) fails the login and is never opened', async () => {
+  for (const [url, scheme] of [['file://host/share', 'file'], ['myapp://x', 'myapp'], ['http://evil.example/auth', 'http']]) {
+    const opened: string[] = []
+    const factory: ClientFactory = async (_c, auth) => {
+      await auth.oauth!.redirectToAuthorization(new URL(url))
+      throw new ConnectorError('Precisa de login.', 'login')
+    }
+    const run = makeOAuthRunner({ secrets: store(), factory, open: u => { opened.push(u) } })
+    await assert.rejects(run(conn('http://127.0.0.1:1/mcp'), new AbortController().signal), { message: `Endereço de login inválido: ${scheme}` })
+    assert.deepEqual(opened, [])
+  }
+})

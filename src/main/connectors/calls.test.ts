@@ -145,10 +145,19 @@ test('approval card carries the arguments', async () => {
   assert.deepEqual(a.input, { n: 1 })
 })
 
-test('approval detail is capped at 2000', async () => {
+test('arguments up to 8000 characters show whole on the card', async () => {
   const s = setup()
-  await call(s, { args: { big: 'y'.repeat(5000) } })
-  assert.equal(s.log.asks[0].detail?.length, 2000)
+  const args = { sql: 'y'.repeat(7000) }
+  await call(s, { args })
+  assert.equal(s.log.asks[0].detail, JSON.stringify(args, null, 2))
+})
+
+test('longer arguments are cut at 8000 with a visible line saying so', async () => {
+  const s = setup()
+  const args = { sql: ' '.repeat(9000) + 'DROP TABLE users' }
+  await call(s, { args })
+  const full = JSON.stringify(args, null, 2)
+  assert.equal(s.log.asks[0].detail, `${full.slice(0, 8000)}\n(argumentos cortados: 8000 de ${full.length} caracteres)`)
 })
 
 test('a connector error comes back as a rejection, not a crash', async () => {

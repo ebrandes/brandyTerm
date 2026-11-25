@@ -11,7 +11,13 @@ import { resultText, toolsText } from './result-text.ts'
 import { CANCELLED, hold, startDeadline, type Deadline } from './deadline.ts'
 
 export { RESULT_CAP } from './result-text.ts'
-const DETAIL_CAP = 2000
+const DETAIL_CAP = 8000
+
+/** The arguments as the approval card shows them; when cut, a visible line says so, so nothing hides past the end. */
+function detailOf(args: unknown): string {
+  const full = JSON.stringify(args ?? {}, null, 2) ?? '{}'
+  return full.length <= DETAIL_CAP ? full : `${full.slice(0, DETAIL_CAP)}\n(argumentos cortados: ${DETAIL_CAP} de ${full.length} caracteres)`
+}
 
 export interface CallsDeps {
   store: Pick<ConnectorStore, 'list' | 'visibleFor' | 'allow'>
@@ -62,7 +68,7 @@ export function createCalls(d: CallsDeps): GwHandler {
 
   async function approve(c: Connector, t: Thread, tool: string, args: unknown, dl: Deadline): Promise<void> {
     if (c.alwaysAllow.includes(tool)) return
-    const detail = (JSON.stringify(args ?? {}, null, 2) ?? '{}').slice(0, DETAIL_CAP)
+    const detail = detailOf(args)
     const input = args && typeof args === 'object' && !Array.isArray(args) ? (args as Record<string, unknown>) : {}
     const answer = await hold(
       s => d.approvals.ask(t, { tool: `mcp__${c.id}__${tool}`, input, summary: `${c.name} · ${tool}`, detail, connector: { id: c.id, name: c.name, tool }, signal: s }),
@@ -105,7 +111,7 @@ export function createCalls(d: CallsDeps): GwHandler {
     try {
       if (await d.login.needsLogin(c)) await d.login.require(c, ref, dl.signal)
       // reach the connector first: a login it asks for comes before the approval card
-      const tools = await withLogin(c, ref, dl, retry, x => d.hub.tools(x))
+      const tools = await withLogin(c, ref, dl, retry, x => d.hub.tools(x, signal))
       if (req.op === 'tools') return toolsText(tools.map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema })))
       if (signal.aborted) throw new Error(CANCELLED)
       await approve(still(c), t, req.tool!, req.args, dl)
