@@ -26,8 +26,15 @@ const STATIC: Components = {
 }
 
 /** Markdown for agent output: GFM (tables, task lists, links), soft line breaks, highlighted code, runnable shell blocks. */
-export const Rich = memo(function Rich({ text, projectId }: { text: string; projectId?: string }) {
-  const components = useMemo<Components>(() => ({ ...STATIC, pre: ({ children }) => <PreBlock projectId={projectId}>{children}</PreBlock> }), [projectId])
+export const Rich = memo(function Rich({ text, projectId, imageSrc }: { text: string; projectId?: string; imageSrc?: (src: string) => string | undefined }) {
+  const components = useMemo<Components>(
+    () => ({
+      ...STATIC,
+      pre: ({ children }) => <PreBlock projectId={projectId}>{children}</PreBlock>,
+      ...(imageSrc ? { img: ({ src, alt }) => <img src={imageSrc(String(src ?? ''))} alt={alt ?? ''} loading="lazy" /> } : {})
+    }),
+    [projectId, imageSrc]
+  )
   return (
     <div className="rich">
       <Markdown remarkPlugins={REMARK} rehypePlugins={REHYPE} components={components}>
