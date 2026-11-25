@@ -160,3 +160,12 @@ test('socketPath falls back to tmpdir when the path is too long', { skip: !posix
   assert.equal(socketPath('/a', 7), '/a/gw-7.sock')
   assert.equal(socketPath('/a'.repeat(60), 7), join(os.tmpdir(), 'bt-gw-7.sock'))
 })
+
+test('close() removes the socket file before it is awaited', { skip: !posix }, async () => {
+  const path = tmpPath()
+  const srv = await startGatewayServer(path, async () => null)
+  assert.equal(fs.existsSync(path), true)
+  const done = srv.close()
+  assert.equal(fs.existsSync(path), false)
+  await done
+})

@@ -9,6 +9,7 @@ import { realFactory } from './client.ts'
 import { createCalls } from './calls.ts'
 import { elsewhere } from './elsewhere.ts'
 import { startGatewayServer, socketPath } from './gateway-server.ts'
+import { sweepStaleSockets } from './socket-sweep.ts'
 import { ConnectorHub } from './hub.ts'
 import { LoginBroker } from './login.ts'
 import { makeOAuthProvider } from './oauth-provider.ts'
@@ -76,6 +77,7 @@ export async function startConnectors(d: {
       engine.touch()
     },
   })
+  sweepStaleSockets(d.userData, process.pid)
   const server = await startGatewayServer(socketPath(d.userData, process.pid), calls)
   setGatewayProvider(t => gatewaySpec(server.path, server.issue(t)))
 
@@ -83,7 +85,10 @@ export async function startConnectors(d: {
     deps: { store, secrets, hub, login },
     async stop() {
       for (const e of [store, hub, login]) e.off('change', sync)
-      await server.close()
+      // synchronous part first: Electron may exit right after this returns
+      hub.killAll()
+      const closing = server.close()
+      await closing
       await hub.closeAll()
     },
   }

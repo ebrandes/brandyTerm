@@ -87,11 +87,11 @@ export async function startGatewayServer(path: string, handle: GwHandler): Promi
       return token
     },
     close() {
+      // everything that matters at quit happens before the first await
       for (const s of sockets) s.destroy()
-      return new Promise<void>(resolve => server.close(() => {
-        if (process.platform !== 'win32') fs.rmSync(path, { force: true })
-        resolve()
-      }))
+      const closing = new Promise<void>(resolve => server.close(() => resolve()))
+      if (process.platform !== 'win32') fs.rmSync(path, { force: true })
+      return closing
     },
   }
 }

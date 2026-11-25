@@ -92,6 +92,11 @@ export const realFactory: ClientFactory = async (c, auth) => {
       await client.close()
     },
     onClose(cb) { closers.push(cb) },
+    kill() {
+      closed = true
+      const pid = (transport as StdioClientTransport).pid
+      if (pid) process.kill(pid)
+    },
   }
   return live
 }

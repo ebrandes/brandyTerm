@@ -91,3 +91,19 @@ test('markLogin and test() count tools', async () => {
   assert.equal(hub.status('c1').status, 'conectado')
   await hub.closeAll()
 })
+
+test('killAll signals every live client synchronously', async () => {
+  const kills: string[] = []
+  const factory: ClientFactory = async c => ({
+    tools: async () => [],
+    call: async () => ({ content: [] }),
+    close: async () => {},
+    onClose: () => {},
+    kill: () => { kills.push(c.id) },
+  })
+  const hub = new ConnectorHub({ factory, auth })
+  await hub.tools(conn)
+  await hub.tools({ ...conn, id: 'c2' })
+  hub.killAll()
+  assert.deepEqual(kills.sort(), ['c1', 'c2'])
+})

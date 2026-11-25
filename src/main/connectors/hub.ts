@@ -9,6 +9,8 @@ export interface LiveClient {
   call(tool: string, args: unknown, signal?: AbortSignal): Promise<CallResult>
   close(): Promise<void>
   onClose(cb: (stderrTail: string) => void): void
+  /** synchronous best-effort kill of the connector's child process (app quit) */
+  kill?(): void
 }
 export interface AuthMaterial {
   env: Record<string, string>
@@ -157,6 +159,14 @@ export class ConnectorHub extends EventEmitter {
     e.client = undefined
     try { await client.close() } catch { /* already gone */ }
     if (e.status === 'conectado') this.set(id, 'desconectado')
+  }
+
+  /** Signals every live stdio child to exit, synchronously: for app quit, where nothing can be awaited. */
+  killAll(): void {
+    for (const e of this.entries.values()) {
+      if (e.timer) clearTimeout(e.timer)
+      try { e.client?.kill?.() } catch { /* already gone */ }
+    }
   }
 
   async closeAll(): Promise<void> {
