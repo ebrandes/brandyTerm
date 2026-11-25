@@ -76,3 +76,29 @@ test('opening the store and listing creates no key: remote-key.json waits for th
   s.ownKey()
   assert.equal(fs.existsSync(join(dir, 'remote-key.json')), true)
 })
+
+const corrupt = (dir: string, name: string) => fs.readdirSync(dir).filter(f => f.startsWith(`${name}.corrupt-`))
+
+test('a corrupt trust file is kept aside (and logged) before the list starts empty', () => {
+  const dir = tmp()
+  fs.writeFileSync(join(dir, 'remote-trust.json'), '{ not json')
+  const s = new TrustStore(dir)
+  assert.deepEqual(s.list(), [])
+  const kept = corrupt(dir, 'remote-trust.json')
+  assert.equal(kept.length, 1)
+  assert.equal(fs.readFileSync(join(dir, kept[0]), 'utf8'), '{ not json')
+  s.add(dev) // the next save replaces the file; the copy stays
+  assert.equal(corrupt(dir, 'remote-trust.json').length, 1)
+})
+
+test('a corrupt key file is kept aside before a new key is made; a missing one is not', () => {
+  const dir = tmp()
+  new TrustStore(dir).ownKey()
+  assert.deepEqual(corrupt(dir, 'remote-key.json'), [])
+  fs.writeFileSync(join(dir, 'remote-key.json'), '{"pub":"AAAA","priv":"BBBB"}')
+  new TrustStore(dir).ownKey()
+  const kept = corrupt(dir, 'remote-key.json')
+  assert.equal(kept.length, 1)
+  assert.equal(fs.readFileSync(join(dir, kept[0]), 'utf8'), '{"pub":"AAAA","priv":"BBBB"}')
+  assert.equal(fs.statSync(join(dir, kept[0])).mode & 0o777, 0o600, 'the copy of a key stays private')
+})

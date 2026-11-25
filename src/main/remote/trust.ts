@@ -13,6 +13,19 @@ function writeAtomic(file: string, data: string, mode?: number): void {
   fs.renameSync(tmp, file)
 }
 
+/** A file that exists but cannot be used is copied to `<file>.corrupt-<time>` (same mode) before it is replaced. */
+function keepCorrupt(file: string): void {
+  if (!fs.existsSync(file)) return
+  const copy = `${file}.corrupt-${new Date().toISOString().replace(/[:.]/g, '-')}`
+  try {
+    fs.copyFileSync(file, copy)
+    fs.chmodSync(copy, fs.statSync(file).mode & 0o777)
+    console.error(`[remote] ${file} inválido; cópia guardada em ${copy}`)
+  } catch (e) {
+    console.error(`[remote] ${file} inválido e não foi copiado:`, e instanceof Error ? e.message : e)
+  }
+}
+
 export class TrustStore extends EventEmitter {
   private readonly keyFile: string
   private readonly trustFile: string
@@ -31,8 +44,10 @@ export class TrustStore extends EventEmitter {
     try {
       const v = JSON.parse(fs.readFileSync(this.trustFile, 'utf8'))
       // entries written before roles existed were all clients
-      return Array.isArray(v) ? v.map(d => ({ ...d, role: d.role === 'host' ? 'host' : 'client' })) : []
-    } catch { return [] }
+      if (Array.isArray(v)) return v.map(d => ({ ...d, role: d.role === 'host' ? 'host' : 'client' }))
+    } catch { /* missing or corrupt */ }
+    keepCorrupt(this.trustFile)
+    return []
   }
 
   private save(): void {
@@ -47,6 +62,7 @@ export class TrustStore extends EventEmitter {
       const k = { pub: fromB64(j.pub), priv: fromB64(j.priv) }
       if (k.pub.length === 32 && k.priv.length === 32) return (this.key = k)
     } catch { /* missing or corrupt: generate */ }
+    keepCorrupt(this.keyFile)
     const k = newKeyPair()
     writeAtomic(this.keyFile, JSON.stringify({ pub: toB64(k.pub), priv: toB64(k.priv) }), 0o600)
     return (this.key = k)
