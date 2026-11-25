@@ -64,8 +64,11 @@ test('an unreadable secrets file is copied aside before the next set', () => {
   try {
     const s = new SecretStore(file, fake)
     assert.deepEqual(s.get('a'), {})
+    s.get('a'); s.get('b')
+    assert.equal(fs.readdirSync(d).filter(f => f.includes('.corrupt-')).length, 1)
     s.set('b', { env: { K: 'v' } })
   } finally { console.error = prev }
+  assert.equal(fs.readdirSync(d).filter(f => f.includes('.corrupt-')).length, 1)
   const copy = fs.readdirSync(d).find(f => /^s\.json\.corrupt-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/.test(f))
   assert.ok(copy)
   assert.equal(fs.readFileSync(join(d, copy), 'utf8'), '{not json')
