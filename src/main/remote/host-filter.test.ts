@@ -91,3 +91,49 @@ test('authorize knows every registered channel (none falls into the unknown refu
     assert.ok(viaProject.ok || viaString.ok || viaNothing.ok, ch)
   }
 })
+
+function withPlugins(): AppState {
+  const s = state()
+  s.projects[0].path = '/work/a'
+  s.projects[1].path = '/work/b'
+  s.userPlugins = {
+    list: [
+      { id: 'u@m', name: 'u', scope: 'user' },
+      { id: 'pa@m#/work/a', name: 'pa', scope: 'project' },
+      { id: 'pb@m#/work/b', name: 'pb', scope: 'project' },
+      { id: 'px@m#/work/unknown', name: 'px', scope: 'project' }
+    ] as never,
+    personal: undefined
+  }
+  return s
+}
+
+test('filterState drops project plugins of hidden or unknown projects', () => {
+  const out = filterState(withPlugins())
+  assert.deepEqual(out.userPlugins?.list.map(u => u.id), ['u@m', 'pa@m#/work/a'])
+  assert.ok(!JSON.stringify(out).includes('/work/b'))
+  assert.ok(!JSON.stringify(out).includes('/work/unknown'))
+})
+
+test('authorize userPlugins:set: project plugins only for visible projects', () => {
+  const s = withPlugins()
+  const ok = (id: unknown) => authorize('userPlugins:set', { id, on: true }, s).ok
+  assert.equal(ok('u@m'), true)
+  assert.equal(ok('personal'), true)
+  assert.equal(ok('pa@m#/work/a'), true)
+  assert.equal(ok('pb@m#/work/b'), false)
+  assert.equal(ok('px@m#/work/unknown'), false)
+  assert.equal(ok(['pb@m#/work/b']), false)
+  assert.equal(ok(undefined), false)
+  assert.deepEqual(authorize('userPlugins:set', { id: 'pb@m#/work/b' }, s), { ok: false, error: HIDDEN })
+})
+
+test('authorize fs:list: remote queries stay inside the project', () => {
+  const s = state()
+  const q = (query: unknown) => authorize('fs:list', { projectId: 'a', query }, s)
+  for (const query of ['/', '/etc/', '~/', '~', '../x', 'a/../../x', '..\\x', ['/']]) {
+    assert.deepEqual(q(query), { ok: false, error: 'Fora do projeto' }, JSON.stringify(query))
+  }
+  for (const query of ['', 'src/ma', 'a..b', 'file.ts']) assert.equal(q(query).ok, true, query)
+  assert.equal(authorize('fs:list', { projectId: 'b', query: 'x' }, s).ok, false)
+})

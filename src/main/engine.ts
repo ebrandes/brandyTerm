@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
+import { ownsProcess } from './owns-process.ts'
 import { existsSync, statSync } from 'node:fs'
 import type { AgentId, AppState, ApprovalDecision, Attachment, Message, Project, SlashCommand, Thread, Usage } from '../shared/types.ts'
 import { MAX_ACTIVE_THREADS } from '../shared/types.ts'
@@ -144,12 +145,12 @@ export class Engine extends EventEmitter {
   }
 
   stopProcess(projectId: string, processId: string): void {
-    this.project(projectId) && this.procs.stop(processId)
+    ownsProcess(this.project(projectId), processId) && this.procs.stop(processId)
   }
 
   removeProcess(projectId: string, processId: string): void {
     const p = this.project(projectId)
-    if (!p) return
+    if (!p || !ownsProcess(p, processId)) return
     this.procs.stop(processId)
     p.processes = p.processes.filter((x) => x.id !== processId)
     this.touch()

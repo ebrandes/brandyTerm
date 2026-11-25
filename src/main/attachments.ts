@@ -5,6 +5,7 @@ import { extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { MAX_FILES, type Attachment } from '../shared/types.ts'
 import { inside } from './paths.ts'
+import { insideProjectFolder, projectDirName } from './attachment-scope.ts'
 import { registry } from './rpc/registry.ts'
 import { ruleOf } from './rpc/channels.ts'
 
@@ -46,21 +47,22 @@ function owned(p: string): boolean {
 export function saveAttachment(projectId: string, name: string, mime: string, data: Uint8Array, marked: boolean): Attachment {
   if (data.byteLength > MAX_ATTACHMENT) throw new Error(`Arquivo grande demais (máx. ${MAX_ATTACHMENT / 1024 / 1024} MB)`)
   const id = randomUUID()
-  const dir = join(attachmentsRoot(), projectId.replace(/[^\w-]/g, '_'))
+  const dir = join(attachmentsRoot(), projectDirName(projectId))
   mkdirSync(dir, { recursive: true })
   const file = join(dir, `${id.slice(0, 8)}-${safeName(name)}`)
   writeFileSync(file, data)
   return { id, name: safeName(name), kind: kindOf(name, mime), mime: mime || 'application/octet-stream', size: data.byteLength, path: file, marked }
 }
 
-/** Keeps only attachments the app stored itself. */
-export function validAttachments(list: unknown): Attachment[] {
+/** Keeps only attachments the app stored itself; with `onlyProject` (remote calls), only that project's own folder. */
+export function validAttachments(list: unknown, onlyProject?: string): Attachment[] {
   if (!Array.isArray(list)) return []
-  return list.filter((a): a is Attachment => !!a && typeof a.path === 'string' && typeof a.name === 'string' && owned(a.path)).slice(0, MAX_FILES)
+  const ok = (p: string): boolean => owned(p) && (onlyProject === undefined || insideProjectFolder(attachmentsRoot(), onlyProject, p))
+  return list.filter((a): a is Attachment => !!a && typeof a.path === 'string' && typeof a.name === 'string' && ok(a.path)).slice(0, MAX_FILES)
 }
 
 export function removeProjectAttachments(projectId: string): void {
-  rmSync(join(attachmentsRoot(), projectId.replace(/[^\w-]/g, '_')), { recursive: true, force: true })
+  rmSync(join(attachmentsRoot(), projectDirName(projectId)), { recursive: true, force: true })
 }
 
 /** privileges of brandy-att://; registered with the other schemes in one call (index.ts) */

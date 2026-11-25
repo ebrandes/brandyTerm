@@ -46,6 +46,8 @@ async function withHost(fn: (e: Env) => Promise<void>): Promise<void> {
   reg.add('settings:set', () => 1, 'deny')
   reg.add('term:write', () => 'wrote', 'terminal')
   reg.add('archive:list', ids => ids, 'pass')
+  reg.add('fs:list', a => ['listed'], 'pass')
+  reg.add('process:stop', () => 'stopped', 'pass')
   const host = new HostServer({
     state: () => state,
     invoke: (channel, arg, ctx) => { calls.push({ channel, arg, ctx }); return reg.invoke(channel, arg, ctx) },
@@ -86,6 +88,16 @@ test('state:get is filtered; hidden project and denied channel are refused', () 
   await assert.rejects(ch.request('chat:send', { projectId: 'b' }), /^Error: Projeto não disponível remotamente$/)
   await assert.rejects(ch.request('chat:send', { projectId: 'zzz' }), /^Error: Projeto não disponível remotamente$/)
   await assert.rejects(ch.request('settings:set', {}), /^Error: Não permitido remotamente: settings:set$/)
+  ch.close()
+}))
+
+test('fs:list is confined to the project for remote callers', () => withHost(async e => {
+  const ch = await e.connect()
+  assert.deepEqual(await ch.request('fs:list', { projectId: 'a', query: 'src' }), ['listed'])
+  for (const query of ['/', '~/', '../x']) {
+    await assert.rejects(ch.request('fs:list', { projectId: 'a', query }), /^Error: Fora do projeto$/)
+  }
+  assert.equal(e.calls.filter(c => c.channel === 'fs:list').length, 1)
   ch.close()
 }))
 
