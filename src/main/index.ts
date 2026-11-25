@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, protocol, shell } from 'electron'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { Engine } from './engine.ts'
@@ -7,7 +7,8 @@ import { killAll } from './adapters/proc.ts'
 import { closeSdkSessions } from './adapters/claude-sdk.ts'
 import { discoverPlugins, installPlugin } from './plugins.ts'
 import { killAllTerminals, killTerminal, registerTerminalIpc } from './terminal.ts'
-import { registerAttachmentIpc, registerAttachmentScheme, validAttachments } from './attachments.ts'
+import { ARTIFACT_SCHEME, registerArtifactIpc } from './artifact-ipc.ts'
+import { ATTACHMENT_SCHEME, registerAttachmentIpc, validAttachments } from './attachments.ts'
 import { registerFsIpc } from './fs-list.ts'
 import { Accounts } from './accounts.ts'
 import { registerAccountIpc } from './account-ipc.ts'
@@ -141,7 +142,8 @@ function registerIpc(): void {
   )
 }
 
-registerAttachmentScheme()
+// Electron keeps only the last call: every privileged scheme goes in this one
+protocol.registerSchemesAsPrivileged([ATTACHMENT_SCHEME, ARTIFACT_SCHEME])
 
 /** reads each account's limits at startup unless they are fresh (each check is a tiny Haiku run) */
 async function refreshLimits(accounts: Accounts): Promise<void> {
@@ -182,6 +184,7 @@ app.whenReady().then(async () => {
   }
   registerTerminalIpc(projectRoot)
   registerFsIpc(projectRoot)
+  registerArtifactIpc(projectRoot)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))
   createWindow()

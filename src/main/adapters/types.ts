@@ -39,6 +39,8 @@ export interface RunOpts {
 export type AgentEvent =
   | { kind: 'session'; sessionId: string }
   | { kind: 'activity'; text: string }
+  /** a file the run created or edited (absolute path) */
+  | { kind: 'file'; path: string; op: 'write' | 'edit' }
   | { kind: 'text'; text: string }
   | { kind: 'todos'; items: Todo[] }
   | { kind: 'usage'; input: number; output: number; cached: number; costUsd?: number }

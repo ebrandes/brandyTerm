@@ -26,8 +26,33 @@ const STATIC: Components = {
 }
 
 /** Markdown for agent output: GFM (tables, task lists, links), soft line breaks, highlighted code, runnable shell blocks. */
-export const Rich = memo(function Rich({ text, projectId }: { text: string; projectId?: string }) {
-  const components = useMemo<Components>(() => ({ ...STATIC, pre: ({ children }) => <PreBlock projectId={projectId}>{children}</PreBlock> }), [projectId])
+type RichProps = {
+  text: string
+  projectId?: string
+  /** rewrites image sources (artifact viewer: project files via brandy-art) */
+  imageSrc?: (src: string) => string | undefined
+  /** handles a link click instead of the default; return true when handled */
+  onLink?: (href: string) => boolean
+}
+
+export const Rich = memo(function Rich({ text, projectId, imageSrc, onLink }: RichProps) {
+  const components = useMemo<Components>(
+    () => ({
+      ...STATIC,
+      pre: ({ children }) => <PreBlock projectId={projectId}>{children}</PreBlock>,
+      ...(imageSrc ? { img: ({ src, alt }) => <img src={imageSrc(String(src ?? ''))} alt={alt ?? ''} loading="lazy" /> } : {}),
+      ...(onLink
+        ? {
+            a: ({ href, children }) => (
+              <a href={href} target="_blank" rel="noreferrer" title={href} onClick={(e) => onLink(String(href ?? '')) && e.preventDefault()}>
+                {children}
+              </a>
+            )
+          }
+        : {})
+    }),
+    [projectId, imageSrc, onLink]
+  )
   return (
     <div className="rich">
       <Markdown remarkPlugins={REMARK} rehypePlugins={REHYPE} components={components}>

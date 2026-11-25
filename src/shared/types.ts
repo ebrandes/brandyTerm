@@ -97,6 +97,23 @@ export interface ToolApproval {
   createdAt: string
 }
 
+/** a file a thread created or edited; `path` is relative to the project root */
+export interface ThreadFile {
+  path: string
+  op: 'write' | 'edit'
+  at: string
+}
+
+export type ArtifactKind = 'md' | 'mermaid' | 'html' | 'svg' | 'code'
+export type MediaKind = 'video' | 'image'
+
+/** an artifact read for the viewer; a file outside the project or gone reads as missing */
+export type ArtifactContent =
+  | { kind: 'missing' }
+  | { kind: 'too-big'; size: number }
+  | { kind: MediaKind; size: number }
+  | { kind: ArtifactKind; text: string; lang?: string }
+
 export interface Thread {
   id: string
   requestId: string
@@ -117,6 +134,10 @@ export interface Thread {
   todos: Todo[]
   /** short log of actions of the current run */
   steps: string[]
+  /** start of the current run: media changed after it becomes artifact cards */
+  runAt?: string
+  /** files the thread created or edited, newest last (artifact cards) */
+  files?: ThreadFile[]
   summary?: string
   /** what the thread says is still open (its PENDENTE: line); a done thread without it is resolved */
   pending?: string

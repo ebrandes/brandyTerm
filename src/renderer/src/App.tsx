@@ -9,6 +9,7 @@ import { useDraftFiles } from './useDraftFiles'
 import { useResizablePanel } from './useResizablePanel'
 import { ResizeHandle } from './components/ResizeHandle'
 import logo from './assets/logo.png'
+import { ArtifactViewer } from './components/ArtifactViewer'
 
 const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
 
@@ -186,6 +187,7 @@ export function App() {
           }}
         />
       )}
+      <ArtifactViewer />
     </div>
   )
 }
