@@ -5,6 +5,14 @@ import { PAIRING_SECONDS, clock, secondsLeft } from '../machine-groups'
 import { api } from '../api'
 import { errorText } from '../notice'
 
+/** what pairing gives away, shown wherever a code is shown or typed */
+const PAIR_WARNING =
+  'O aparelho pareado pode mandar mensagens, rodar comandos e ler arquivos dos projetos visíveis desta máquina. Pareie só computadores seus.'
+
+function PairWarning() {
+  return <p className="rp-warn" role="note">{PAIR_WARNING}</p>
+}
+
 /** This machine's pairing code (2 minutes), closed when it runs out or the panel goes away. */
 function NewPairing() {
   const [code, setCode] = useState<string>()
@@ -57,6 +65,7 @@ function NewPairing() {
             {code.split('-').map((g, i) => <span key={i}>{g}</span>)}
           </div>
           <p className="rp-hint">Digite este código no outro computador</p>
+          <PairWarning />
           <div className="rp-code-foot">
             <span className="rp-count">{clock(left)}</span>
             <button className="rp-link" onClick={cancel}>Cancelar</button>
@@ -91,6 +100,7 @@ function Discovered({ h }: { h: DiscoveredHost }) {
       <span className="rp-found-name"><OsIcon os={h.os} /> {h.name}</span>
       <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código" aria-label={`Código de ${h.name}`} autoCapitalize="characters" spellCheck={false} autoComplete="off" maxLength={19} />
       <button type="submit" className="rp-btn sm" disabled={busy || !code.trim()}>Parear</button>
+      {code.trim() && <PairWarning />}
       {error && <p className="rp-error">{error}</p>}
     </form>
   )

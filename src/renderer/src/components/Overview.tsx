@@ -9,6 +9,9 @@ import { api } from '../api'
 import { report } from '../notice'
 import './overview-footer.css'
 
+// what the switch really does: listing and the app's file calls, not what a visible project's coordinator can reach
+const REMOTE_TIP =
+  'Desligado: os computadores pareados não veem este projeto nem abrem arquivos dele pelo app. Se um projeto visível contém esta pasta, o coordenador e os comandos de lá ainda alcançam os arquivos'
 
 interface Props {
   project: Project
@@ -86,7 +89,7 @@ export function Overview({ project, selectedId, onSelect, onCancel, onBoard, all
           </div>
         )}
         {!project.machine?.remote && !project.demo && (
-          <label className="overview-footer-row" title="Quando desligado, os computadores pareados não veem este projeto nem leem arquivos dele">
+          <label className="overview-footer-row" title={REMOTE_TIP}>
             <span>Disponível remotamente</span>
             <input
               type="checkbox"
