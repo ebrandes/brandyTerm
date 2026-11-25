@@ -1,4 +1,4 @@
-import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, Attachment, FsEntry, SlashCommand } from './types.ts'
+import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, ArtifactContent, Attachment, FsEntry, SlashCommand } from './types.ts'
 
 export interface BrandyApi {
   platform: string
@@ -14,6 +14,10 @@ export interface BrandyApi {
   saveAttachment(args: { projectId: string; name: string; mime: string; data: Uint8Array; marked?: boolean }): Promise<Attachment>
   /** opens a stored attachment with the system's default app */
   openAttachment(path: string): Promise<void>
+  /** a file of the project (relative path) for the artifact viewer */
+  readArtifact(args: { projectId: string; path: string }): Promise<ArtifactContent>
+  /** opens a project file in the system's default app */
+  openArtifact(args: { projectId: string; path: string }): Promise<void>
   /** slash commands for the composer: app commands, plugin skills/commands, project commands */
   listCommands(projectId: string): Promise<SlashCommand[]>
   /** files/folders for an "@" mention: project paths matching `query`, or one level of a "~/" or "/" folder (max 50; [] for demo projects) */

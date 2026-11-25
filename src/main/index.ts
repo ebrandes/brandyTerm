@@ -7,6 +7,7 @@ import { killAll } from './adapters/proc.ts'
 import { closeSdkSessions } from './adapters/claude-sdk.ts'
 import { discoverPlugins, installPlugin } from './plugins.ts'
 import { killAllTerminals, killTerminal, registerTerminalIpc } from './terminal.ts'
+import { registerArtifactIpc, registerArtifactScheme } from './artifact-ipc.ts'
 import { registerAttachmentIpc, registerAttachmentScheme, validAttachments } from './attachments.ts'
 import { registerFsIpc } from './fs-list.ts'
 import { Accounts } from './accounts.ts'
@@ -142,6 +143,7 @@ function registerIpc(): void {
 }
 
 registerAttachmentScheme()
+registerArtifactScheme()
 
 /** reads each account's limits at startup unless they are fresh (each check is a tiny Haiku run) */
 async function refreshLimits(accounts: Accounts): Promise<void> {
@@ -182,6 +184,7 @@ app.whenReady().then(async () => {
   }
   registerTerminalIpc(projectRoot)
   registerFsIpc(projectRoot)
+  registerArtifactIpc(projectRoot)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))
   createWindow()
