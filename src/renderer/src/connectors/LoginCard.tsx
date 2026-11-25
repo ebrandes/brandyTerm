@@ -13,7 +13,7 @@ interface Props {
   machineName?: string
   /** the card belongs to a paired machine: login can only happen there */
   remote: boolean
-  /** only the panel card shows the login terminal */
+  /** which card shows the login terminal: the panel's for a panel login, else the thread's */
   place?: 'panel' | 'thread'
 }
 
@@ -21,14 +21,14 @@ interface Props {
 export function LoginCard({ login, machineName, remote, place = 'panel' }: Props) {
   const view = loginCardView(login, remote, machineName, place)
   const term = loginTerminalOf(login)
-  const isCli = login.authKind === 'cli' && !remote && place === 'panel'
+  const isCli = login.authKind === 'cli' && !remote && (place === 'panel') === login.panel
   const box = useRef<HTMLDivElement>(null)
   const fields = useRef<Record<string, HTMLInputElement | null>>({})
 
   // the terminal entry exists from the first paint, so the CLI's earliest output is kept
   useEffect(() => {
     if (!isCli) return
-    attach(term) // never disposed here: ConnectorsSection forgets it when the login ends
+    attach(term) // never disposed here: ConnectorsSection forgets it when the login ends (the owning card may be a thread's)
   }, [isCli, term])
 
   useEffect(() => {

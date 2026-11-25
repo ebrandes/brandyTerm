@@ -10,10 +10,10 @@ export interface LoginCardView {
   showFields: boolean
 }
 
-/** `place`: only the panel card shows the login terminal, so one xterm host is never in two cards. */
+/** `place`: the panel card shows the login terminal when the login is a panel one, the thread card otherwise, so one xterm host is never in two cards. */
 export function loginCardView(login: PanelLogin, remote: boolean, machineName?: string, place: 'panel' | 'thread' = 'panel'): LoginCardView {
   const title = `Conectar ${login.name}`
-  const showTerminal = place === 'panel' && login.authKind === 'cli' && login.phase === 'waiting'
+  const showTerminal = (place === 'panel') === login.panel && login.authKind === 'cli' && login.phase === 'waiting'
   if (remote) {
     return { title, primary: { label: `Faça login em ${machineName ?? 'outra máquina'}`, disabled: true }, cancel: false, showTerminal: false, showFields: false }
   }

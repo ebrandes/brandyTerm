@@ -49,6 +49,8 @@ export interface PanelLogin {
   phase: 'ask' | 'waiting' | 'failed'
   error?: string
   authKind: ConnectorAuth['kind']
+  /** started from the panel (a row's Entrar or a fresh install); false when only a thread waits on it */
+  panel: boolean
   fields?: { key: string; label: string }[]
   terminalId?: string
 }

@@ -294,3 +294,17 @@ test('Cancelar while the token is being tested restores the previous token', asy
   await run
   assert.equal(secrets.get(github.id).headers?.Authorization, 'Bearer good')
 })
+
+test('the view says whether a login was started from the panel', () => {
+  const { broker, railway, github } = setup()
+  void broker.require(railway, { ...p, threadId: 't1' }, new AbortController().signal).catch(() => {})
+  broker.ask(github)
+  const panel = Object.fromEntries(broker.panelLogins().map(l => [l.name, l.panel]))
+  assert.deepEqual(panel, { Railway: false, GitHub: true })
+  assert.equal(broker.threadLogins('t1')[0].panel, false)
+  // a row-started login a thread then waits on stays a panel login
+  void broker.require(github, { ...p, threadId: 't2' }, new AbortController().signal).catch(() => {})
+  assert.equal(broker.threadLogins('t2')[0].panel, true)
+  broker.cancel(railway.id)
+  broker.cancel(github.id)
+})

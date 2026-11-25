@@ -166,7 +166,7 @@ test('remote state has no connector command, args, url, envKeys, headerKeys, pro
         url: 'https://secret.example/mcp', envKeys: ['RAILWAY_TOKEN'], headerKeys: ['Authorization'], projects: ['/Users/eu/p'],
         authKind: 'cli', enabled: true, preset: 'railway', alwaysAllow: ['get_logs'], status: 'conectado', error: 'boom /Users/eu', toolCount: 12
       }],
-      logins: [{ connectorId: 'c1', name: 'Railway', phase: 'ask', authKind: 'cli', terminalId: 'connector-login-c1' }]
+      logins: [{ connectorId: 'c1', name: 'Railway', phase: 'ask', authKind: 'cli', panel: true, terminalId: 'connector-login-c1' }]
     }
   } as unknown as AppState
   const out = filterState(s)

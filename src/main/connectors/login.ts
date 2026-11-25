@@ -182,6 +182,7 @@ export class LoginBroker extends EventEmitter {
       name: c.name,
       phase: card.phase,
       authKind: c.auth.kind,
+      panel: card.panel,
       ...(card.error ? { error: card.error } : {}),
       ...(c.auth.kind === 'token' ? { fields: c.auth.fields.map(f => ({ key: f.key, label: f.label })) } : {}),
       ...(c.auth.kind === 'cli' ? { terminalId: loginTerminalId(c.id) } : {}),

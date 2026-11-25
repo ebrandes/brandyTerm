@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import type { PanelLogin } from '../../../shared/connectors.ts'
 import { loginCardView } from './login-card-view.ts'
 
-const base: PanelLogin = { connectorId: 'c1', name: 'Railway', phase: 'ask', authKind: 'oauth' }
+const base: PanelLogin = { connectorId: 'c1', name: 'Railway', phase: 'ask', authKind: 'oauth', panel: true }
 
 test('local ask: Entrar enabled, Cancelar shown', () => {
   const v = loginCardView(base, false)
@@ -41,11 +41,17 @@ test('failed: the error as note and Tentar de novo', () => {
   assert.deepEqual(v.primary, { label: 'Tentar de novo', disabled: false })
 })
 
-test('only the panel card shows the terminal of a cli login', () => {
-  const w: PanelLogin = { ...base, authKind: 'cli', phase: 'waiting' }
+test('a panel-started cli login shows its terminal in the panel card only', () => {
+  const w: PanelLogin = { ...base, authKind: 'cli', phase: 'waiting', panel: true }
   assert.equal(loginCardView(w, false, undefined, 'panel').showTerminal, true)
   const t = loginCardView(w, false, undefined, 'thread')
   assert.equal(t.showTerminal, false)
   assert.equal(t.note, 'Aguardando login…')
   assert.equal(t.cancel, true)
+})
+
+test('a thread-only cli login shows its terminal in the thread card only', () => {
+  const w: PanelLogin = { ...base, authKind: 'cli', phase: 'waiting', panel: false }
+  assert.equal(loginCardView(w, false, undefined, 'thread').showTerminal, true)
+  assert.equal(loginCardView(w, false, undefined, 'panel').showTerminal, false)
 })
