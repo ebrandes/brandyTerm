@@ -1,17 +1,25 @@
 import { FileText, PenLine } from 'lucide-react'
 import type { Attachment } from '../types'
 import { attachmentUrl, formatSize } from '../attach'
+import { parseId } from '../remote/route'
+import { HostThumb } from './HostFile'
 import { api } from '../api'
 import { report } from '../notice'
 
 /** Files sent with a message: image thumbnails and file chips; click opens them in the default app. */
 export function MessageFiles({ items, projectId }: { items: Attachment[]; projectId: string }) {
+  // brandy-att: serves this machine's attachments only; a paired machine's come over the channel
+  const remote = parseId(projectId).machineId !== null
   return (
     <div className="msg-files">
       {items.map((a) =>
         a.kind === 'image' ? (
           <button key={a.id} className="msg-img" onClick={() => void api.openAttachment(a.path, projectId).catch(report)} title={`${a.name} — abrir`}>
-            <img src={attachmentUrl(a.path)} alt={a.name} loading="lazy" />
+            {remote ? (
+              <HostThumb projectId={projectId} path={a.path} name={a.name} />
+            ) : (
+              <img src={attachmentUrl(a.path)} alt={a.name} loading="lazy" />
+            )}
             {a.marked && (
               <span className="msg-img-tag">
                 <PenLine size={11} /> marcada

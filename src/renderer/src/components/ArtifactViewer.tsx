@@ -7,6 +7,8 @@ import { CodeBlock } from './CodeBlock'
 import { MermaidBlock } from './MermaidBlock'
 import { api } from '../api'
 import { report } from '../notice'
+import { hostView } from '../remote/host-file'
+import { HostFile } from './HostFile'
 import './artifact.css'
 
 /** A diagram at full size; invalid code shows as a plain block. */
@@ -35,6 +37,8 @@ function FileBody({ target, content }: { target: FileTarget; content: ArtifactCo
   if (content.kind === 'missing') return <p className="art-note">O arquivo não existe mais.</p>
   if (content.kind === 'too-big') return <p className="art-note">Arquivo grande demais para pré-visualizar ({mb(content.size)} MB).</p>
   if (content.kind === 'md') return <Rich text={content.text} imageSrc={imageSrc} onLink={onLink} />
+  // a paired machine's media comes over the channel; its pages are never rendered here
+  if (hostView(target.projectId, content.kind)) return <HostFile target={target} kind={content.kind} />
   if (content.kind === 'video')
     return <video className="art-media" src={artifactUrl(target.projectId, target.path)} controls autoPlay playsInline />
   if (content.kind === 'image') return <img className="art-media" src={artifactUrl(target.projectId, target.path)} alt={target.path} />

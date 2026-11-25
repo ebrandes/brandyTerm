@@ -1,0 +1,4 @@
+.host-page { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.host-page button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-hi); background: var(--card); color: var(--text); font-size: 12.5px; cursor: pointer; }
+.host-page button:hover { border-color: var(--accent-line); }
+.host-thumb { display: block; padding: 14px 12px; color: var(--faint); font-size: 11.5px; }
