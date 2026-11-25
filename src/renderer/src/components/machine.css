@@ -12,12 +12,7 @@
 
 .composer.offline textarea { cursor: not-allowed; }
 
-.rp-head { width: 100%; display: flex; align-items: center; gap: 6px; margin-bottom: 6px; text-align: left; }
-.rp-head h3 { margin-bottom: 0; }
-.rp-head .dot { margin-left: auto; }
 .dot-err { background: var(--red); }
-.rp-chev { color: var(--faint); transition: transform .15s; }
-.rp-chev.open { transform: rotate(90deg); }
 .rp-body { display: flex; flex-direction: column; gap: 10px; }
 .rp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .rp-row input, .rp-check input { accent-color: var(--accent); }

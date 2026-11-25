@@ -9,8 +9,10 @@ import { ProjectRow, type ProjectAsk } from './ProjectRow'
 import { ArchivedProjects } from './ArchivedProjects'
 import { ConnectorsSection } from '../connectors/ConnectorsSection'
 import { RemotePanel } from './RemotePanel'
+import { SideSection } from './SideSection'
 import { MachineGroupHead } from './MachineGroupHead'
 import { showGroups, type MachineGroup } from '../machine-groups'
+import { readyLabel } from '../side-summary'
 import logo from '../assets/logo.png'
 import { api } from '../api'
 import './machine.css'
@@ -86,7 +88,7 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
     <aside className="sidebar">
       <img className="brand" src={logo} alt="BrandyTerm" draggable={false} />
       <div className="side-head">
-        <h2>Projetos</h2>
+        <h2 className="side-title">Projetos</h2>
         <button className="icon-btn" onClick={() => onOpen()} aria-label="Abrir pasta" title="Abrir pasta como projeto">
           <FolderPlus size={16} />
         </button>
@@ -105,8 +107,9 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
 
       {accounts && <AccountsPanel state={accounts} />}
 
-      <div className="side-section">
-        <h3>Agentes</h3>
+      <hr className="side-divider" />
+
+      <SideSection id="agents" title="Agentes" summary={readyLabel(agents.filter((a) => a.installed).length)}>
         {agents.map((a) => (
           <div key={a.id} className="agent-row" title={a.version ?? a.note}>
             <span className={`dot ${a.installed ? 'dot-ok' : 'dot-off'}`} />
@@ -114,18 +117,18 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
             <span className="agent-note">{a.installed ? 'pronto' : 'não instalado'}</span>
           </div>
         ))}
-      </div>
+      </SideSection>
 
-      {(['plugin', 'tool'] as const).map((kind) => (
-        <div key={kind} className="side-section">
-          <h3>{kind === 'tool' ? 'Ferramentas' : 'Plugins'}</h3>
-          {plugins
-            .filter((p) => (p.kind ?? 'plugin') === kind)
-            .map((p) => (
+      {(['plugin', 'tool'] as const).map((kind) => {
+        const list = plugins.filter((p) => (p.kind ?? 'plugin') === kind)
+        return (
+          <SideSection key={kind} id={kind === 'tool' ? 'tools' : 'plugins'} title={kind === 'tool' ? 'Ferramentas' : 'Plugins'} summary={list.length}>
+            {list.map((p) => (
               <PluginRow key={p.id} plugin={p} open={openPlugin === p.id} onToggle={() => setOpenPlugin(openPlugin === p.id ? null : p.id)} />
             ))}
-        </div>
-      ))}
+          </SideSection>
+        )
+      })}
 
       <ConnectorsSection state={connectors} projects={projects} viewing={viewed?.machine?.remote ? viewed.machine : undefined} />
 

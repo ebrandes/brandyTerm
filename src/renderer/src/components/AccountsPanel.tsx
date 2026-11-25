@@ -3,6 +3,7 @@ import { Plus, RefreshCw, Trash2 } from 'lucide-react'
 import type { AccountsState, ClaudeAccount, LimitWindow } from '../types'
 import { AccountLogin } from './AccountLogin'
 import { api } from '../api'
+import { usageLine } from '../side-summary'
 import './accounts.css'
 
 const pct = (w?: LimitWindow) => (w ? Math.round(w.utilization * 100) : undefined)
@@ -43,7 +44,9 @@ function AccountRow({ a, active }: { a: ClaudeAccount; active: boolean }) {
         ? a.checking
           ? 'lendo limites…'
           : 'limites ainda não lidos'
-        : `5h ${five ?? 0}% · semana ${week}% · ${resets(a.sevenDay)}`
+        : usageLine(five, week)
+  const renew = !a.error && !limited && week !== undefined ? resets(a.sevenDay) : ''
+  const detailTip = renew ? `5h ${five ?? 0}% · semana ${week}% · ${renew}` : detail
   return (
     <div className={`acct${active ? ' active' : ''}${limited || a.error ? ' blocked' : ''}`}>
       <button
@@ -76,7 +79,9 @@ function AccountRow({ a, active }: { a: ClaudeAccount; active: boolean }) {
               {a.plan && <span className="acct-plan">{a.plan}</span>}
             </span>
           )}
-          <span className="acct-detail">{detail}</span>
+          <span className="acct-detail" title={detailTip}>
+            {detail}
+          </span>
           {week !== undefined && (
             <span className={`acct-bar ${level(week)}`}>
               <span style={{ width: `${Math.min(100, week)}%` }} />
@@ -107,8 +112,8 @@ export function AccountsPanel({ state }: { state: AccountsState }) {
   const [adding, setAdding] = useState(false)
   return (
     <div className="side-section accounts">
-      <div className="acct-head">
-        <h3>Contas Claude</h3>
+      <div className="side-head acct-head">
+        <h3 className="side-title">Contas Claude</h3>
         <button className="icon-btn sm" onClick={() => setAdding(true)} title="Adicionar conta" aria-label="Adicionar conta">
           <Plus size={14} />
         </button>

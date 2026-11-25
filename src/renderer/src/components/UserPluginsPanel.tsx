@@ -1,10 +1,8 @@
-import { useState } from 'react'
-import { ChevronRight } from 'lucide-react'
 import type { UserPlugin, UserPluginsState } from '../types'
 import { api } from '../api'
+import { plural } from '../side-summary'
+import { SideSection } from './SideSection'
 import './userplugins.css'
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 function summary(p: Pick<UserPlugin, 'skills' | 'commands' | 'agents'>): string {
   const parts = [p.skills && plural(p.skills, 'skill', 'skills'), p.commands && plural(p.commands, 'comando', 'comandos'), p.agents && plural(p.agents, 'agente', 'agentes')]
@@ -43,21 +41,13 @@ function Row({ p }: { p: UserPlugin }) {
   )
 }
 
-/** Sidebar block: which of the user's own Claude Code skills/plugins the threads may use. */
+/** Sidebar "Skills": which of the user's own Claude Code skills/plugins the threads may use. */
 export function UserPluginsPanel({ state }: { state: UserPluginsState }) {
-  const [open, setOpen] = useState(false)
   const on = state.list.filter((p) => p.on).length + (state.personal?.on ? 1 : 0)
   const total = state.list.length + (state.personal ? 1 : 0)
   if (!total) return null
   return (
-    <div className="side-section">
-      <button className="up-head" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <h3>Do seu Claude Code</h3>
-        <span className="up-count">
-          {on}/{total} nas threads
-        </span>
-        <ChevronRight size={13} className={open ? 'up-chev open' : 'up-chev'} />
-      </button>
+    <SideSection id="skills" title="Skills" summary={`${on}/${total} nas threads`}>
       {state.personal && (
         <div className="up-row" title="Suas skills e comandos de ~/.claude, como o plugin 'pessoal'">
           <span className="up-text">
@@ -67,14 +57,10 @@ export function UserPluginsPanel({ state }: { state: UserPluginsState }) {
           <Toggle on={state.personal.on} label="Usar suas skills nas threads" onChange={(v) => void api.setUserPlugin({ id: 'personal', on: v })} />
         </div>
       )}
-      {open && (
-        <>
-          {state.list.map((p) => (
-            <Row key={p.id} p={p} />
-          ))}
-          <p className="up-hint">Ligue o que as threads do Claude podem usar. MCPs e configurações globais ficam de fora.</p>
-        </>
-      )}
-    </div>
+      {state.list.map((p) => (
+        <Row key={p.id} p={p} />
+      ))}
+      <p className="up-hint">Ligue o que as threads do Claude podem usar. MCPs e configurações globais ficam de fora.</p>
+    </SideSection>
   )
 }
