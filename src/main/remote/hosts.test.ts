@@ -8,7 +8,7 @@ import type { DiscoveredHost, MachineInfo, RemoteHostInfo } from '../../shared/r
 import type { AppState } from '../../shared/types.ts'
 import type { Browse } from './browse.ts'
 import { FakeHost } from './fake-host.ts'
-import { RemoteHosts } from './hosts.ts'
+import { DISCOVER_MS, RemoteHosts } from './hosts.ts'
 import { TrustStore } from './trust.ts'
 
 const dirs: string[] = []
@@ -64,6 +64,8 @@ function rig(opts: { trusted?: boolean; staleHost?: boolean; claim?: string; bro
 }
 
 const online = (h: RemoteHosts): boolean => h.list()[0]?.online === true
+/** reconnect timers, without the mDNS lease */
+const retries = (t: Timers): number => t.items.filter(i => i.ms !== DISCOVER_MS).length
 
 test('a trusted host with an address comes online; its state push is re-emitted with its machineId', async () => {
   const { hosts, host } = rig()
@@ -199,7 +201,8 @@ test('mDNS: only unpaired hosts are discovered; a trusted host seen again is ret
   const { hosts, host, timers, dir } = rig({ browse })
   host.down = true
   hosts.start()
-  await until(() => timers.items.length === 1)
+  await until(() => retries(timers) === 1)
+  hosts.discover(true) // the pairing list is open
   host.down = false
   up({ name: 'Outro', os: 'mac', address: '192.168.0.9:7000', machineId: 'x9' })
   up({ name: 'Servidor', os: 'linux', address: '192.168.0.7:7001', machineId: '11111111-1111-4111-8111-111111111111' })
@@ -207,7 +210,7 @@ test('mDNS: only unpaired hosts are discovered; a trusted host seen again is ret
   assert.equal(hosts.list()[0].address, '192.168.0.7:7001')
   await until(() => online(hosts), 'online without waiting for the timer')
   assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { [hostInfo.id]: '192.168.0.7:7001' })
-  assert.equal(timers.items.length, 0)
+  assert.equal(retries(timers), 0)
   hosts.stop()
   assert.equal(stopped, true)
 })
@@ -266,9 +269,10 @@ test('an mDNS address is kept only after a handshake succeeds there', async () =
   const { hosts, host, timers, dir } = rig({ browse })
   host.down = true
   hosts.start()
-  await until(() => timers.items.length === 1)
+  await until(() => retries(timers) === 1)
+  hosts.discover(true)
   up({ name: 'Servidor', os: 'linux', address: '192.168.0.99:7001', machineId: '11111111-1111-4111-8111-111111111111' })
-  await until(() => timers.items.length === 1 && host.dials >= 2)
+  await until(() => retries(timers) === 1 && host.dials >= 2)
   assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { [hostInfo.id]: '10.0.0.5:7000' })
 })
 
@@ -278,6 +282,7 @@ test('discovered() hides only machines trusted as hosts; a client-only machine s
   const { hosts, trust } = rig({ trusted: false, browse })
   trust.add({ pub: 'CLI', role: 'client', machineId: 'c9', name: 'Cel', os: 'mac' })
   hosts.start()
+  hosts.discover(true)
   up({ name: 'Cel', os: 'mac', address: '192.168.0.9:7000', machineId: 'c9' })
   assert.deepEqual(hosts.discovered().map(d => d.machineId), ['c9'])
 })

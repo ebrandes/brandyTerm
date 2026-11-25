@@ -19,12 +19,12 @@ export interface ClientIpcDeps {
   getWin: () => BrowserWindow | null
 }
 
-/** Connects to the paired hosts and registers the `remote:*` channels. Call before bindIpc. */
+/** Dials the paired hosts (none until the first pairing) and registers the `remote:*` channels. Call before bindIpc. */
 export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHosts {
   const trust = remote.trust
   const hosts = new RemoteHosts({
     trust,
-    own: trust.ownKey(),
+    own: () => trust.ownKey(), // created on the first pairing, not at startup
     me: () => engine.state.machine ?? loadIdentity(),
     dial: dialWs,
     dir: app.getPath('userData'),
@@ -68,6 +68,7 @@ export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHo
   add('remote:revoke', (pub: string) => trust.revoke(String(pub), 'client'))
   add('remote:set-terminal', (a: { pub: string; on: boolean }) => trust.setTerminal(String(a.pub), !!a.on))
   add('remote:discovered', () => hosts.discovered())
+  add('remote:discover', (on: boolean) => hosts.discover(!!on))
   add('remote:pair', (a: { address: string; code: string }) => hosts.pair(String(a.address), String(a.code)))
   add('remote:rename', (name: string) => {
     const m = renameMachine(String(name ?? ''))

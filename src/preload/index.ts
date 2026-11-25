@@ -63,6 +63,7 @@ const api: BrandyApi = {
     revoke: (pub) => ipcRenderer.invoke('remote:revoke', pub),
     setTerminal: (a) => ipcRenderer.invoke('remote:set-terminal', a),
     discovered: () => ipcRenderer.invoke('remote:discovered'),
+    discover: (on) => ipcRenderer.invoke('remote:discover', on),
     pair: (a) => ipcRenderer.invoke('remote:pair', a),
     rename: (name) => ipcRenderer.invoke('remote:rename', name)
   },

@@ -11,10 +11,13 @@ import { pairWithHost } from './host-pair-client.ts'
 import type { TrustStore } from './trust.ts'
 
 export const RETRY_MS = [1000, 2000, 4000, 8000, 16000, 30000]
+/** mDNS browsing stops this long after the last discover(true) or discovered() call */
+export const DISCOVER_MS = 15_000
 
 export interface HostsDeps {
   trust: TrustStore
-  own: KeyPair
+  /** this machine's key; a function so remote-key.json is created only when a pairing or a dial needs it */
+  own: KeyPair | (() => KeyPair)
   me: MachineInfo | (() => MachineInfo)
   dial: (address: string) => Socket
   /** where remote-hosts.json lives */
@@ -48,6 +51,7 @@ export class RemoteHosts extends EventEmitter {
   private readonly seen = new Map<string, DiscoveredHost>()
   private readonly pairing = new Set<Socket>()
   private browser: BrowseHandle | null = null
+  private lease: unknown = null
   private started = false
   private readonly setT: (fn: () => void, ms: number) => unknown
   private readonly clearT: (h: unknown) => void
@@ -62,14 +66,13 @@ export class RemoteHosts extends EventEmitter {
   }
 
   private me(): MachineInfo { return typeof this.deps.me === 'function' ? this.deps.me() : this.deps.me }
+  private own(): KeyPair { return typeof this.deps.own === 'function' ? this.deps.own() : this.deps.own }
 
+  /** Dials only the trusted hosts (none until the first pairing). No mDNS here: see discover(). */
   start(): void {
     if (this.started) return
     this.started = true
     this.deps.trust.on('change', this.onTrust)
-    if (this.deps.browse) {
-      this.browser = this.deps.browse(h => this.onSeen(h), id => { this.seen.delete(id) })
-    }
     this.sync()
   }
 
@@ -77,11 +80,32 @@ export class RemoteHosts extends EventEmitter {
     if (!this.started) return
     this.started = false
     this.deps.trust.off('change', this.onTrust)
-    this.browser?.stop()
-    this.browser = null
+    this.stopBrowse()
     for (const id of [...this.entries.keys()]) this.drop(id)
     for (const s of this.pairing) { try { s.close() } catch { /* already closed */ } }
     this.pairing.clear()
+  }
+
+  /** mDNS browsing, only while the pairing list is open: on starts or extends it, off stops it. A renderer
+   * that never says it closed is covered by the lease: DISCOVER_MS without discover(true)/discovered() stops it. */
+  discover(on: boolean): void {
+    if (!on || !this.started) return this.stopBrowse()
+    if (!this.browser && this.deps.browse) {
+      this.browser = this.deps.browse(h => this.onSeen(h), id => { this.seen.delete(id) })
+    }
+    this.renewLease()
+  }
+
+  private renewLease(): void {
+    if (this.lease !== null) this.clearT(this.lease)
+    this.lease = this.setT(() => { this.lease = null; this.stopBrowse() }, DISCOVER_MS)
+  }
+
+  private stopBrowse(): void {
+    if (this.lease !== null) this.clearT(this.lease)
+    this.lease = null
+    this.browser?.stop()
+    this.browser = null
     this.seen.clear()
   }
 
@@ -99,8 +123,13 @@ export class RemoteHosts extends EventEmitter {
     return [...this.lastState].map(([machineId, state]) => ({ machineId, state }))
   }
 
-  /** Hosts seen on the LAN that are not paired (and not this machine). */
+  /** Hosts seen on the LAN that are not paired (and not this machine). Asking means the list is still open. */
   discovered(): DiscoveredHost[] {
+    if (this.browser) this.renewLease()
+    return this.unpaired()
+  }
+
+  private unpaired(): DiscoveredHost[] {
     const known = new Set(this.deps.trust.list('host').map(d => d.machineId))
     return [...this.seen.values()].filter(h => !known.has(h.machineId) && h.machineId !== this.me().id)
   }
@@ -113,7 +142,7 @@ export class RemoteHosts extends EventEmitter {
   }
 
   async pair(address: string, code: string): Promise<MachineInfo> {
-    const own = this.deps.own
+    const own = this.own()
     const sockets = this.pairing
     const dial = (a: string): Socket => {
       const s = this.deps.dial(a)
@@ -210,7 +239,7 @@ export class RemoteHosts extends EventEmitter {
 
   private onSeen(h: DiscoveredHost): void {
     this.seen.set(h.machineId, h)
-    this.emit('discovered', this.discovered())
+    this.emit('discovered', this.unpaired())
     const e = this.entries.get(h.machineId)
     if (e) this.retryNow(h.machineId, h.address)
   }
@@ -236,7 +265,7 @@ export class RemoteHosts extends EventEmitter {
     let sock: Socket
     try { sock = this.deps.dial(e.address) } catch (err) { return this.failed(id, gen, err) }
     e.sock = sock
-    connectChannel(sock, this.deps.own, fromB64(e.device.pub), this.me()).then(
+    connectChannel(sock, this.own(), fromB64(e.device.pub), this.me()).then(
       ch => this.connected(id, gen, ch),
       err => this.failed(id, gen, err)
     )

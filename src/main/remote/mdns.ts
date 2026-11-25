@@ -14,16 +14,31 @@ export function lanOnlyRecords(records: Rec[], host: string, addrs: string[]): R
   ]
 }
 
-const log = (e: unknown): void => console.error('[remote] mDNS:', e instanceof Error ? e.message : e)
+/** Socket options that keep mDNS on the LAN: the group is joined and multicast sent on the first LAN
+ * interface only (never a VPN or tunnel). No LAN address: null, and no mDNS socket at all. */
+export function mdnsOptions(lan: string[]): { interface: string; bind: string } | null {
+  return lan.length ? { interface: lan[0], bind: '0.0.0.0' } : null
+}
+
+export const log = (e: unknown): void => console.error('[remote] mDNS:', e instanceof Error ? e.message : e)
+
+/** A Bonjour bound to the LAN interface, or null when there is none. Throws like `new Bonjour`. */
+export function lanBonjour(): Bonjour | null {
+  const opts = mdnsOptions(lanAddresses(os.networkInterfaces()))
+  if (!opts) return null
+  // the typings only list service fields; these go to multicast-dns
+  const bonjour = new Bonjour(opts as unknown as ConstructorParameters<typeof Bonjour>[0], log)
+  // multicast-dns emits 'error' (EACCES, EADDRINUSE...) on its socket: an unhandled one would crash the app
+  ;(bonjour as unknown as { server?: { mdns?: EventEmitter } }).server?.mdns?.on('error', log)
+  return bonjour
+}
 
 /** Announces the host on the LAN as `_brandyterm._tcp`. Never throws; failures only disable discovery. */
 export const publishMdns: NonNullable<HostDeps['publish']> = info => {
   let bonjour: Bonjour | null = null
   try {
-    bonjour = new Bonjour(undefined, log)
-    // multicast-dns emits 'error' (EACCES, EADDRINUSE...) on its socket: an unhandled one would crash the app
-    const mdns = (bonjour as unknown as { server?: { mdns?: EventEmitter } }).server?.mdns
-    mdns?.on('error', log)
+    bonjour = lanBonjour()
+    if (!bonjour) return { stop() {} }
     const svc = bonjour.publish({ name: info.name, type: 'brandyterm', port: info.port, txt: info.txt })
     // records() runs after the probe, so this override is in place before anything is announced
     const original = svc.records.bind(svc) as () => Rec[]

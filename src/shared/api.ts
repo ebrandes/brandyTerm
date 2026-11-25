@@ -75,6 +75,8 @@ export interface BrandyApi {
     setTerminal(args: { pub: string; on: boolean }): Promise<void>
     /** client side: hosts seen by mDNS that are not paired yet */
     discovered(): Promise<DiscoveredHost[]>
+    /** mDNS browsing runs only while the pairing list is open: true when it opens, false when it closes */
+    discover(on: boolean): Promise<void>
     pair(args: { address: string; code: string }): Promise<MachineInfo>
     rename(name: string): Promise<MachineInfo>
   }

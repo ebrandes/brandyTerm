@@ -23,6 +23,7 @@ export const UNSCOPED = new Set([
   'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',
   'remote:hosts', 'remote:states', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
   'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename', 'remote:open-bytes',
+  'remote:discover',
   'fs:browse', 'project:add-path'
 ])
 

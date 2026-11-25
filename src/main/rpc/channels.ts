@@ -58,6 +58,7 @@ export const RULES = {
   'remote:revoke': 'deny',
   'remote:set-terminal': 'deny',
   'remote:discovered': 'deny',
+  'remote:discover': 'deny',
   'remote:pair': 'deny',
   'remote:rename': 'deny',
   'remote:open-bytes': 'deny'

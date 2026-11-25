@@ -102,6 +102,8 @@ export function RemotePairing() {
   const [failed, setFailed] = useState(false)
   useEffect(() => {
     let alive = true
+    // mDNS runs only while this list is open (the polling below keeps it alive; the main stops it if it stops)
+    void api.remote.discover(true).catch(() => alive && setFailed(true))
     const load = () =>
       void api.remote.discovered().then((d) => {
         if (!alive) return
@@ -113,6 +115,7 @@ export function RemotePairing() {
     return () => {
       alive = false
       clearInterval(t)
+      void api.remote.discover(false).catch(() => {})
     }
   }, [])
   return (
