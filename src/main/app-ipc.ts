@@ -7,6 +7,7 @@ import { setUserPlugin, userPluginsState } from './user-plugins.ts'
 import { updateSettings } from './settings.ts'
 import { registry } from './rpc/registry.ts'
 import { ruleOf } from './rpc/channels.ts'
+import { ownedProcess } from './owns-process.ts'
 import type { AppSettings } from '../shared/types.ts'
 
 export interface AppIpcDeps {
@@ -43,12 +44,15 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
   registry.add('process:start', (a: { projectId: string; name: string; command: string }) =>
     engine.startProcess(String(a.projectId), String(a.name ?? ''), String(a.command ?? '')),
     ruleOf('process:start'))
-  registry.add('process:stop', (a: { projectId: string; processId: string }) =>
-    engine.stopProcess(String(a.projectId), String(a.processId)),
-    ruleOf('process:stop'))
-  registry.add('process:remove', (a: { projectId: string; processId: string }) =>
-    engine.removeProcess(String(a.projectId), String(a.processId)),
-    ruleOf('process:remove'))
+  // a project stops or removes only the processes it started (a remote caller names both ids)
+  registry.add('process:stop', (a: unknown) => {
+    const own = ownedProcess(engine.state.projects, a)
+    if (own) engine.stopProcess(own.projectId, own.processId)
+  }, ruleOf('process:stop'))
+  registry.add('process:remove', (a: unknown) => {
+    const own = ownedProcess(engine.state.projects, a)
+    if (own) engine.removeProcess(own.projectId, own.processId)
+  }, ruleOf('process:remove'))
   registry.add('process:open-port', (port: number) => {
     const n = Number(port)
     if (Number.isInteger(n) && n > 0 && n < 65536) void shell.openExternal(`http://localhost:${n}`)
