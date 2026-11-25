@@ -23,6 +23,7 @@ import type { RemoteHosts } from './remote/hosts.ts'
 import { registerAppIpc } from './app-ipc.ts'
 import { registry } from './rpc/registry.ts'
 import { bindIpc } from './rpc/ipc.ts'
+import { startConnectors } from './connectors/index.ts'
 
 const isMac = process.platform === 'darwin'
 
@@ -138,6 +139,8 @@ app.whenReady().then(async () => {
     engine, attachmentsRoot, rootOf: projectRoot, userData: () => app.getPath('userData'),
     hiddenRoots: () => engine.state.projects.filter((p) => p.remoteHidden && p.path).map((p) => p.path as string)
   })
+  const connectors = await startConnectors({ engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents })
+  app.once('before-quit', () => void connectors.stop())
   bindIpc(registry)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))

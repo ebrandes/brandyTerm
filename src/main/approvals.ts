@@ -60,6 +60,12 @@ export class ThreadApprovals {
     x?.done(d === 'forever' && !x.ask.connector ? 'always' : d)
   }
 
+  /** "Sempre" was stored for a connector tool: its other pending cards, in any thread, are allowed */
+  releaseConnector(connectorId: string, tool: string): void {
+    for (const list of [...this.queue.values()])
+      for (const x of list.filter((x) => x.ask.connector?.id === connectorId && x.ask.connector.tool === tool)) x.done('allow')
+  }
+
   /** the run ended or was cancelled: deny what it was still waiting for (the thread's rules stay) */
   drop(t: Thread): void {
     for (const x of [...(this.queue.get(t.id) ?? [])]) x.done('deny')

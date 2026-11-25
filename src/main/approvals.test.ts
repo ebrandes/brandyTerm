@@ -89,3 +89,20 @@ test('"all" answered on a connector card keeps that card and sets allowAll', asy
   assert.equal(t.allowAll, true)
   assert.equal(t.approval?.connector?.tool, 'get_logs')
 })
+
+test('releaseConnector allows the pending cards of that connector and tool in every thread', async () => {
+  const t1 = thread()
+  const t2 = { id: 't2', steps: [] } as unknown as Thread
+  const ap = new ThreadApprovals(() => {})
+  const a = ap.ask(t1, conn('get_logs'))
+  const b = ap.ask(t2, conn('get_logs'))
+  const other = ap.ask(t2, conn('deploy'))
+  const elsewhere = ap.ask(t2, conn('get_logs', 'other'))
+  ap.releaseConnector('railway', 'get_logs')
+  assert.equal(await a, 'allow')
+  assert.equal(await b, 'allow')
+  assert.equal(await pending(other), true)
+  assert.equal(await pending(elsewhere), true)
+  assert.equal(t1.approval, undefined)
+  assert.equal(t2.approval?.connector?.tool, 'deploy')
+})
