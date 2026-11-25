@@ -7,8 +7,9 @@ import type { ConnectorHub } from './hub.ts'
 import type { LoginBroker } from './login.ts'
 import type { ConnectorStore } from './store.ts'
 import { HOLD_MS } from './login.ts'
+import { resultText, toolsText } from './result-text.ts'
 
-export const RESULT_CAP = 100_000
+export { RESULT_CAP } from './result-text.ts'
 const DETAIL_CAP = 2000
 
 export interface CallsDeps {
@@ -48,16 +49,6 @@ async function hold(ask: (signal: AbortSignal) => Promise<ApprovalDecision>, req
     request.removeEventListener('abort', onAbort)
     ctl.abort()
   }
-}
-
-function textOf(content: unknown[]): string {
-  const text = content
-    .map(part => {
-      const p = part as { type?: string; text?: unknown }
-      return p?.type === 'text' && typeof p.text === 'string' ? p.text : JSON.stringify(part)
-    })
-    .join('\n')
-  return text.length <= RESULT_CAP ? text : `${text.slice(0, RESULT_CAP)}\n(resultado cortado em ${RESULT_CAP} caracteres)`
 }
 
 export function createCalls(d: CallsDeps): GwHandler {
@@ -114,7 +105,7 @@ export function createCalls(d: CallsDeps): GwHandler {
     const c = resolve(ref, p, req.name)
     if (req.op === 'tools') {
       if (await d.login.needsLogin(c)) await d.login.require(c, ref, signal)
-      return (await d.hub.tools(c)).map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema }))
+      return toolsText((await d.hub.tools(c)).map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema })))
     }
     if (!req.tool) throw new Error('Informe a ferramenta')
     if (signal.aborted) throw new Error('Chamada cancelada')
@@ -122,7 +113,7 @@ export function createCalls(d: CallsDeps): GwHandler {
     const fresh = still(c)
     await approve(fresh, t, req.tool, req.args, signal)
     const res = await d.hub.call(still(c), req.tool, req.args, signal)
-    const text = textOf(res.content)
+    const text = resultText(res.content)
     if (res.isError) throw new Error(text)
     return text
   }

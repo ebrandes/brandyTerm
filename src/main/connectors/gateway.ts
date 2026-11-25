@@ -4,7 +4,7 @@ import net from 'node:net'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { LineReader, MAX_RESULT, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
+import { LineReader, MAX_REPLY, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
 
 type Pending = { resolve(r: GwResponse): void; reject(e: Error): void }
 
@@ -71,8 +71,9 @@ class Link {
   }
 }
 
+/** backstop only: main already sent the text capped and encoded once */
 function clip(text: string): string {
-  return text.length <= MAX_RESULT ? text : text.slice(0, MAX_RESULT) + '\n[resultado truncado]'
+  return text.length <= MAX_REPLY ? text : text.slice(0, MAX_REPLY) + '\n[resultado truncado]'
 }
 
 function reply(text: string, isError = false) {
@@ -97,7 +98,7 @@ async function main(): Promise<void> {
     try {
       const res = await link.request(req)
       if (!res.ok) return reply(res.error, true)
-      return reply(typeof res.result === 'string' ? res.result : JSON.stringify(res.result, null, 2))
+      return reply(typeof res.result === 'string' ? res.result : (JSON.stringify(res.result) ?? 'null'))
     } catch (e) {
       return reply(e instanceof Error ? e.message : String(e), true)
     }

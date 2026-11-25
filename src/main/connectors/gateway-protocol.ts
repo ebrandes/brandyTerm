@@ -12,8 +12,10 @@ export interface GwRequest {
 export type GwResponse = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string }
 
 export const MAX_LINE = 1_048_576
-/** Largest connector result, in characters, that crosses the socket and reaches the agent. */
+/** Largest connector result, in characters, that reaches the agent; calls.ts cuts there and adds a short note. */
 export const MAX_RESULT = 100_000
+/** Backstop for a whole reply, above MAX_RESULT and its note, so a result calls.ts capped is never cut again. */
+export const MAX_REPLY = MAX_RESULT + 1_000
 
 export const BAD_SESSION = 'Sessão do gateway inválida'
 export const NOT_RESPONDING = 'BrandyTerm não está respondendo'

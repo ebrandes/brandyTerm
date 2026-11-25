@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ThreadRef } from '../../shared/connectors.ts'
-import { BAD_SESSION, LineReader, MAX_RESULT, type GwRequest, type GwResponse } from './gateway-protocol.ts'
+import { BAD_SESSION, LineReader, MAX_REPLY, type GwRequest, type GwResponse } from './gateway-protocol.ts'
 
 export type GwHandler = (ctx: ThreadRef, req: GwRequest, signal: AbortSignal) => Promise<unknown>
 
@@ -22,10 +22,10 @@ export function socketPath(userData: string, pid: number): string {
   return Buffer.byteLength(p) > 100 ? join(tmpdir(), `bt-gw-${pid}.sock`) : p
 }
 
-function cap(result: unknown): unknown {
-  const text = JSON.stringify(result) ?? 'null'
-  if (text.length <= MAX_RESULT) return result
-  return `${text.slice(0, MAX_RESULT)}\n[resultado truncado: ${text.length} caracteres]`
+/** The reply text, encoded once: a string goes as is, anything else as compact JSON. Only a backstop cut happens here. */
+function cap(result: unknown): string {
+  const text = typeof result === 'string' ? result : (JSON.stringify(result) ?? 'null')
+  return text.length <= MAX_REPLY ? text : `${text.slice(0, MAX_REPLY)}\n[resultado truncado: ${text.length} caracteres]`
 }
 
 function parse(line: string): GwRequest | null {

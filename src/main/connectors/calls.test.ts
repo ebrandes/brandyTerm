@@ -104,9 +104,9 @@ test('project-restricted connector is refused on call and on tools', async () =>
   assert.deepEqual(s.log.order, [])
 })
 
-test('connector_tools lists tools', async () => {
+test('connector_tools lists tools as compact JSON', async () => {
   const s = setup()
-  assert.deepEqual(await s.handle(ref, s.req('tools', { name: 'Railway' }), sig()), [{ name: 'get_logs', description: 'Logs', inputSchema: { type: 'object' } }])
+  assert.equal(await s.handle(ref, s.req('tools', { name: 'Railway' }), sig()), JSON.stringify([{ name: 'get_logs', description: 'Logs', inputSchema: { type: 'object' } }]))
 })
 
 test('connector_tools is held for login first', async () => {
@@ -189,9 +189,9 @@ test('huge result is capped', async () => {
   assert.equal(out, 'x'.repeat(RESULT_CAP) + '\n(resultado cortado em 100000 caracteres)')
 })
 
-test('non-text parts are serialized and parts are joined', async () => {
-  const s = setup({ result: { content: [{ type: 'text', text: 'a' }, { type: 'image', mimeType: 'image/png' }] } })
-  assert.equal(await call(s), 'a\n{"type":"image","mimeType":"image/png"}')
+test('non-text parts become placeholders and parts are joined', async () => {
+  const s = setup({ result: { content: [{ type: 'text', text: 'a' }, { type: 'image', mimeType: 'image/png', data: 'AAAA' }] } })
+  assert.equal(await call(s), 'a\n[imagem image/png, 3 bytes]')
 })
 
 test('approval card carries the arguments', async () => {

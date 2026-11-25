@@ -7,6 +7,9 @@ import net from 'node:net'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { startGatewayServer, type GwHandler } from './gateway-server.ts'
+import { createCalls, RESULT_CAP } from './calls.ts'
+import { MAX_REPLY } from './gateway-protocol.ts'
+import type { Connector } from '../../shared/connectors.ts'
 
 const posix = process.platform !== 'win32'
 const script = resolve('src/main/connectors/gateway.ts')
@@ -70,8 +73,42 @@ test('handler error becomes isError', async () => {
 test('a 150 000 character result arrives capped and the next call still works', async () => {
   await withGateway(listHandler, async c => {
     const big = text(await c.callTool({ name: 'call_connector', arguments: { name: 'R', tool: 'big' } }))
-    assert.ok(big.length < 100_300 && /truncado/.test(big))
+    assert.ok(big.length < MAX_REPLY + 300 && /truncado/.test(big))
     assert.deepEqual(JSON.parse(text(await c.callTool({ name: 'list_connectors', arguments: {} }))), [{ name: 'Railway', description: 'x' }])
+  })
+})
+
+/** the real dispatcher behind the socket, with a connector whose tool answers `text` */
+function callsAnswering(text: string): GwHandler {
+  const c: Connector = { id: 'c1', name: 'Logs', description: '', transport: 'stdio', command: 'x', enabled: true, auth: { kind: 'none' }, alwaysAllow: ['tail'] }
+  return createCalls({
+    store: { list: () => [c], visibleFor: () => [c], allow: () => {} },
+    hub: { tools: async () => [], call: async () => ({ content: [{ type: 'text', text }] }) },
+    login: { needsLogin: async () => false, require: async () => {} },
+    approvals: { ask: async () => 'allow', releaseConnector: () => {} },
+    findThread: r => ({ p: { id: r.projectId, path: '/p' }, t: { id: r.threadId } }) as never,
+    machineName: () => 'PC', elsewhere: () => undefined, notify: () => {},
+  })
+}
+const tail = { name: 'call_connector', arguments: { name: 'Logs', tool: 'tail' } }
+
+test('a 94k log with quotes and newlines reaches the agent as the same plain text', async () => {
+  let log = ''
+  for (let i = 0; log.length < 94_300; i++) log += `2026-11-25T10:00:${String(i % 60).padStart(2, '0')}Z "GET /api/deploys?id=${i}" 200 "ok" {"ms":${i % 97}}\n`
+  assert.ok(log.length < RESULT_CAP)
+  await withGateway(callsAnswering(log), async c => {
+    assert.equal(text(await c.callTool(tail)), log)
+  })
+})
+
+test('a result over RESULT_CAP ends with the calls.ts note exactly once', async () => {
+  await withGateway(callsAnswering('"linha"\n'.repeat(20_000)), async c => {
+    const out = text(await c.callTool(tail))
+    const note = `\n(resultado cortado em ${RESULT_CAP} caracteres)`
+    assert.ok(out.endsWith(note))
+    assert.equal(out.split(note).length, 2)
+    assert.equal(out.includes('truncado'), false)
+    assert.equal(out, '"linha"\n'.repeat(20_000).slice(0, RESULT_CAP) + note)
   })
 })
 

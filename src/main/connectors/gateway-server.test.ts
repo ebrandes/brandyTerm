@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import { startGatewayServer, socketPath, type GwHandler } from './gateway-server.ts'
-import { MAX_LINE, MAX_RESULT, type GwResponse } from './gateway-protocol.ts'
+import { MAX_LINE, MAX_REPLY, type GwResponse } from './gateway-protocol.ts'
 
 const posix = process.platform !== 'win32'
 let n = 0
@@ -121,7 +121,7 @@ test('MAX_LINE counts bytes, not characters', async () => {
   } finally { await srv.close() }
 })
 
-test('a result over the cap is truncated and the connection stays usable', async () => {
+test('a result over the backstop is truncated and the connection stays usable', async () => {
   const srv = await startGatewayServer(tmpPath(), async (_c, req) => (req.id === 6 ? 'x'.repeat(150_000) : 'curto'))
   try {
     const token = srv.issue({ projectId: 'p', threadId: 't' })
@@ -130,12 +130,23 @@ test('a result over the cap is truncated and the connection stays usable', async
     s.write(JSON.stringify({ id: 6, token, op: 'call' }) + '\n')
     const big = await first
     assert.ok(big.ok && typeof big.result === 'string')
-    assert.ok((big.result as string).length < MAX_RESULT + 200)
+    assert.ok((big.result as string).startsWith('x'.repeat(MAX_REPLY) + '\n'))
+    assert.ok((big.result as string).length < MAX_REPLY + 200)
     assert.match(big.result as string, /truncado/)
     const second = oneReply(s)
     s.write(JSON.stringify({ id: 7, token, op: 'call' }) + '\n')
     assert.deepEqual(await second, { id: 7, ok: true, result: 'curto' })
     s.destroy()
+  } finally { await srv.close() }
+})
+
+test('a string result is sent as is, never re-encoded; other results as compact JSON', async () => {
+  const text = '"aspas"\nlinha 2'
+  const srv = await startGatewayServer(tmpPath(), async (_c, req) => (req.id === 11 ? text : [{ a: 1 }]))
+  try {
+    const token = srv.issue({ projectId: 'p', threadId: 't' })
+    assert.deepEqual(await ask(srv.path, { id: 11, token, op: 'call' }), { id: 11, ok: true, result: text })
+    assert.deepEqual(await ask(srv.path, { id: 12, token, op: 'list' }), { id: 12, ok: true, result: '[{"a":1}]' })
   } finally { await srv.close() }
 })
 
