@@ -1,0 +1,26 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { lanAddresses, isPrivateIPv4 } from './lan.ts'
+
+const v4 = (address: string, internal = false) =>
+  ({ address, netmask: '255.255.255.0', family: 'IPv4', mac: '00:00:00:00:00:00', internal, cidr: `${address}/24` }) as const
+const v6 = { address: 'fe80::1', netmask: 'ffff:ffff:ffff:ffff::', family: 'IPv6', mac: '00:00:00:00:00:00', internal: false, cidr: 'fe80::1/64', scopeid: 1 } as const
+
+test('lanAddresses keeps private LAN interfaces only', () => {
+  const ifaces = {
+    en0: [v4('192.168.1.20'), v6],
+    Ethernet: [v4('10.0.0.5')],
+    wlan0: [v4('172.20.1.2')],
+    utun3: [v4('10.8.0.2')],
+    ppp0: [v4('192.168.2.1')],
+    lo0: [v4('127.0.0.1', true)],
+    en1: [v4('8.8.8.8')],
+    en2: [v4('192.168.9.9', true)]
+  }
+  assert.deepEqual(lanAddresses(ifaces as never), ['192.168.1.20', '10.0.0.5', '172.20.1.2'])
+})
+
+test('isPrivateIPv4', () => {
+  for (const a of ['10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.0.1']) assert.equal(isPrivateIPv4(a), true, a)
+  for (const a of ['172.32.0.1', '8.8.8.8', '127.0.0.1', '169.254.1.1', '::1', '10.0.0', '999.1.1.1']) assert.equal(isPrivateIPv4(a), false, a)
+})

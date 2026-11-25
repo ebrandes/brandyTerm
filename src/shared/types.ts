@@ -193,6 +193,8 @@ export interface Project {
   processes: ProcessInfo[]
   /** threads moved to the archive file (kept out of the state and the IPC); recomputed at startup */
   archived?: { count: number; usage: Usage }
+  /** never shown to remote devices */
+  remoteHidden?: boolean
 }
 
 /** One archived thread, as listed on demand by the board (no messages). */
@@ -230,6 +232,8 @@ export interface AppSettings {
   keepAwake?: boolean
   /** compact an idle coordinator's context (default on) */
   idleCompact?: IdleCompactCfg
+  /** LAN host server for other BrandyTerm machines (default off) */
+  remote?: { enabled: boolean; port: number }
 }
 
 export interface AgentInfo {
