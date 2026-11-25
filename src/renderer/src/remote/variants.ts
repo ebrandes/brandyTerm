@@ -17,19 +17,21 @@ export function createVariants(local: BrandyApi, openUrl: (url: string) => void)
   return {
     openFolder: machineId => (machineId ? requestRemoteFolder(machineId) : local.openFolder()),
     openAttachment: (path, projectId) => {
-      const r = routeCall('attach:read', { projectId: projectId ?? '', path })
-      return r.machineId === null ? local.openAttachment(path) : openFromHost(r.machineId, 'attach:read', r.arg)
+      const r = routeCall('attach:read', { projectId, path })
+      return r.machineId === null ? local.openAttachment(path, projectId) : openFromHost(r.machineId, 'attach:read', r.arg)
     },
     openArtifact: a => {
       const r = routeCall('artifact:bytes', a)
       return r.machineId === null ? local.openArtifact(a) : openFromHost(r.machineId, 'artifact:bytes', r.arg)
     },
     async openPort(port, projectId) {
-      const machineId = projectId ? parseId(projectId).machineId : null
-      if (machineId === null) return local.openPort(port)
+      const machineId = parseId(projectId).machineId
+      if (machineId === null) return local.openPort(port, projectId)
       const host = (await local.remote.hosts()).find(h => h.machine.id === machineId)
-      const url = host?.online ? portUrl(host.address, port) : null
-      if (!host || !url) throw new Error(`${host?.machine.name ?? 'Máquina'} está offline`)
+      const name = host?.machine.name ?? 'Máquina'
+      if (!host?.online) throw new Error(`${name} está offline`)
+      const url = portUrl(host.address, port)
+      if (!url) throw new Error(host.address ? 'Porta inválida' : `${name} está offline`)
       openUrl(url)
     }
   }

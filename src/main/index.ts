@@ -127,7 +127,10 @@ app.whenReady().then(async () => {
   registerTerminalIpc(projectRoot)
   registerFsIpc(projectRoot)
   registerArtifactIpc(projectRoot)
-  registerRemoteCalls({ engine, attachmentsRoot, rootOf: projectRoot })
+  registerRemoteCalls({
+    engine, attachmentsRoot, rootOf: projectRoot, userData: () => app.getPath('userData'),
+    hiddenRoots: () => engine.state.projects.filter((p) => p.remoteHidden && p.path).map((p) => p.path as string)
+  })
   bindIpc(registry)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))

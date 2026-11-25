@@ -10,7 +10,8 @@ export function RemoteFolderHost() {
   const [open, setOpen] = useState<Open | null>(null)
   useEffect(() => onRemoteFolderRequest(async ({ machineId, resolve }) => {
     const host = (await api.remote.hosts().catch(() => [])).find((h) => h.machine.id === machineId)
-    setOpen({ machineId, name: host?.machine.name ?? 'outra máquina', resolve })
+    // a newer request replaces the one on screen: the older caller must not wait forever
+    setOpen((prev) => { prev?.resolve(null); return { machineId, name: host?.machine.name ?? 'outra máquina', resolve } })
   }), [])
   if (!open) return null
   const done = (id: string | null) => { open.resolve(id); setOpen(null) }

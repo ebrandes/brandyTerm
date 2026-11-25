@@ -6,6 +6,7 @@ import { Rich } from './Rich'
 import { CodeBlock } from './CodeBlock'
 import { MermaidBlock } from './MermaidBlock'
 import { api } from '../api'
+import { report } from '../notice'
 import './artifact.css'
 
 /** A diagram at full size; invalid code shows as a plain block. */
@@ -74,7 +75,7 @@ function FileView({ target }: { target: FileTarget }) {
           <button onClick={copy} title="Copiar caminho">
             <Copy size={14} /> {copied ? 'Copiado' : 'Copiar caminho'}
           </button>
-          <button onClick={() => void api.openArtifact(target)} title="Abrir no app padrão">
+          <button onClick={() => void api.openArtifact(target).catch(report)} title="Abrir no app padrão">
             <ExternalLink size={14} /> Abrir no app padrão
           </button>
         </>

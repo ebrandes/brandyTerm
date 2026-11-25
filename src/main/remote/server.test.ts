@@ -16,8 +16,8 @@ import { clientProof, verifyHostProof } from '../../shared/remote/pairing.ts'
 import { parsePaired, parsePairFail } from '../../shared/remote/pair-wire.ts'
 import type { AppState, Project } from '../../shared/types.ts'
 
-const HOST: MachineInfo = { id: 'host-1', name: 'Host', os: 'mac' }
-const ME: MachineInfo = { id: 'cli-1', name: 'Cliente', os: 'linux' }
+const HOST: MachineInfo = { id: '33333333-3333-4333-8333-333333333333', name: 'Host', os: 'mac' }
+const ME: MachineInfo = { id: '44444444-4444-4444-8444-444444444444', name: 'Cliente', os: 'linux' }
 const proj = (id: string, over: Partial<Project> = {}) => ({ id, name: id, ...over }) as Project
 
 interface Env {
@@ -166,7 +166,7 @@ function pairMsg(code: string, key: KeyPair, over: Record<string, unknown> = {})
     nonceC,
     text: JSON.stringify({
       t: 'pair', cpub: toB64(key.pub), nonceC: toB64(nonceC), proof: clientProof(code, key.pub, nonceC),
-      machineId: 'phone-1', name: 'Celular', os: 'phone', protocol: 1, ...over
+      machineId: '55555555-5555-4555-8555-555555555555', name: 'Celular', os: 'phone', protocol: 1, ...over
     })
   }
 }

@@ -12,6 +12,8 @@ export function hostOfAddress(address: string | undefined): string | null {
 }
 
 export function portUrl(address: string | undefined, port: number): string | null {
+  // the port comes from the host's state: only a plain integer may reach the URL
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) return null
   const host = hostOfAddress(address)
   if (!host) return null
   return `http://${host.includes(':') ? `[${host}]` : host}:${port}`

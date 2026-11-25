@@ -3,13 +3,8 @@ import { ChevronUp, Folder } from 'lucide-react'
 import type { FsEntry } from '../types'
 import { api } from '../api'
 import { remoteId } from '../remote/route'
+import { parentDir } from '../remote/parent-dir'
 import './remote-picker.css'
-
-/** Parent of "~/a/b/" is "~/a/"; "~/" stays. */
-export const parentDir = (p: string): string => {
-  const up = p.replace(/\/+$/, '').split('/').slice(0, -1).join('/')
-  return up ? `${up}/` : '/'
-}
 
 const asProjectPath = (p: string): string => (p === '~/' ? '~' : p.length > 1 ? p.replace(/\/+$/, '') : p)
 
@@ -23,6 +18,7 @@ export function RemoteFolderPicker({ machineId, machineName, onDone }: { machine
   useEffect(() => {
     let live = true
     setItems(null)
+    setError(undefined)
     api.remote.call({ machineId, channel: 'fs:browse', arg: dir }).then(
       (r) => { if (live) setItems(r as FsEntry[]) },
       (e) => { if (live) { setItems([]); setError(String(e?.message ?? e)) } }

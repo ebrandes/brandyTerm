@@ -1,8 +1,8 @@
 // Renderer IPC for the multi-machine feature (host and client side). Every channel is `deny` for remotes.
 import { app, shell, type BrowserWindow } from 'electron'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname } from 'node:path'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { MAX_ATTACHMENT } from '../attachment-scope.ts'
 import type { Engine } from '../engine.ts'
 import { registry } from '../rpc/registry.ts'
 import { ruleOf } from '../rpc/channels.ts'
@@ -43,15 +43,20 @@ export function startClient({ engine, remote, getWin }: ClientIpcDeps): RemoteHo
   add('remote:states', () => hosts.states())
   add('remote:call', (a: { machineId: string; channel: string; arg: unknown }) =>
     hosts.call(String(a.machineId), String(a.channel), a.arg))
-  add('remote:open-bytes', (a: { machineId: string; name: string; data: Uint8Array }) => {
+  add('remote:open-bytes', async (a: { machineId: string; name: string; data: Uint8Array }) => {
     const id = String(a.machineId)
     if (!hosts.list().some(h => h.machine.id === id)) throw new Error('Máquina desconhecida')
     if (!(a.data instanceof Uint8Array)) throw new Error('Arquivo inválido')
-    const file = targetPath(tmpdir(), id, a.name)
-    mkdirSync(dirname(file), { recursive: true })
-    writeFileSync(file, a.data, { mode: 0o600 })
-    if (openDecision(file) === 'open') void shell.openPath(file)
-    else shell.showItemInFolder(file)
+    if (a.data.byteLength > MAX_ATTACHMENT) throw new Error('Arquivo grande demais')
+    // per-user folder (not the shared tmp); a planted file or link is removed, never followed
+    const file = targetPath(join(app.getPath('userData'), 'remote-open'), id, a.name)
+    mkdirSync(dirname(file), { recursive: true, mode: 0o700 })
+    rmSync(file, { force: true })
+    writeFileSync(file, a.data, { mode: 0o600, flag: 'wx' })
+    if (openDecision(file) === 'open') {
+      const err = await shell.openPath(file)
+      if (err) throw new Error(err)
+    } else shell.showItemInFolder(file)
   })
   add('remote:open-pairing', () => {
     const server = remote.server()

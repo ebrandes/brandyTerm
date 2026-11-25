@@ -28,6 +28,7 @@ test('portUrl takes the host part of ip:port', () => {
   assert.equal(portUrl('192.168.0.9:7777', 3000), 'http://192.168.0.9:3000')
   assert.equal(portUrl('[fe80::1]:7777', 3000), 'http://[fe80::1]:3000')
   assert.equal(portUrl(undefined, 3000), null)
+  for (const bad of ['1@evil.com', '0', 70000, 1.5, -1, NaN]) assert.equal(portUrl('192.168.0.9:7777', bad as never), null, String(bad))
 })
 
 test('openPort: local project opens localhost via main; remote opens the host ip', async () => {
@@ -54,8 +55,7 @@ test('openAttachment and openArtifact on a remote project read on the host, then
     ['bytes', { machineId: 'm1', name: 'f.png', data: new Uint8Array([1]) }]
   ])
   await f.v.openAttachment('/local/a.png', 'p')
-  await f.v.openAttachment('/local/b.png')
-  assert.deepEqual(f.log.slice(4), [['local-att', '/local/a.png'], ['local-att', '/local/b.png']])
+  assert.deepEqual(f.log.slice(4), [['local-att', '/local/a.png']])
 })
 
 test('openFolder: no machine uses the local dialog; a machine asks the picker', async () => {

@@ -38,6 +38,9 @@ function bytesOk(v: unknown, len: number): v is string {
   try { return fromB64(v).length === len } catch { return false }
 }
 function textOk(v: unknown): v is string { return typeof v === 'string' && v.length >= 1 && v.length <= 64 }
+/** the id identity.ts makes (randomUUID): it names folders on the peer, so nothing else is accepted */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+function idOk(v: unknown): v is string { return typeof v === 'string' && UUID.test(v) }
 function proofOk(v: unknown): v is string {
   if (typeof v !== 'string') return false
   try { fromB64(v); return true } catch { return false }
@@ -53,7 +56,7 @@ export function parsePair(text: string): PairMsg | null {
   const o = parseObj(text)
   if (!o || o.t !== 'pair') return null
   if (!bytesOk(o.cpub, PUB_LEN) || !bytesOk(o.nonceC, NONCE_LEN) || !proofOk(o.proof)) return null
-  if (!textOk(o.machineId) || !textOk(o.name)) return null
+  if (!idOk(o.machineId) || !textOk(o.name)) return null
   if (typeof o.os !== 'string' || ![...OSES, 'phone'].includes(o.os)) return null
   if (typeof o.protocol !== 'number') return null
   return {
@@ -66,7 +69,7 @@ export function parsePaired(text: string): PairedMsg | null {
   const o = parseObj(text)
   if (!o || o.t !== 'paired') return null
   if (!bytesOk(o.hpub, PUB_LEN) || !bytesOk(o.nonceH, NONCE_LEN) || !proofOk(o.proof)) return null
-  if (!textOk(o.machineId) || !textOk(o.name)) return null
+  if (!idOk(o.machineId) || !textOk(o.name)) return null
   if (typeof o.os !== 'string' || !OSES.includes(o.os)) return null
   return {
     t: 'paired', hpub: o.hpub, nonceH: o.nonceH, proof: o.proof,

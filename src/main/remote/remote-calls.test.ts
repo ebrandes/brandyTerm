@@ -17,12 +17,16 @@ function setup() {
   mkdirSync(join(att, 'p1'), { recursive: true })
   mkdirSync(join(att, 'p2'), { recursive: true })
   mkdirSync(join(proj, 'sub'), { recursive: true })
+  for (const d of ['home/work', 'userdata', 'hidden/inner']) mkdirSync(join(base, d), { recursive: true })
   const added: string[] = []
   const c = remoteCalls({
     engine: { addProject: p => { added.push(p); return 'id1' } },
     attachmentsRoot: () => att,
     rootOf: id => (id === 'p1' ? proj : null),
-    home: () => base
+    home: () => join(base, 'home'),
+    userData: () => join(base, 'userdata'),
+    hiddenRoots: () => [join(base, 'hidden')],
+    platform: 'linux'
   })
   return { base, att, proj, added, c }
 }
@@ -77,18 +81,47 @@ test('project:add-path adds a folder (expanding ~), rejects a file or a missing 
   const { base, proj, added, c } = setup()
   writeFileSync(join(base, 'f.txt'), 'x')
   assert.equal(c.addPath(proj), 'id1')
-  assert.equal(c.addPath('~/proj'), 'id1')
-  assert.deepEqual(added, [proj, proj])
+  assert.equal(c.addPath('~/work'), 'id1')
+  assert.deepEqual(added, [proj, join(base, 'home', 'work')])
   assert.throws(() => c.addPath(join(base, 'f.txt')), /^Error: Não é uma pasta$/)
   assert.throws(() => c.addPath(join(base, 'missing')), /Não é uma pasta/)
   assert.throws(() => c.addPath(''), /Não é uma pasta/)
+  assert.throws(() => c.addPath('proj'), /Não é uma pasta/) // relative: would resolve against the host cwd
+})
+
+test('project:add-path refuses roots, home, app data and anything around a hidden project', () => {
+  const { base, c } = setup()
+  const no = (p: string, re: RegExp) => assert.throws(() => c.addPath(p), re, p)
+  no('/', /Pasta não permitida/)
+  no('~', /Pasta não permitida/)
+  no('~/', /Pasta não permitida/)
+  no(join(base, 'home'), /Pasta não permitida/)
+  no(base, /Pasta não permitida/) // contains home
+  no(join(base, 'userdata'), /Pasta não permitida/)
+  mkdirSync(join(base, 'userdata', 'sub'))
+  no(join(base, 'userdata', 'sub'), /Pasta não permitida/)
+  no(join(base, 'hidden'), /Projeto não disponível remotamente/)
+  no(join(base, 'hidden', 'inner'), /Projeto não disponível remotamente/)
+  symlinkSync(join(base, 'hidden'), join(base, 'home', 'link'))
+  no('~/link', /Projeto não disponível remotamente/)
+  no(join(base, 'hidden', '..', 'hidden'), /Projeto não disponível remotamente/)
+})
+
+test('project:add-path compares case-insensitively off Linux', () => {
+  const { base } = setup()
+  const c = remoteCalls({
+    engine: { addProject: () => 'x' }, attachmentsRoot: () => base, rootOf: () => null, home: () => join(base, 'home'),
+    userData: () => join(base, 'USERDATA'), hiddenRoots: () => [join(base, 'HIDDEN')], platform: 'darwin'
+  })
+  assert.throws(() => c.addPath(join(base, 'hidden', 'inner')), /Projeto não disponível/)
+  assert.throws(() => c.addPath(join(base, 'userdata')), /Pasta não permitida/)
 })
 
 test('fs:browse lists folders only', async () => {
   const { base, c } = setup()
   writeFileSync(join(base, 'f.txt'), 'x')
   const r = await c.browse(`${base}/`)
-  assert.deepEqual(r.map(e => e.path.slice(base.length + 1)), ['att/', 'proj/'])
+  assert.deepEqual(r.map(e => e.path.slice(base.length + 1)), ['att/', 'hidden/', 'home/', 'proj/', 'userdata/'])
   assert.ok(r.every(e => e.kind === 'dir'))
   assert.ok(!r.some(e => e.path.endsWith('f.txt')))
 })

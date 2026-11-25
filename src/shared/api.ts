@@ -14,7 +14,7 @@ export interface BrandyApi {
   /** stores a pasted/dropped/picked file for the project; images may carry the user's marks */
   saveAttachment(args: { projectId: string; name: string; mime: string; data: Uint8Array; marked?: boolean }): Promise<Attachment>
   /** opens a stored attachment with the system's default app */
-  openAttachment(path: string, projectId?: string): Promise<void>
+  openAttachment(path: string, projectId: string): Promise<void>
   /** a file of the project (relative path) for the artifact viewer */
   readArtifact(args: { projectId: string; path: string }): Promise<ArtifactContent>
   /** opens a project file in the system's default app */
@@ -37,7 +37,7 @@ export interface BrandyApi {
   stopProcess(args: { projectId: string; processId: string }): Promise<void>
   removeProcess(args: { projectId: string; processId: string }): Promise<void>
   /** opens http://localhost:PORT in the default browser */
-  openPort(port: number, projectId?: string): Promise<void>
+  openPort(port: number, projectId: string): Promise<void>
   /** installs an optional plugin through Claude's marketplace */
   installPlugin(args: { id: string; force?: boolean }): Promise<void>
   openPluginReport(id: string): Promise<void>

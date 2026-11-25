@@ -5,9 +5,9 @@ import { toB64 } from './crypto.ts'
 
 const b = (n: number) => toB64(new Uint8Array(n).fill(7))
 const pair = (over: Record<string, unknown> = {}) =>
-  JSON.stringify({ t: 'pair', cpub: b(32), nonceC: b(16), proof: b(32), machineId: 'm1', name: 'Mac', os: 'mac', protocol: 1, ...over })
+  JSON.stringify({ t: 'pair', cpub: b(32), nonceC: b(16), proof: b(32), machineId: '11111111-1111-4111-8111-111111111111', name: 'Mac', os: 'mac', protocol: 1, ...over })
 const paired = (over: Record<string, unknown> = {}) =>
-  JSON.stringify({ t: 'paired', hpub: b(32), nonceH: b(16), proof: b(32), machineId: 'm2', name: 'PC', os: 'linux', ...over })
+  JSON.stringify({ t: 'paired', hpub: b(32), nonceH: b(16), proof: b(32), machineId: '22222222-2222-4222-8222-222222222222', name: 'PC', os: 'linux', ...over })
 
 test('parsePair accepts a valid message, including phone', () => {
   assert.equal(parsePair(pair())?.name, 'Mac')
@@ -26,7 +26,7 @@ test('parsePair rejects malformed input', () => {
 })
 
 test('parsePaired is strict and rejects phone', () => {
-  assert.equal(parsePaired(paired())?.machineId, 'm2')
+  assert.equal(parsePaired(paired())?.machineId, '22222222-2222-4222-8222-222222222222')
   for (const t of [paired({ hpub: b(33) }), paired({ nonceH: b(8) }), paired({ os: 'phone' }), paired({ name: '' }), 'nope'])
     assert.equal(parsePaired(t), null, t)
 })
@@ -35,4 +35,11 @@ test('parsePairFail accepts known reasons only', () => {
   assert.equal(parsePairFail(JSON.stringify({ t: 'pair-fail', reason: 'pareamento fechado' }))?.reason, 'pareamento fechado')
   assert.equal(parsePairFail(JSON.stringify({ t: 'pair-fail', reason: 'outra' })), null)
   assert.equal(parsePairFail('{'), null)
+})
+
+test('machine ids that are not a UUID are refused (they name folders on the peer)', () => {
+  for (const id of ['..', 'a/b', '..\\x', 'm1', '11111111-1111-4111-8111-11111111111', '11111111-1111-4111-8111-111111111111/']) {
+    assert.equal(parsePair(pair({ machineId: id })), null, id)
+    assert.equal(parsePaired(paired({ machineId: id })), null, id)
+  }
 })

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ExternalLink, Play, Plus, Square, Trash2 } from 'lucide-react'
 import type { Project } from '../types'
 import { api } from '../api'
+import { report } from '../notice'
 import { parseId } from '../remote/route'
 
 const REMOTE_PORT_TIP = 'Abre pela rede local; o servidor precisa escutar além de localhost'
@@ -93,7 +94,7 @@ export function ProcessPanel({ project }: { project: Project }) {
           {x.ports.length > 0 && (
             <div className="ports">
               {x.ports.map((port) => (
-                <button key={port} className="port" onClick={() => void api.openPort(port, project.id).catch(() => {})} title={remote ? REMOTE_PORT_TIP : `Abrir http://localhost:${port}`}>
+                <button key={port} className="port" onClick={() => void api.openPort(port, project.id).catch(report)} title={remote ? REMOTE_PORT_TIP : `Abrir http://localhost:${port}`}>
                   :{port} <ExternalLink size={11} />
                 </button>
               ))}

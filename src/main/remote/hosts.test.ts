@@ -19,8 +19,8 @@ afterEach(() => {
   for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true })
 })
 
-const me: MachineInfo = { id: 'me', name: 'Eu', os: 'mac' }
-const hostInfo: MachineInfo = { id: 'h1', name: 'Servidor', os: 'linux' }
+const me: MachineInfo = { id: '22222222-2222-4222-8222-222222222222', name: 'Eu', os: 'mac' }
+const hostInfo: MachineInfo = { id: '11111111-1111-4111-8111-111111111111', name: 'Servidor', os: 'linux' }
 
 class Timers {
   items: { id: number; fn: () => void; ms: number }[] = []
@@ -46,13 +46,13 @@ function rig(opts: { trusted?: boolean; staleHost?: boolean; claim?: string; bro
   const hostTrust = new TrustStore(tmp())
   const host = new FakeHost(hostTrust, { ...hostInfo, id: opts.claim ?? hostInfo.id })
   if (opts.trusted !== false) {
-    trust.add({ pub: toB64(hostTrust.ownKey().pub), role: 'host', machineId: 'h1', name: 'Servidor', os: 'linux' })
-    hostTrust.add({ pub: toB64(trust.ownKey().pub), role: 'client', machineId: 'me', name: 'Eu', os: 'mac' })
-    fs.writeFileSync(join(dir, 'remote-hosts.json'), JSON.stringify({ h1: '10.0.0.5:7000' }))
+    trust.add({ pub: toB64(hostTrust.ownKey().pub), role: 'host', machineId: '11111111-1111-4111-8111-111111111111', name: 'Servidor', os: 'linux' })
+    hostTrust.add({ pub: toB64(trust.ownKey().pub), role: 'client', machineId: '22222222-2222-4222-8222-222222222222', name: 'Eu', os: 'mac' })
+    fs.writeFileSync(join(dir, 'remote-hosts.json'), JSON.stringify({ [hostInfo.id]: '10.0.0.5:7000' }))
   }
   if (opts.staleHost) {
-    trust.add({ pub: toB64(newKeyPair().pub), role: 'host', machineId: 'h1', name: 'Servidor', os: 'linux' })
-    fs.writeFileSync(join(dir, 'remote-hosts.json'), JSON.stringify({ h1: '10.0.0.5:7000' }))
+    trust.add({ pub: toB64(newKeyPair().pub), role: 'host', machineId: '11111111-1111-4111-8111-111111111111', name: 'Servidor', os: 'linux' })
+    fs.writeFileSync(join(dir, 'remote-hosts.json'), JSON.stringify({ [hostInfo.id]: '10.0.0.5:7000' }))
   }
   const timers = new Timers()
   const hosts = new RemoteHosts({
@@ -71,10 +71,10 @@ test('a trusted host with an address comes online; its state push is re-emitted 
   hosts.on('state', e => states.push(e))
   hosts.start()
   await until(() => online(hosts) && host.channels.length === 1, 'online')
-  assert.deepEqual(hosts.list()[0].machine, { id: 'h1', name: 'Servidor', os: 'linux' })
+  assert.deepEqual(hosts.list()[0].machine, { id: '11111111-1111-4111-8111-111111111111', name: 'Servidor', os: 'linux' })
   host.channels[0].push('state', { projects: [] })
   await until(() => states.length === 1, 'state')
-  assert.equal(states[0].machineId, 'h1')
+  assert.equal(states[0].machineId, '11111111-1111-4111-8111-111111111111')
   assert.deepEqual(states[0].state, { projects: [] } as unknown as AppState)
 })
 
@@ -82,7 +82,7 @@ test('call forwards to the host and resolves its value', async () => {
   const { hosts } = rig()
   hosts.start()
   await until(() => online(hosts))
-  assert.deepEqual(await hosts.call('h1', 'chat:send', { a: 1 }), { channel: 'chat:send', arg: { a: 1 } })
+  assert.deepEqual(await hosts.call('11111111-1111-4111-8111-111111111111', 'chat:send', { a: 1 }), { channel: 'chat:send', arg: { a: 1 } })
   await assert.rejects(hosts.call('nope', 'x', 1), /desconhecida/)
 })
 
@@ -90,14 +90,14 @@ test('host closes: offline with since, pending call rejects, new call says offli
   const { hosts, host, timers } = rig()
   hosts.start()
   await until(() => online(hosts) && host.channels.length === 1)
-  const pending = hosts.call('h1', 'hang', 1)
+  const pending = hosts.call('11111111-1111-4111-8111-111111111111', 'hang', 1)
   const rejected = assert.rejects(pending, /Máquina desconectada/)
   host.channels[0].close()
   await rejected
   await until(() => !online(hosts))
   const info = hosts.list()[0]
   assert.ok(info.since && !Number.isNaN(Date.parse(info.since)))
-  await assert.rejects(hosts.call('h1', 'x', 1), /Servidor está offline/)
+  await assert.rejects(hosts.call('11111111-1111-4111-8111-111111111111', 'x', 1), /Servidor está offline/)
   assert.equal(timers.items[0].ms, 1000)
   timers.fire()
   await until(() => online(hosts), 'back online')
@@ -123,7 +123,7 @@ test('a host that claims another machine id is refused with identidade não conf
   await until(() => hosts.list()[0]?.error === 'identidade não confere', 'error')
   assert.equal(hosts.list()[0].online, false)
   await until(() => host.channels[0] !== undefined)
-  await assert.rejects(hosts.call('h1', 'x', 1), /offline/)
+  await assert.rejects(hosts.call('11111111-1111-4111-8111-111111111111', 'x', 1), /offline/)
 })
 
 test('revoking a host closes its channel, stops reconnecting and drops it from the list', async () => {
@@ -137,7 +137,7 @@ test('revoking a host closes its channel, stops reconnecting and drops it from t
   await until(() => hostSawClose, 'host sees the close')
   assert.equal(timers.items.length, 0)
   assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), {})
-  await assert.rejects(hosts.call('h1', 'x', 1), /desconhecida/)
+  await assert.rejects(hosts.call('11111111-1111-4111-8111-111111111111', 'x', 1), /desconhecida/)
 })
 
 test('stop clears timers and closes channels', async () => {
@@ -165,8 +165,8 @@ test('pair: right code trusts the host, remembers the address and connects', asy
   const m = await hosts.pair('10.0.0.5:7000', code.toLowerCase())
   assert.deepEqual(m, hostInfo)
   assert.equal(trust.list().length, 1)
-  assert.equal(trust.list()[0].machineId, 'h1')
-  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '10.0.0.5:7000' })
+  assert.equal(trust.list()[0].machineId, '11111111-1111-4111-8111-111111111111')
+  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { [hostInfo.id]: '10.0.0.5:7000' })
   await until(() => online(hosts), 'online after pair')
 })
 
@@ -202,11 +202,11 @@ test('mDNS: only unpaired hosts are discovered; a trusted host seen again is ret
   await until(() => timers.items.length === 1)
   host.down = false
   up({ name: 'Outro', os: 'mac', address: '192.168.0.9:7000', machineId: 'x9' })
-  up({ name: 'Servidor', os: 'linux', address: '192.168.0.7:7001', machineId: 'h1' })
+  up({ name: 'Servidor', os: 'linux', address: '192.168.0.7:7001', machineId: '11111111-1111-4111-8111-111111111111' })
   assert.deepEqual(hosts.discovered().map(d => d.machineId), ['x9'])
   assert.equal(hosts.list()[0].address, '192.168.0.7:7001')
   await until(() => online(hosts), 'online without waiting for the timer')
-  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '192.168.0.7:7001' })
+  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { [hostInfo.id]: '192.168.0.7:7001' })
   assert.equal(timers.items.length, 0)
   hosts.stop()
   assert.equal(stopped, true)
@@ -218,17 +218,17 @@ test('pairing as a client does not let the host control this machine', async () 
   await hosts.pair('10.0.0.5:7000', host.openPairing())
   const hostPub = hostTrust.ownKey().pub
   assert.equal(trust.get(toB64(hostPub), 'client'), undefined) // the server's accept predicate
-  assert.equal(trust.get(toB64(hostPub), 'host')?.machineId, 'h1')
+  assert.equal(trust.get(toB64(hostPub), 'host')?.machineId, '11111111-1111-4111-8111-111111111111')
   assert.deepEqual(trust.list('client'), [])
 })
 
 test('a machine trusted in both roles is dialed; revoking the client role keeps the host role', async () => {
   const { hosts, host, trust } = rig()
   const pub = trust.list('host')[0].pub
-  trust.add({ pub, role: 'client', machineId: 'h1', name: 'Servidor', os: 'linux' })
+  trust.add({ pub, role: 'client', machineId: '11111111-1111-4111-8111-111111111111', name: 'Servidor', os: 'linux' })
   hosts.start()
   await until(() => online(hosts) && host.channels.length === 1)
-  assert.equal(trust.get(pub, 'client')?.machineId, 'h1')
+  assert.equal(trust.get(pub, 'client')?.machineId, '11111111-1111-4111-8111-111111111111')
   trust.revoke(pub, 'client')
   assert.equal(trust.get(pub, 'client'), undefined)
   assert.ok(trust.get(pub, 'host'))
@@ -267,9 +267,9 @@ test('an mDNS address is kept only after a handshake succeeds there', async () =
   host.down = true
   hosts.start()
   await until(() => timers.items.length === 1)
-  up({ name: 'Servidor', os: 'linux', address: '192.168.0.99:7001', machineId: 'h1' })
+  up({ name: 'Servidor', os: 'linux', address: '192.168.0.99:7001', machineId: '11111111-1111-4111-8111-111111111111' })
   await until(() => timers.items.length === 1 && host.dials >= 2)
-  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { h1: '10.0.0.5:7000' })
+  assert.deepEqual(JSON.parse(fs.readFileSync(join(dir, 'remote-hosts.json'), 'utf8')), { [hostInfo.id]: '10.0.0.5:7000' })
 })
 
 test('discovered() hides only machines trusted as hosts; a client-only machine still shows', () => {
@@ -288,7 +288,7 @@ test('states() caches the last push, keeps it offline and drops it on revoke', a
   await until(() => online(hosts) && host.channels.length === 1)
   host.channels[0].push('state', { projects: [{ id: 'p' }] })
   await until(() => hosts.states().length === 1, 'cached')
-  assert.deepEqual(hosts.states()[0].machineId, 'h1')
+  assert.deepEqual(hosts.states()[0].machineId, '11111111-1111-4111-8111-111111111111')
   host.channels[0].close('x')
   await until(() => !online(hosts))
   assert.equal(hosts.states().length, 1)
