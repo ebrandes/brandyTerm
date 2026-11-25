@@ -20,7 +20,7 @@ const TOOL_NAMES: Record<string, string> = {
 export function ThreadAttention({ t, projectId, machine }: { t: Thread; projectId: string; machine?: Project['machine'] }) {
   return (
     <>
-      {(t.logins ?? []).map((l) => <LoginCard key={l.connectorId} login={l} remote={machine?.remote === true} machineName={machine?.name} />)}
+      {(t.logins ?? []).map((l) => <LoginCard key={l.connectorId} login={l} remote={machine?.remote === true} place="thread" machineName={machine?.name} />)}
       <Attention t={t} projectId={projectId} />
     </>
   )

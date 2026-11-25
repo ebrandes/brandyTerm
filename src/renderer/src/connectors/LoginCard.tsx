@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { ShieldQuestion } from 'lucide-react'
 import type { PanelLogin, ThreadLogin } from '../../../shared/connectors.ts'
-import { attach, dispose } from '../terminals'
+import { attach } from '../terminals'
 import { api } from '../api'
 import { report } from '../notice'
 import { loginCardView } from './login-card-view'
+import { loginTerminalOf } from './login-terminals'
 import './login-card.css'
 
 interface Props {
@@ -12,21 +13,22 @@ interface Props {
   machineName?: string
   /** the card belongs to a paired machine: login can only happen there */
   remote: boolean
+  /** only the panel card shows the login terminal */
+  place?: 'panel' | 'thread'
 }
 
 /** "Conectar <nome>": Entrar and Cancelar, the token fields or the login terminal. Same card in the panel and in a thread's chat. */
-export function LoginCard({ login, machineName, remote }: Props) {
-  const view = loginCardView(login, remote, machineName)
-  const term = login.terminalId ?? `connector-login-${login.connectorId}`
-  const isCli = login.authKind === 'cli' && !remote
+export function LoginCard({ login, machineName, remote, place = 'panel' }: Props) {
+  const view = loginCardView(login, remote, machineName, place)
+  const term = loginTerminalOf(login)
+  const isCli = login.authKind === 'cli' && !remote && place === 'panel'
   const box = useRef<HTMLDivElement>(null)
   const fields = useRef<Record<string, HTMLInputElement | null>>({})
 
   // the terminal entry exists from the first paint, so the CLI's earliest output is kept
   useEffect(() => {
     if (!isCli) return
-    attach(term)
-    return () => dispose(term)
+    attach(term) // never disposed here: ConnectorsSection forgets it when the login ends
   }, [isCli, term])
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export function LoginCard({ login, machineName, remote }: Props) {
       // not laid out yet
     }
     e.term.focus()
-    return () => e.host.remove()
+    return () => { if (e.host.parentElement === el) e.host.remove() }
   }, [view.showTerminal, term])
 
   const enter = () => {

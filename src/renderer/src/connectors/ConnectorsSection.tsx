@@ -1,14 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { ConnectorsState } from '../../../shared/connectors.ts'
 import type { MachineInfo } from '../../../shared/remote/machine.ts'
 import type { Project } from '../types'
+import { dispose } from '../terminals'
 import { useRemoteHosts } from '../useRemoteHosts'
 import { AddConnectorDialog } from './AddConnectorDialog'
 import { ConnectorRow } from './ConnectorRow'
 import { ImportConnectors } from './ImportConnectors'
 import { LoginCard } from './LoginCard'
 import { onlyElsewhere } from './elsewhere'
+import { goneTerminals } from './login-terminals'
 import { statusClass } from './status'
 import { useHostConnectors } from './useHostConnectors'
 import './connectors.css'
@@ -26,6 +28,13 @@ export function ConnectorsSection({ state, projects, viewing }: Props) {
   const [adding, setAdding] = useState<{ preset?: string } | null>(null)
   const [importing, setImporting] = useState(false)
   const hosts = useHostConnectors(useRemoteHosts())
+  // a login terminal lives until its login ends, not until its card unmounts
+  const seen = useRef<string[]>([])
+  useEffect(() => {
+    const { gone, live } = goneTerminals(seen.current, state?.logins ?? [])
+    for (const id of gone) dispose(id)
+    seen.current = live
+  }, [state?.logins])
 
   if (viewing) {
     const theirs = hosts.find((h) => h.machine.id === viewing.id)?.list ?? []

@@ -40,3 +40,12 @@ test('failed: the error as note and Tentar de novo', () => {
   assert.equal(v.note, 'deu ruim')
   assert.deepEqual(v.primary, { label: 'Tentar de novo', disabled: false })
 })
+
+test('only the panel card shows the terminal of a cli login', () => {
+  const w: PanelLogin = { ...base, authKind: 'cli', phase: 'waiting' }
+  assert.equal(loginCardView(w, false, undefined, 'panel').showTerminal, true)
+  const t = loginCardView(w, false, undefined, 'thread')
+  assert.equal(t.showTerminal, false)
+  assert.equal(t.note, 'Aguardando login…')
+  assert.equal(t.cancel, true)
+})
