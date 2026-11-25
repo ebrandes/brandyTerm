@@ -1,6 +1,7 @@
 // LAN host: pairing and encrypted channels for trusted devices. No Electron here (see index.ts for wiring).
 import { EventEmitter } from 'node:events'
 import http from 'node:http'
+import type net from 'node:net'
 import os from 'node:os'
 import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
@@ -13,6 +14,7 @@ import type { AppState } from '../../shared/types.ts'
 import type { CallCtx } from '../rpc/registry.ts'
 import { authorize, filterState } from './host-filter.ts'
 import { handlePair, type PairingCtx } from './host-pairing.ts'
+import { adapterDescriptions, loadAdapterDescriptions } from './adapters.ts'
 import { acceptLan } from './lan.ts'
 import type { RemoteGuard } from './read-guard.ts'
 import type { TrustStore } from './trust.ts'
@@ -27,7 +29,7 @@ export interface HostDeps {
   machine(): MachineInfo
   /** mDNS announcement; only when given */
   publish?: (info: { name: string; port: number; txt: Record<string, string> }) => { stop(): void }
-  /** upgrade filter; default: local address is a LAN interface and the peer is a private IPv4 */
+  /** connection filter, run before any HTTP; default: local address is a LAN interface and the peer a private IPv4 */
   acceptAddress?: (local: string, remote: string) => boolean
   /** keeps hidden projects, the app's data and dot entries out of remote file calls (read-guard.ts) */
   guard: RemoteGuard
@@ -38,7 +40,8 @@ const PUSH_DEBOUNCE_MS = 100
 const MAX_UNAUTH = 32
 const REMOVED = 'dispositivo removido'
 
-const defaultAccept = (local: string, remote: string): boolean => acceptLan(os.networkInterfaces(), local, remote)
+const defaultAccept = (local: string, remote: string): boolean =>
+  acceptLan(os.networkInterfaces(), local, remote, adapterDescriptions())
 
 interface Live { ch: SecureChannel; since: string }
 
@@ -62,8 +65,11 @@ export class HostServer extends EventEmitter {
 
   async start(port: number): Promise<void> {
     if (this.http) throw new Error('já iniciado')
+    if (!this.deps.acceptAddress) await loadAdapterDescriptions()
     const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_PAYLOAD })
     const srv = http.createServer((_req, res) => { res.writeHead(404).end() })
+    // listening on 0.0.0.0: anything that did not come in on the LAN is cut before a byte of HTTP is read
+    srv.on('connection', sock => this.screen(sock))
     srv.on('upgrade', (req, sock, head) => this.upgrade(wss, req, sock, head))
     wss.on('connection', ws => this.onConnection(ws))
     await new Promise<void>((resolve, reject) => {
@@ -127,11 +133,15 @@ export class HostServer extends EventEmitter {
     return [...this.live].map(l => ({ pub: l.ch.peerPub, name: this.deps.trust.get(l.ch.peerPub, 'client')?.name ?? l.ch.peer.name, since: l.since }))
   }
 
-  private upgrade(wss: WebSocketServer, req: http.IncomingMessage, sock: Duplex, head: Buffer): void {
+  private screen(sock: net.Socket): void {
     const accept = this.deps.acceptAddress ?? defaultAccept
     let ok = false
-    try { ok = accept(req.socket.localAddress ?? '', req.socket.remoteAddress ?? '') } catch { ok = false }
-    if (!ok || this.stopped || this.unauth.size >= MAX_UNAUTH) { sock.destroy(); return }
+    try { ok = accept(sock.localAddress ?? '', sock.remoteAddress ?? '') } catch { ok = false }
+    if (!ok || this.stopped) sock.destroy()
+  }
+
+  private upgrade(wss: WebSocketServer, req: http.IncomingMessage, sock: Duplex, head: Buffer): void {
+    if (this.stopped || this.unauth.size >= MAX_UNAUTH) { sock.destroy(); return }
     wss.handleUpgrade(req, sock, head, ws => wss.emit('connection', ws, req))
   }
 

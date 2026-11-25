@@ -36,3 +36,12 @@ test('acceptLan', () => {
   assert.equal(acceptLan(ifaces, '127.0.0.1', '127.0.0.1'), false)
   assert.equal(acceptLan(ifaces, '192.168.1.20', undefined), false)
 })
+
+test('a Fortinet adapter is not the LAN, whatever its name (Windows descriptions)', () => {
+  const ifaces = { Ethernet: [v4('192.168.1.20')], 'Ethernet 3': [v4('10.212.134.5')] } as never
+  const descriptions = { Ethernet: 'Intel(R) Ethernet Connection', 'Ethernet 3': 'Fortinet SSL VPN Virtual Ethernet Adapter' }
+  assert.deepEqual(lanAddresses(ifaces, descriptions), ['192.168.1.20'])
+  assert.deepEqual(lanAddresses(ifaces), ['192.168.1.20', '10.212.134.5'])
+  assert.equal(acceptLan(ifaces, '10.212.134.5', '10.212.134.1', descriptions), false)
+  assert.equal(acceptLan(ifaces, '::ffff:192.168.1.20', '192.168.1.9', descriptions), true)
+})

@@ -2,9 +2,13 @@ import type { EventEmitter } from 'node:events'
 import os from 'node:os'
 import { Bonjour } from 'bonjour-service'
 import type { HostDeps } from './server.ts'
+import { adapterDescriptions } from './adapters.ts'
 import { lanAddresses } from './lan.ts'
 
 interface Rec { name: string; type: string; ttl?: number; data?: unknown }
+
+/** the addresses the host server accepts (lan.ts), with the adapter descriptions it loaded at start */
+const lan = (): string[] => lanAddresses(os.networkInterfaces(), adapterDescriptions())
 
 /** Replaces every address record with the LAN addresses only (no VPN/tunnel IP is multicast). */
 export function lanOnlyRecords(records: Rec[], host: string, addrs: string[]): Rec[] {
@@ -24,7 +28,7 @@ export const log = (e: unknown): void => console.error('[remote] mDNS:', e insta
 
 /** A Bonjour bound to the LAN interface, or null when there is none. Throws like `new Bonjour`. */
 export function lanBonjour(): Bonjour | null {
-  const opts = mdnsOptions(lanAddresses(os.networkInterfaces()))
+  const opts = mdnsOptions(lan())
   if (!opts) return null
   // the typings only list service fields; these go to multicast-dns
   const bonjour = new Bonjour(opts as unknown as ConstructorParameters<typeof Bonjour>[0], log)
@@ -43,7 +47,7 @@ export const publishMdns: NonNullable<HostDeps['publish']> = info => {
     // records() runs after the probe, so this override is in place before anything is announced
     const original = svc.records.bind(svc) as () => Rec[]
     ;(svc as unknown as { records: () => Rec[] }).records = () =>
-      lanOnlyRecords(original(), svc.host, lanAddresses(os.networkInterfaces()))
+      lanOnlyRecords(original(), svc.host, lan())
   } catch (e) {
     log(e)
   }
