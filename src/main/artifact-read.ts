@@ -2,6 +2,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs'
 import { extname, resolve } from 'node:path'
 import type { ArtifactContent, ArtifactKind } from '../shared/types.ts'
 import { inside } from './paths.ts'
+import { mediaType } from './artifact-media.ts'
 
 /** Reading a thread's artifact for the viewer. Pure: no Electron here. */
 
@@ -42,6 +43,9 @@ export function readArtifact(root: string, rel: string): ArtifactContent {
   if (!abs) return { kind: 'missing' }
   try {
     const size = statSync(abs).size
+    // media is streamed by brandy-art://, never read here: no size cap
+    const media = mediaType(abs)
+    if (media) return { kind: media.startsWith('video/') ? 'video' : 'image', size }
     if (size > MAX_ARTIFACT) return { kind: 'too-big', size }
     const { kind, lang } = artifactKind(abs)
     const text = readFileSync(abs, 'utf8')
@@ -58,4 +62,17 @@ export function textContentType(path: string): string | null {
   if (kind === 'html') return 'text/html; charset=utf-8'
   if (kind === 'svg') return 'image/svg+xml; charset=utf-8'
   return null
+}
+
+/** `brandy-art://p/<projectId>/<path>` → [projectId, relative path]; null when malformed. */
+export function parseArtifactUrl(url: string): [string, string] | null {
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'brandy-art:' || u.hostname !== 'p') return null
+    const [, id, ...rest] = u.pathname.split('/')
+    if (!id || !rest.length || !rest.join('')) return null
+    return [decodeURIComponent(id), rest.map(decodeURIComponent).join('/')]
+  } catch {
+    return null
+  }
 }

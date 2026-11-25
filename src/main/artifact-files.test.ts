@@ -1,4 +1,7 @@
 import { test } from 'node:test'
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import assert from 'node:assert/strict'
 import { addThreadFile, fileFromTool, filesFromCodex } from './artifact-files.ts'
 import { applyThreadEvent } from './thread-events.ts'
@@ -63,4 +66,20 @@ test('applyThreadEvent records files and ignores projects without a path', () =>
   assert.equal(t.files, undefined)
   assert.equal(applyThreadEvent({ path: '/p' } as Project, t, { kind: 'file', path: '/p/a.md', op: 'write' }), true)
   assert.equal((t as Thread).files?.[0]?.path, "a.md")
+})
+
+test('addThreadFile accepts a root file whose name starts with two dots', () => {
+  assert.deepEqual(addThreadFile([], '/p', '/p/..notes.md', 'write', t1), [{ path: '..notes.md', op: 'write', at: t1 }])
+})
+
+test('addThreadFile matches files reported through the real path of a symlinked project', () => {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), 'brandy-link-')))
+  mkdirSync(join(base, 'real', 'docs'), { recursive: true })
+  symlinkSync(join(base, 'real'), join(base, 'link'))
+  const list = addThreadFile([], join(base, 'link'), join(base, 'real', 'docs', 'a.md'), 'write', t1)
+  assert.deepEqual(list, [{ path: 'docs/a.md', op: 'write', at: t1 }])
+})
+
+test('filesFromCodex skips failed changes', () => {
+  assert.deepEqual(filesFromCodex({ status: 'failed', changes: [{ path: '/p/a.md', kind: 'add' }] }), [])
 })

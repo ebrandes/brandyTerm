@@ -19,6 +19,8 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
   let lastText = ''
   let rejected = false
   let lastCall = ''
+  // Write/Edit calls waiting for their result: a denied or failed call makes no card
+  const pendingFiles = new Map<string, { path: string; op: 'write' | 'edit' }>()
   // Claude Code 2.1.x plans with TaskCreate/TaskUpdate; ids are sequential per session
   const tasks: { text: string; status: 'pending' | 'in_progress' | 'completed' }[] = []
   const emitTasks = () => onEvent({ kind: 'todos', items: tasks.map((t) => ({ ...t })) })
@@ -45,7 +47,7 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
       })
     } else {
       const file = fileFromTool(b.name, b.input)
-      if (file) onEvent({ kind: 'file', ...file })
+      if (file && b.id) pendingFiles.set(String(b.id), file)
       onEvent({ kind: 'activity', text: describeTool(b.name, b.input) })
     }
   }
@@ -73,6 +75,13 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
         for (const b of ev.message?.content ?? []) {
           if (b.type === 'tool_use') toolUse(b)
           else if (b.type === 'text' && b.text) lastText = b.text
+        }
+      } else if (ev.type === 'user') {
+        for (const b of Array.isArray(ev.message?.content) ? ev.message.content : []) {
+          const file = b?.type === 'tool_result' ? pendingFiles.get(String(b.tool_use_id)) : undefined
+          if (!file) continue
+          pendingFiles.delete(String(b.tool_use_id))
+          if (!b.is_error) onEvent({ kind: 'file', ...file })
         }
       } else if (ev.type === 'result') {
         const windows = Object.values(ev.modelUsage ?? {}).map((m: any) => Number(m?.contextWindow) || 0)

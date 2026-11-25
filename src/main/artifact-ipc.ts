@@ -1,6 +1,9 @@
 import { ipcMain, net, protocol, shell } from 'electron'
+import { createReadStream, statSync } from 'node:fs'
+import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
-import { readArtifact, resolveInside, textContentType } from './artifact-read.ts'
+import { mediaType, parseRange } from './artifact-media.ts'
+import { parseArtifactUrl, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
 
 /**
  * Artifact viewer access to project files. `artifact:read` returns text for the
@@ -15,21 +18,14 @@ type RootOf = (projectId: string) => string | null | undefined
 /** privileges of brandy-art://; registered with the other schemes in one call (index.ts) */
 export const ARTIFACT_SCHEME = { scheme: 'brandy-art', privileges: { standard: true, secure: true, supportFetchAPI: true } }
 
-/** `brandy-art://p/<projectId>/<path>` → [projectId, relative path] */
-function parse(url: string): [string, string] | null {
-  const u = new URL(url)
-  if (u.hostname !== 'p') return null
-  const [, id, ...rest] = u.pathname.split('/')
-  if (!id || !rest.length) return null
-  return [decodeURIComponent(id), rest.map(decodeURIComponent).join('/')]
-}
-
 export function registerArtifactIpc(rootOf: RootOf): void {
   protocol.handle('brandy-art', async (req) => {
-    const target = parse(req.url)
+    const target = parseArtifactUrl(req.url)
     const root = target && rootOf(target[0])
     const abs = root ? resolveInside(root, target[1]) : null
     if (!abs) return new Response('not found', { status: 404 })
+    const media = mediaType(abs)
+    if (media) return streamMedia(abs, media, req.headers.get('range'))
     const file = await net.fetch(pathToFileURL(abs).toString())
     const headers = new Headers(file.headers)
     headers.set('Content-Security-Policy', ARTIFACT_CSP)
@@ -47,4 +43,20 @@ export function registerArtifactIpc(rootOf: RootOf): void {
     const abs = root ? resolveInside(root, String(a?.path ?? '')) : null
     if (abs) void shell.openPath(abs)
   })
+}
+
+/** Video/image bytes with Range support, so the player can seek without loading the whole file. */
+function streamMedia(abs: string, type: string, range: string | null): Response {
+  const size = statSync(abs).size
+  const span = parseRange(range, size)
+  const headers = new Headers({ 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Content-Security-Policy': ARTIFACT_CSP, 'X-Content-Type-Options': 'nosniff' })
+  if (span === 'invalid') {
+    headers.set('Content-Range', `bytes */${size}`)
+    return new Response(null, { status: 416, headers })
+  }
+  const { start, end } = span ?? { start: 0, end: size - 1 }
+  headers.set('Content-Length', String(size ? end - start + 1 : 0))
+  if (span) headers.set('Content-Range', `bytes ${start}-${end}/${size}`)
+  const body = size ? (Readable.toWeb(createReadStream(abs, { start, end })) as ReadableStream) : null
+  return new Response(body, { status: span ? 206 : 200, headers })
 }

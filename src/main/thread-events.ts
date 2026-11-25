@@ -1,6 +1,7 @@
 import type { Project, Thread } from '../shared/types.ts'
 import type { AgentEvent } from './adapters/types.ts'
 import { addThreadFile } from './artifact-files.ts'
+import { findNewMedia } from './artifact-media.ts'
 
 /** a context limit is not known before the first result; Claude's default window */
 const DEFAULT_WINDOW = 200_000
@@ -27,6 +28,13 @@ export function applyThreadEvent(p: Project, t: Thread, e: AgentEvent): boolean 
     const cur = e.items.find((i) => i.status === 'in_progress')
     if (cur) t.note = cur.text
     return true
+  }
+  if (e.kind === 'done') {
+    // media made by commands (ffmpeg, renders) never goes through Write/Edit
+    if (!p.path || !t.runAt) return false
+    const before = t.files?.length ?? 0
+    for (const abs of findNewMedia(p.path, Date.parse(t.runAt))) t.files = addThreadFile(t.files ?? [], p.path, abs, 'write', now.toISOString())
+    return (t.files?.length ?? 0) !== before
   }
   if (e.kind === 'file') {
     if (!p.path) return false

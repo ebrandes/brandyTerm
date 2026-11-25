@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Copy, ExternalLink, X } from 'lucide-react'
 import type { ArtifactContent } from '../types'
-import { artifactUrl, closeArtifact, fenced, markdownImageSrc, useArtifact, type ArtifactTarget } from '../artifacts'
+import { artifactUrl, closeArtifact, fenced, markdownImageSrc, resolveRelative, showArtifact, useArtifact, type ArtifactTarget } from '../artifacts'
 import { Rich } from './Rich'
 import { CodeBlock } from './CodeBlock'
 import { MermaidBlock } from './MermaidBlock'
@@ -20,11 +20,25 @@ const mb = (n: number) => (n / 1024 / 1024).toFixed(1).replace('.', ',')
 function FileBody({ target, content }: { target: FileTarget; content: ArtifactContent }) {
   const dir = target.path.includes('/') ? target.path.slice(0, target.path.lastIndexOf('/')) : ''
   const imageSrc = useCallback((src: string) => markdownImageSrc(target.projectId, dir, src), [dir, target.projectId])
+  // web links open in the browser; a relative link opens that project file here; anything else (file:, …) does nothing
+  const onLink = useCallback(
+    (href: string) => {
+      if (/^(https?:|mailto:)/i.test(href) || href.startsWith('#')) return false
+      const rel = resolveRelative(dir, href)
+      if (rel) showArtifact({ projectId: target.projectId, path: rel })
+      return true
+    },
+    [dir, target.projectId]
+  )
   if (content.kind === 'missing') return <p className="art-note">O arquivo não existe mais.</p>
   if (content.kind === 'too-big') return <p className="art-note">Arquivo grande demais para pré-visualizar ({mb(content.size)} MB).</p>
-  if (content.kind === 'md') return <Rich text={content.text} imageSrc={imageSrc} />
+  if (content.kind === 'md') return <Rich text={content.text} imageSrc={imageSrc} onLink={onLink} />
+  if (content.kind === 'video')
+    return <video className="art-media" src={artifactUrl(target.projectId, target.path)} controls autoPlay playsInline />
+  if (content.kind === 'image') return <img className="art-media" src={artifactUrl(target.projectId, target.path)} alt={target.path} />
   if (content.kind === 'html' || content.kind === 'svg')
     return <iframe className="art-frame" sandbox="" src={artifactUrl(target.projectId, target.path)} title={target.path} />
+  if (!('text' in content)) return null
   if (content.kind === 'mermaid') return <BigDiagram code={content.text} />
   return <Rich text={fenced(content.text, content.lang ?? '')} />
 }
@@ -98,8 +112,17 @@ export function ArtifactViewer() {
   useEffect(() => {
     if (!target) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeArtifact()
+    // keys typed inside the sandboxed iframe never reach the app: keep focus here (the wheel still scrolls it)
+    const onBlur = () =>
+      setTimeout(() => {
+        if (document.activeElement?.tagName === 'IFRAME') document.querySelector<HTMLElement>('.art-close')?.focus()
+      })
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('blur', onBlur)
+    }
   }, [target])
   if (!target) return null
   return (

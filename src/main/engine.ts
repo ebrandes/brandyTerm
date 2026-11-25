@@ -300,7 +300,7 @@ export class Engine extends EventEmitter {
     t.resolved = false
     t.pending = undefined
     t.note = 'Iniciando…'
-    t.aliveAt = new Date().toISOString()
+    t.aliveAt = t.runAt = new Date().toISOString()
     t.todos = []
     t.steps = []
     t.updatedAt = new Date().toISOString()

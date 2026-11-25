@@ -8,6 +8,7 @@ import { ThreadChip } from './ThreadChip'
 import { Composer } from './Composer'
 import { MessageFiles } from './MessageFiles'
 import { ArtifactCards } from './ArtifactCards'
+import { filesForSummary } from '../artifacts'
 import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention, ThreadChips } from './ThreadAttention'
 
@@ -83,6 +84,9 @@ function AskCard({ project, ask }: { project: Project; ask: NonNullable<Message[
 function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message; agent?: AgentId; inThread: boolean; project: Project; onOpenThread: (id: string) => void }) {
   // artifact cards need a real project folder
   const artifacts = !project.demo && !!project.path
+  // each summary shows only the files of the run it reports
+  const runFiles = (threadId: string) =>
+    filesForSummary(project.threads.find((t) => t.id === threadId)?.files ?? [], project.messages, project.messages.indexOf(m), threadId)
   const linked = (m.threads ?? []).map((id) => project.threads.find((t) => t.id === id)).filter((t): t is Thread => !!t)
   if (m.author === 'system')
     return (
@@ -143,7 +147,7 @@ function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message
                     {AGENT_NAMES[s.agent]} <span className="sep">·</span> {s.title}
                   </div>
                   <div className="summary-text">{s.text}</div>
-                  {artifacts && s.threadId && <ArtifactCards projectId={project.id} files={project.threads.find((t) => t.id === s.threadId)?.files ?? []} />}
+                  {artifacts && s.threadId && <ArtifactCards projectId={project.id} files={runFiles(s.threadId)} />}
                 </div>
               </div>
             ))}

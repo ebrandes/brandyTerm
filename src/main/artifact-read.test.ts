@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chmodSync, mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MAX_ARTIFACT, artifactKind, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
+import { MAX_ARTIFACT, artifactKind, parseArtifactUrl, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
 
 function fixture() {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'brandy-art-')))
@@ -62,4 +62,21 @@ test('readArtifact reads an unreadable file as missing instead of throwing', () 
   } finally {
     chmodSync(join(root, 'locked.md'), 0o644)
   }
+})
+
+test('readArtifact returns media without reading it or capping its size', () => {
+  const { root } = fixture()
+  writeFileSync(join(root, 'big.mp4'), Buffer.alloc(MAX_ARTIFACT + 10))
+  writeFileSync(join(root, 'a.png'), Buffer.alloc(4))
+  assert.deepEqual(readArtifact(root, 'big.mp4'), { kind: 'video', size: MAX_ARTIFACT + 10 })
+  assert.deepEqual(readArtifact(root, 'a.png'), { kind: 'image', size: 4 })
+})
+
+test('parseArtifactUrl splits project and path, null on anything malformed', () => {
+  assert.deepEqual(parseArtifactUrl('brandy-art://p/proj%201/docs/a%20b.md'), ['proj 1', 'docs/a b.md'])
+  assert.deepEqual(parseArtifactUrl('brandy-art://p/x/a%2F..%2Fb.md'), ['x', 'a/../b.md'])
+  assert.equal(parseArtifactUrl('brandy-art://p/x/%FF.png'), null)
+  assert.equal(parseArtifactUrl('brandy-art://q/x/a.md'), null)
+  assert.equal(parseArtifactUrl('brandy-art://p/x'), null)
+  assert.equal(parseArtifactUrl('not a url'), null)
 })

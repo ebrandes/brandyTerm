@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import type { ThreadFile } from './types'
 
 /** What the artifact viewer shows: a project file, or a diagram taken from an answer. */
 export type ArtifactTarget = { projectId: string; path: string } | { inline: 'mermaid'; code: string }
@@ -63,4 +64,28 @@ export function fenced(text: string, lang = ''): string {
   const longest = Math.max(2, ...(text.match(/`+/g) ?? []).map((m) => m.length))
   const fence = '`'.repeat(longest + 1)
   return `${fence}${lang}\n${text}\n${fence}`
+}
+
+/**
+ * The files of one run, for the summary at `index` in `messages`: written after the
+ * previous summary of the same thread and up to this one.
+ */
+export function filesForSummary(
+  files: ThreadFile[],
+  messages: { time: string; summaries?: { threadId?: string }[] }[],
+  index: number,
+  threadId: string
+): ThreadFile[] {
+  const until = Date.parse(messages[index]?.time ?? '') || Infinity
+  let since = -Infinity
+  for (let i = index - 1; i >= 0; i--) {
+    if (messages[i].summaries?.some((s) => s.threadId === threadId)) {
+      since = Date.parse(messages[i].time) || -Infinity
+      break
+    }
+  }
+  return files.filter((f) => {
+    const at = Date.parse(f.at)
+    return at > since && at <= until
+  })
 }
