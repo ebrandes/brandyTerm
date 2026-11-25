@@ -19,6 +19,7 @@ const api: BrandyApi = {
   openFolder: () => ipcRenderer.invoke('project:open-folder'),
   removeProject: (id) => ipcRenderer.invoke('project:remove', id),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
+  setRemoteHidden: (a) => ipcRenderer.invoke('project:set-remote-hidden', a),
   send: (a) => ipcRenderer.invoke('chat:send', a),
   saveAttachment: (a) => ipcRenderer.invoke('attach:save', a),
   openAttachment: (p) => ipcRenderer.invoke('attach:open', p),

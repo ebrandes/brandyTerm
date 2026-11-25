@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { Download, Folder, FolderPlus, Loader2, X } from 'lucide-react'
-import type { AccountsState, AgentInfo, PluginInfo, Project, UserPluginsState } from '../types'
+import type { AccountsState, AgentInfo, AppSettings, PluginInfo, Project, UserPluginsState } from '../types'
+import type { MachineInfo } from '../../../shared/remote/machine.ts'
 import { UserPluginsPanel } from './UserPluginsPanel'
 import { AccountsPanel } from './AccountsPanel'
 import { ProjectStatusDot } from './ProjectStatusDot'
+import { RemotePanel } from './RemotePanel'
+import { MachineGroupHead } from './MachineGroupHead'
+import { useRemoteHosts } from '../useRemoteHosts'
+import { groupProjects, showGroups } from '../machine-groups'
 import logo from '../assets/logo.png'
 import { api } from '../api'
+import './machine.css'
 
 interface Props {
   projects: Project[]
@@ -13,11 +19,15 @@ interface Props {
   plugins: PluginInfo[]
   accounts?: AccountsState
   userPlugins?: UserPluginsState
+  /** this machine and the app settings (remote access) */
+  machine?: MachineInfo
+  settings?: AppSettings
   activeId: string
   /** projectId -> ISO time the project was last open */
   lastSeen?: Record<string, string>
   onSelect: (id: string) => void
-  onOpen: () => void
+  /** machineId: a folder of that paired machine; none: this machine's own dialog */
+  onOpen: (machineId?: string) => void
   onRemove: (id: string) => void
 }
 
@@ -62,33 +72,39 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, agents, plugins, accounts, userPlugins, activeId, lastSeen, onSelect, onOpen, onRemove }: Props) {
+export function Sidebar({ projects, agents, plugins, accounts, userPlugins, machine, settings, activeId, lastSeen, onSelect, onOpen, onRemove }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
+  const hosts = useRemoteHosts()
+  const groups = groupProjects(projects, hosts, machine)
+  const grouped = showGroups(groups)
   return (
     <aside className="sidebar">
       <img className="brand" src={logo} alt="BrandyTerm" draggable={false} />
       <div className="side-head">
         <h2>Projetos</h2>
-        <button className="icon-btn" onClick={onOpen} aria-label="Abrir pasta" title="Abrir pasta como projeto">
+        <button className="icon-btn" onClick={() => onOpen()} aria-label="Abrir pasta" title="Abrir pasta como projeto">
           <FolderPlus size={16} />
         </button>
       </div>
       <nav className="project-list">
-        {projects.map((p) => {
-          return (
-            <div key={p.id} className={`project-item${p.id === activeId ? ' active' : ''}`}>
-              <button className="project-main" onClick={() => onSelect(p.id)} title={p.path ?? 'Projeto de demonstração'}>
-                <Folder size={15} />
-                <span className="project-name">{p.name}</span>
-                {p.demo && <span className="tag">demo</span>}
-                <ProjectStatusDot project={p} lastSeen={lastSeen?.[p.id]} selected={p.id === activeId} />
-              </button>
-              <button className="project-x" aria-label={`Remover ${p.name}`} title="Remover da lista" onClick={() => onRemove(p.id)}>
-                <X size={13} />
-              </button>
-            </div>
-          )
-        })}
+        {groups.map((g) => (
+          <div key={g.id} className={`machine-group${g.online ? '' : ' offline'}`}>
+            {grouped && <MachineGroupHead group={g} onOpen={onOpen} />}
+            {g.projects.map((p) => (
+              <div key={p.id} className={`project-item${p.id === activeId ? ' active' : ''}`}>
+                <button className="project-main" onClick={() => onSelect(p.id)} title={p.path ?? 'Projeto de demonstração'}>
+                  <Folder size={15} />
+                  <span className="project-name">{p.name}</span>
+                  {p.demo && <span className="tag">demo</span>}
+                  <ProjectStatusDot project={p} lastSeen={lastSeen?.[p.id]} selected={p.id === activeId} />
+                </button>
+                <button className="project-x" aria-label={`Remover ${p.name}`} title="Remover da lista" onClick={() => onRemove(p.id)}>
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ))}
       </nav>
 
       {accounts && <AccountsPanel state={accounts} />}
@@ -116,6 +132,8 @@ export function Sidebar({ projects, agents, plugins, accounts, userPlugins, acti
       ))}
 
       {userPlugins && <UserPluginsPanel state={userPlugins} />}
+
+      <RemotePanel machine={machine} settings={settings} />
     </aside>
   )
 }

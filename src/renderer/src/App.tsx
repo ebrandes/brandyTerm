@@ -107,6 +107,7 @@ export function App() {
     if (id) setActiveId(id)
   }
 
+  const removingProject = removing ? state?.projects.find((p) => p.id === removing) : undefined
   if (!state) return <div className="app" />
   if (!project) {
     return (
@@ -130,10 +131,12 @@ export function App() {
         plugins={state.plugins}
         accounts={state.accounts}
         userPlugins={state.userPlugins}
+        machine={state.machine}
+        settings={state.settings}
         activeId={project.id}
         lastSeen={state.settings?.lastSeen}
         onSelect={setActiveId}
-        onOpen={() => void openFolder()}
+        onOpen={(machineId) => void openFolder(machineId)}
         onRemove={setRemoving}
       />
       <Chat
@@ -157,7 +160,8 @@ export function App() {
       {removing && (
         <div className="modal-back" role="dialog" aria-modal="true" aria-label="Remover projeto">
           <div className="modal">
-            <h3>Remover “{state.projects.find((p) => p.id === removing)?.name}” da lista?</h3>
+            <h3>Remover “{removingProject?.name}” da lista?</h3>
+            {removingProject?.machine?.remote && <p>Este projeto fica em {removingProject.machine.name}: ele será removido de lá também.</p>}
             <p>As conversas e threads salvas do projeto serão apagadas. A pasta no disco não é alterada.</p>
             <div className="modal-actions">
               <button onClick={() => setRemoving(null)} autoFocus>Cancelar</button>

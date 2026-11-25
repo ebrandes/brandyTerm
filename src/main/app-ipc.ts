@@ -29,6 +29,12 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     killTerminal(String(id))
     engine.removeProject(String(id))
   }, ruleOf('project:remove'))
+  registry.add('project:set-remote-hidden', (a: { projectId: string; hidden: boolean }) => {
+    const p = engine.state.projects.find((x) => x.id === String(a.projectId))
+    if (!p || p.demo) return
+    p.remoteHidden = a.hidden ? true : undefined
+    engine.touch()
+  }, ruleOf('project:set-remote-hidden'))
   registry.add('chat:send', (a: { projectId: string; text: string; threadId?: string; attachments?: unknown }, ctx) =>
     engine.send(String(a.projectId), String(a.text ?? ''), a.threadId ? String(a.threadId) : undefined,
       validAttachments(a.attachments, ctx.remote ? String(a.projectId) : undefined)),

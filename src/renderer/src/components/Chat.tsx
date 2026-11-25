@@ -12,6 +12,7 @@ import { filesForSummary } from '../artifacts'
 import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention } from './ThreadAttention'
 import { ThreadMetaChips } from './ThreadMetaChips'
+import { MachineChip } from './MachineChip'
 import { api } from '../api'
 
 interface Props {
@@ -276,12 +277,12 @@ export function Chat(props: Props) {
             <button className="back" onClick={onBack}>
               <ArrowLeft size={13} /> Coordenador
             </button>
-            <h1>{thread.title}</h1>
+            <h1>{thread.title}<MachineChip machine={project.machine} /></h1>
             <ThreadMetaChips thread={thread} projectId={project.id} />
           </>
         ) : (
           <>
-            <h1>{project.name}</h1>
+            <h1>{project.name}<MachineChip machine={project.machine} /></h1>
             <p>Terminal do coordenador{project.path ? ` · ${project.path}` : ''}</p>
           </>
         )}
@@ -323,6 +324,7 @@ export function Chat(props: Props) {
         sending={props.sending}
         error={props.sendError}
         onSend={props.onSend}
+        offline={project.machine?.online === false ? `${project.machine.name} está offline` : undefined}
       />
       {canTerminal && terminalOpen && <TerminalPanel projectId={project.id} path={project.path} onClose={onToggleTerminal} />}
     </main>

@@ -84,6 +84,16 @@ export function Overview({ project, selectedId, onSelect, onCancel, onBoard, all
             <strong className={coordinatorWarn(coordCtx.used, coordCtx.limit) ? 'warn' : undefined}>{contextLabel(coordCtx)}</strong>
           </div>
         )}
+        {!project.machine?.remote && !project.demo && (
+          <label className="overview-footer-row" title="Quando desligado, os computadores pareados não veem este projeto nem leem arquivos dele">
+            <span>Disponível remotamente</span>
+            <input
+              type="checkbox"
+              checked={!project.remoteHidden}
+              onChange={(e) => void api.setRemoteHidden({ projectId: project.id, hidden: !e.target.checked })}
+            />
+          </label>
+        )}
         <label className="overview-footer-row" title="Threads novas (em qualquer projeto) já começam com permitir tudo: não pedem aprovação de comandos e edições. Fica salvo no app; as threads atuais seguem o que você escolher em cada uma">
           <span>Threads novas: permitir tudo</span>
           <input type="checkbox" checked={allowAllThreads} onChange={(e) => void api.setSettings({ allowAllThreads: e.target.checked })} />

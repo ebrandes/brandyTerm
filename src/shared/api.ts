@@ -38,6 +38,8 @@ export interface BrandyApi {
   removeProcess(args: { projectId: string; processId: string }): Promise<void>
   /** opens http://localhost:PORT in the default browser */
   openPort(port: number, projectId: string): Promise<void>
+  /** owner only: hides (or shows again) a project from the machines paired to this one */
+  setRemoteHidden(args: { projectId: string; hidden: boolean }): Promise<void>
   /** installs an optional plugin through Claude's marketplace */
   installPlugin(args: { id: string; force?: boolean }): Promise<void>
   openPluginReport(id: string): Promise<void>

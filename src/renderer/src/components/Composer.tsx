@@ -21,10 +21,12 @@ interface Props {
   sending: boolean
   error?: string
   onSend: () => void
+  /** the owning machine is unreachable: the box is locked and shows this instead of the placeholder */
+  offline?: string
 }
 
 /** Message box: Enter sends, Shift+Enter breaks the line, paste/drop files, "/" opens the command menu, "@" the file menu. */
-export function Composer({ projectId, target, draft, onDraft, files, onAddFiles, onRemoveFile, onMarked, sending, error, onSend }: Props) {
+export function Composer({ projectId, target, draft, onDraft, files, onAddFiles, onRemoveFile, onMarked, sending, error, onSend, offline }: Props) {
   const box = useRef<HTMLTextAreaElement>(null)
   const anyFile = useRef<HTMLInputElement>(null)
   const imageFile = useRef<HTMLInputElement>(null)
@@ -65,7 +67,7 @@ export function Composer({ projectId, target, draft, onDraft, files, onAddFiles,
     onDraft(`/${c.name} `)
     box.current?.focus()
   }
-  const canSend = !sending && (!!draft.trim() || files.length > 0)
+  const canSend = !offline && !sending && (!!draft.trim() || files.length > 0)
 
   const key = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionOpen && mention.onKey(e)) return
@@ -130,7 +132,7 @@ export function Composer({ projectId, target, draft, onDraft, files, onAddFiles,
         </div>
       )}
       <form
-        className="composer"
+        className={`composer${offline ? ' offline' : ''}`}
         onSubmit={(e) => {
           e.preventDefault()
           if (canSend) onSend()
@@ -139,6 +141,7 @@ export function Composer({ projectId, target, draft, onDraft, files, onAddFiles,
         <textarea
           ref={box}
           rows={1}
+          disabled={!!offline}
           value={draft}
           onChange={(e) => {
             onDraft(e.target.value)
@@ -152,7 +155,7 @@ export function Composer({ projectId, target, draft, onDraft, files, onAddFiles,
             e.preventDefault()
             onAddFiles(f)
           }}
-          placeholder={`Fale com ${target}… (/ comandos, @ arquivos)`}
+          placeholder={offline ?? `Fale com ${target}… (/ comandos, @ arquivos)`}
           aria-label={`Mensagem para ${target}`}
         />
         <input ref={anyFile} type="file" multiple hidden onChange={picked} />
