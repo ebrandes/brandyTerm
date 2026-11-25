@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { runCliLogin } from './cli-login.ts'
+import { fakeNpmBin } from './cli-shim-fixture.ts'
 import type { Connector } from '../../shared/connectors.ts'
 
 const railway: Connector = {
@@ -85,4 +86,22 @@ test('aborted before the spawn: nothing is spawned', async () => {
   const { calls, d } = deps(0)
   await assert.rejects(runCliLogin(railway, 'connector-login-railway', ac.signal, d), /cancelado/)
   assert.equal(calls.spawn.length, 0)
+})
+
+test('on Windows the login pty runs the .cmd shim through node, with the login PATH', async () => {
+  const { dir, js } = fakeNpmBin()
+  const { calls, d } = deps(0)
+  await runCliLogin(railway, 'connector-login-railway', new AbortController().signal, { ...d, path: async () => dir, platform: 'win32' })
+  assert.deepEqual(calls.spawn.map(s => [s.file, s.args, s.env]), [['node', [js, 'login'], { PATH: dir }]])
+  // the check goes to exec as configured: the runner resolves it the same way (runCheck)
+  assert.deepEqual(calls.exec, [['railway', 'whoami']])
+})
+
+test('a resolved command that still fails to start is named as the user typed it', async () => {
+  const { dir } = fakeNpmBin()
+  const { d } = deps(Object.assign(new Error('posix_spawnp failed'), { code: 'ENOENT' }))
+  await assert.rejects(
+    runCliLogin(railway, 'connector-login-railway', new AbortController().signal, { ...d, path: async () => dir, platform: 'win32' }),
+    { message: 'Comando railway não encontrado. Instale o CLI e tente de novo.' },
+  )
 })

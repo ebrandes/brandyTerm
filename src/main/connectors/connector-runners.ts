@@ -6,8 +6,17 @@ import { runCliLogin, type CliLoginDeps } from './cli-login.ts'
 import { makeOAuthRunner } from './oauth.ts'
 import { loginUrlProblem } from './login-url.ts'
 import { loginPath } from './shell-path.ts'
+import { runCheck, type ExecStatus } from './cli-command.ts'
 import type { Runners } from './login.ts'
 import type { SecretStore } from './secrets.ts'
+
+/** The exit code of a command; a failure to start counts as 1. */
+const execStatus: ExecStatus = (file, args, env) =>
+  new Promise<number>(resolve => {
+    execFile(file, args, { env, timeout: 15_000 }, err => {
+      resolve(err ? (typeof (err as NodeJS.ErrnoException).code === 'number' ? ((err as NodeJS.ErrnoException).code as unknown as number) : 1) : 0)
+    })
+  })
 
 /** The login terminal's screen is the renderer's xterm, so the window must exist when Entrar runs. */
 export function ptyDeps(getWin: () => WebContents | undefined): CliLoginDeps {
@@ -18,14 +27,7 @@ export function ptyDeps(getWin: () => WebContents | undefined): CliLoginDeps {
       spawnPty(win, id, { file: o.file, args: o.args, cwd: o.cwd, cols: 80, rows: 24, env: o.env, onExit: o.onExit })
       return { kill: () => killTerminal(id) }
     },
-    exec: async cmd => {
-      const PATH = await loginPath()
-      return new Promise<number>(resolve => {
-        execFile(cmd[0], cmd.slice(1), { env: { ...process.env, PATH }, timeout: 15_000 }, err => {
-          resolve(err ? (typeof (err as NodeJS.ErrnoException).code === 'number' ? ((err as NodeJS.ErrnoException).code as unknown as number) : 1) : 0)
-        })
-      })
-    },
+    exec: async cmd => runCheck(cmd, { path: await loginPath(), exec: execStatus }),
   }
 }
 

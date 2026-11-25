@@ -8,6 +8,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import type { Connector } from '../../shared/connectors.ts'
 import { ConnectorError, LOGIN_NEEDED, type AuthMaterial, type CallResult, type ClientFactory, type LiveClient, type ToolInfo } from './hub.ts'
 import { loginPath } from './shell-path.ts'
+import { killPidTree } from '../adapters/proc.ts'
 
 const TAIL_MAX = 500
 /** a connector tool may run long (a deploy, a performance trace): 10 min, extended while it reports progress */
@@ -107,7 +108,8 @@ export const realFactory: ClientFactory = async (c, auth) => {
     kill() {
       closed = true
       const pid = (transport as StdioClientTransport).pid
-      if (pid) process.kill(pid)
+      // on Windows the npx child under cmd.exe goes too
+      if (pid) killPidTree(pid)
     },
   }
   return live
