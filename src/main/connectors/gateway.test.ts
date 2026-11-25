@@ -1,0 +1,86 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import { join, resolve } from 'node:path'
+import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { startGatewayServer, type GwHandler } from './gateway-server.ts'
+
+const posix = process.platform !== 'win32'
+const script = resolve('src/main/connectors/gateway.ts')
+let n = 0
+
+function sockPath(): string {
+  const dir = fs.mkdtempSync(join(os.tmpdir(), 'bgwc-'))
+  return posix ? join(dir, `s${n++}.sock`) : `\\\\.\\pipe\\bgwc-test-${process.pid}-${n++}`
+}
+
+async function withGateway<T>(handler: GwHandler, run: (c: Client) => Promise<T>, socket?: string): Promise<T> {
+  const srv = await startGatewayServer(sockPath(), handler)
+  const token = srv.issue({ projectId: 'p', threadId: 't' })
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [script],
+    env: { NODE_NO_WARNINGS: '1', ELECTRON_RUN_AS_NODE: '1', BRANDY_GATEWAY_SOCKET: socket ?? srv.path, BRANDY_GATEWAY_TOKEN: token },
+  })
+  const client = new Client({ name: 'test', version: '1' })
+  await client.connect(transport)
+  try { return await run(client) } finally { await client.close(); await srv.close() }
+}
+
+const text = (r: unknown): string => ((r as { content: { text: string }[] }).content[0].text)
+const listHandler: GwHandler = async (_c, req) => {
+  if (req.op === 'list') return [{ name: 'Railway', description: 'x' }]
+  if (req.op === 'call' && req.tool === 'big') return 'y'.repeat(150_000)
+  if (req.op === 'call' && req.tool === 'fail') throw new Error('Railway não está instalado em Mac.')
+  return `${req.op}:${req.name}:${req.tool}:${JSON.stringify(req.args)}`
+}
+
+test('lists exactly three tools', async () => {
+  await withGateway(listHandler, async c => {
+    const { tools } = await c.listTools()
+    assert.deepEqual(tools.map(t => t.name), ['list_connectors', 'connector_tools', 'call_connector'])
+  })
+})
+
+test('list_connectors returns the handler result as JSON text', async () => {
+  await withGateway(listHandler, async c => {
+    const r = await c.callTool({ name: 'list_connectors', arguments: {} })
+    assert.deepEqual(JSON.parse(text(r)), [{ name: 'Railway', description: 'x' }])
+  })
+})
+
+test('connector_tools and call_connector forward their arguments', async () => {
+  await withGateway(listHandler, async c => {
+    assert.equal(text(await c.callTool({ name: 'connector_tools', arguments: { name: 'R' } })), 'tools:R:undefined:undefined')
+    assert.equal(text(await c.callTool({ name: 'call_connector', arguments: { name: 'R', tool: 'go', args: { a: 1 } } })), 'call:R:go:{"a":1}')
+  })
+})
+
+test('handler error becomes isError', async () => {
+  await withGateway(listHandler, async c => {
+    const r = await c.callTool({ name: 'call_connector', arguments: { name: 'Railway', tool: 'fail' } })
+    assert.equal(r.isError, true)
+    assert.equal(text(r), 'Railway não está instalado em Mac.')
+  })
+})
+
+test('a 150 000 character result arrives capped and the next call still works', async () => {
+  await withGateway(listHandler, async c => {
+    const big = text(await c.callTool({ name: 'call_connector', arguments: { name: 'R', tool: 'big' } }))
+    assert.ok(big.length < 100_300 && /truncado/.test(big))
+    assert.deepEqual(JSON.parse(text(await c.callTool({ name: 'list_connectors', arguments: {} }))), [{ name: 'Railway', description: 'x' }])
+  })
+})
+
+test('dead socket answers instead of hanging', async () => {
+  const dead = sockPath()
+  const t0 = Date.now()
+  await withGateway(listHandler, async c => {
+    const r = await c.callTool({ name: 'list_connectors', arguments: {} })
+    assert.equal(r.isError, true)
+    assert.equal(text(r), 'BrandyTerm não está respondendo')
+    assert.ok(Date.now() - t0 < 2000 + 1500)
+  }, dead)
+})
