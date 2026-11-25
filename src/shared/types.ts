@@ -97,6 +97,13 @@ export interface ToolApproval {
   createdAt: string
 }
 
+/** a file a thread created or edited; `path` is relative to the project root */
+export interface ThreadFile {
+  path: string
+  op: 'write' | 'edit'
+  at: string
+}
+
 export interface Thread {
   id: string
   requestId: string
@@ -117,6 +124,8 @@ export interface Thread {
   todos: Todo[]
   /** short log of actions of the current run */
   steps: string[]
+  /** files the thread created or edited, newest last (artifact cards) */
+  files?: ThreadFile[]
   summary?: string
   /** what the thread says is still open (its PENDENTE: line); a done thread without it is resolved */
   pending?: string

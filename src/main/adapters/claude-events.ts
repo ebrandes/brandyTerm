@@ -1,3 +1,4 @@
+import { fileFromTool } from '../artifact-files.ts'
 import type { AgentEvent } from './types.ts'
 import { claudeAuth } from './auth.ts'
 
@@ -42,7 +43,11 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
           status: t.status === 'completed' || t.status === 'in_progress' ? t.status : 'pending'
         }))
       })
-    } else onEvent({ kind: 'activity', text: describeTool(b.name, b.input) })
+    } else {
+      const file = fileFromTool(b.name, b.input)
+      if (file) onEvent({ kind: 'file', ...file })
+      onEvent({ kind: 'activity', text: describeTool(b.name, b.input) })
+    }
   }
 
   return {

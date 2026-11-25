@@ -1,3 +1,4 @@
+import { filesFromCodex } from '../artifact-files.ts'
 import { execFile } from 'node:child_process'
 import type { AgentAdapter, AgentEvent, RunHandle, RunOpts } from './types.ts'
 import { resolveCli, spawnCli } from './proc.ts'
@@ -84,6 +85,7 @@ export const codexAdapter: AgentAdapter = {
               onEvent({ kind: 'activity', text: `$ ${String(it.command ?? '').slice(0, 140)}` })
             } else if (it.type === 'file_change' || it.type === 'mcp_tool_call' || it.type === 'web_search') {
               if (ev.type === 'item.started') onEvent({ kind: 'activity', text: it.type })
+              if (it.type === 'file_change' && ev.type === 'item.completed') for (const f of filesFromCodex(it)) onEvent({ kind: 'file', ...f })
             }
             break
           }

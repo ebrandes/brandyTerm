@@ -1,5 +1,6 @@
 import type { Project, Thread } from '../shared/types.ts'
 import type { AgentEvent } from './adapters/types.ts'
+import { addThreadFile } from './artifact-files.ts'
 
 /** a context limit is not known before the first result; Claude's default window */
 const DEFAULT_WINDOW = 200_000
@@ -25,6 +26,11 @@ export function applyThreadEvent(p: Project, t: Thread, e: AgentEvent): boolean 
     t.todos = e.items
     const cur = e.items.find((i) => i.status === 'in_progress')
     if (cur) t.note = cur.text
+    return true
+  }
+  if (e.kind === 'file') {
+    if (!p.path) return false
+    t.files = addThreadFile(t.files ?? [], p.path, e.path, e.op, now.toISOString())
     return true
   }
   if (e.kind === 'activity') {

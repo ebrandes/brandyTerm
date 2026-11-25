@@ -34,7 +34,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "postinstall": "node scripts/fetch-plugins.mjs",
-    "plugins": "node scripts/fetch-plugins.mjs"
+    "plugins": "node scripts/fetch-plugins.mjs",
+    "test": "node --test 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "latest",
