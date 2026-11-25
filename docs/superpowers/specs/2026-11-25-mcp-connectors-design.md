@@ -26,8 +26,10 @@ fixed plugin (Chrome DevTools MCP) whose server never reaches the threads anyway
   per `connector:tool` across all threads and projects, listed and revocable in the panel).
   A thread's "permitir tudo" does **not** cover connector calls (builder's call: it was granted for
   local edits and commands, not production services).
-- Connector login (OAuth for remote servers like Railway/Stripe, API keys for others) happens
-  once, in the app; threads never see secrets.
+- Connector login (OAuth for remote servers, API keys, or the service's own CLI login such as
+  `railway login`) happens in the app through an explicit login card with "Entrar" and "Cancelar"
+  that waits for the result and then connects, like the big apps do (user's decision). Threads
+  never see secrets.
 
 ## Non-goals
 
@@ -64,7 +66,7 @@ OAuth tokens) live apart, encrypted with Electron `safeStorage`, keyed by connec
 **Hub (main process).** Owns one live MCP client per connector (`@modelcontextprotocol/sdk`
 `Client` with `StdioClientTransport` or `StreamableHTTPClientTransport`), started lazily on the
 first request and shared by every thread; idle connections close after 10 minutes. Remote OAuth
-uses the SDK's `OAuthClientProvider`: the first connect opens the system browser, the callback
+uses the SDK's `OAuthClientProvider`: the login card's Entrar opens the system browser, the callback
 lands on a loopback port, tokens go to `safeStorage`. Errors come back as tool errors, never
 crashes.
 
@@ -92,10 +94,34 @@ URL+headers), and "Importar do Claude Code" that lists servers found in `~/.clau
 (user scope) and imports the chosen ones (secrets re-encrypted into BrandyTerm's store).
 "Testar" connects and shows the tool count.
 
-**Login mid-run (builder's call, recorded).** A connector that still needs login does not open a
-browser by itself: `call_connector`/`connector_tools` fail at once with "Railway precisa de login no
-painel Conectores", the thread may ask the user with `PERGUNTA:`, and the main chat shows a notice with
-a button that opens the panel's login. No browser window ever pops up unprompted mid-run.
+**Login card (user's decision).** Every connector, preset or custom, declares how it logs in, so
+the app (and the thread) always knows what to do:
+`auth: { kind: 'none' } | { kind: 'oauth' } | { kind: 'token', fields } | { kind: 'cli', command, check? }`
+(`cli` example: Railway's `railway login`, with `railway whoami` as the check).
+- Install: "Adicionar" → preset or custom form → a login card "Conectar Railway" with **Entrar** and
+  **Cancelar** → on Entrar the app runs the login (OAuth: system browser plus loopback callback;
+  token: the form fields; cli: the command in an app terminal shown inside the card so its prompts
+  are visible) and the card shows "Aguardando login…" with Cancelar still available → on success it
+  connects, shows the tool count and the connector is saved as conectado; on failure or Cancelar
+  nothing is half-installed (the entry stays as "precisa de login").
+- Mid-run: when `connector_tools`/`call_connector` hits a connector that needs login, the hub holds
+  the call and shows the same login card in that thread's chat, next to the approval cards. Nothing
+  opens until the user clicks Entrar; the call continues after a successful login (then goes to its
+  approval card as usual), and Cancelar or a 15-minute timeout returns a tool error
+  "login do Railway cancelado" the agent can read.
+
+**Multiple machines (user's decision).** Connectors belong to the machine they are installed on;
+one machine may have a connector the other does not, and the app only warns about it.
+- Installing, configuring, logging in and removing happen only on that machine, never from a
+  paired device (the remote channels are `deny`), the same way Claude only installs where the
+  permissions can be accepted. A login card seen from another machine shows "Faça login em <máquina>"
+  with Entrar disabled.
+- A thread uses the connectors of the machine it runs on. When it asks for one that is missing there
+  but installed on a paired machine, the tool error says "Railway não está instalado em <máquina>;
+  está em <outra>. Instale pelo painel Conectores em <máquina>." and the chat shows the same notice.
+- The panel lists, per paired online machine, the connectors it has that this one lacks, marked
+  "Só em <outra>", with "Instalar aqui" (prefills the preset; secrets are never copied, login runs here).
+- Approval cards for connector calls can be answered from either machine, like other approvals.
 
 **Custom and imported stdio connectors (builder's call, recorded).** Presets are trusted as shipped.
 A custom or imported stdio connector shows the exact command, arguments and env names before it is
