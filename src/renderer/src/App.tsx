@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MAX_FILES, type AppState } from './types'
 import { Chat } from './components/Chat'
 import { Overview } from './components/Overview'
@@ -112,6 +112,10 @@ export function App() {
   }
 
   const removingProject = removing ? state?.projects.find((p) => p.id === removing) : undefined
+  const connectorNames = useMemo(
+    () => Object.fromEntries((state?.connectors?.list ?? []).map((c) => [c.id, c.name])),
+    [state?.connectors?.list]
+  )
   const groups = state ? groupProjects(state.projects, hosts, state.machine) : []
   if (!state) return <div className="app" />
   if (!project) {
@@ -137,6 +141,7 @@ export function App() {
         plugins={state.plugins}
         accounts={state.accounts}
         userPlugins={state.userPlugins}
+        connectors={state.connectors}
         machine={state.machine}
         settings={state.settings}
         activeId={project.id}
@@ -162,6 +167,7 @@ export function App() {
         onToggleTerminal={() => toggleTerminal(project.id)}
         onOpenThread={(id) => setSelected((s) => ({ ...s, [project.id]: id }))}
         showMachine={showGroups(groups)}
+        connectorNames={connectorNames}
       />
       <ResizeHandle handle={panel.handleProps} dragging={panel.dragging} label="Redimensionar a visão do projeto" controls="overview" />
       {removing && (

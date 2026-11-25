@@ -24,6 +24,7 @@ import { registerAppIpc } from './app-ipc.ts'
 import { registry } from './rpc/registry.ts'
 import { bindIpc } from './rpc/ipc.ts'
 import { startConnectors } from './connectors/index.ts'
+import { registerConnectorsIpc } from './connectors/connectors-ipc.ts'
 
 const isMac = process.platform === 'darwin'
 
@@ -141,6 +142,7 @@ app.whenReady().then(async () => {
   })
   const connectors = await startConnectors({ engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents })
   app.once('before-quit', () => void connectors.stop())
+  registerConnectorsIpc(connectors.deps)
   bindIpc(registry)
   const icon = iconPath()
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))

@@ -50,6 +50,17 @@ const api: BrandyApi = {
     loginStart: (a) => ipcRenderer.invoke('accounts:login-start', a),
     loginCancel: () => ipcRenderer.invoke('accounts:login-cancel')
   },
+  connectors: {
+    presets: () => ipcRenderer.invoke('connectors:presets'),
+    add: (a) => ipcRenderer.invoke('connectors:add', a),
+    update: (a) => ipcRenderer.invoke('connectors:update', a),
+    remove: (a) => ipcRenderer.invoke('connectors:remove', a),
+    enable: (a) => ipcRenderer.invoke('connectors:enable', a),
+    test: (a) => ipcRenderer.invoke('connectors:test', a),
+    login: (a) => ipcRenderer.invoke('connectors:login', a),
+    loginCancel: (a) => ipcRenderer.invoke('connectors:login-cancel', a),
+    revokeAlways: (a) => ipcRenderer.invoke('connectors:revoke-always', a)
+  },
   remote: {
     hosts: () => ipcRenderer.invoke('remote:hosts'),
     onHosts: (cb) => listen('remote:hosts', cb),

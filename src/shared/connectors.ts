@@ -95,4 +95,10 @@ export interface ImportCandidate {
 }
 
 /** The subset of a host's connectors that crosses the remote filter. */
-export type RemoteConnectorView = Pick<ConnectorView, 'id' | 'name' | 'description' | 'status' | 'enabled' | 'preset'>
+export type RemoteConnectorView = Pick<ConnectorView, 'id' | 'name' | 'description' | 'status' | 'enabled' | 'preset' | 'toolCount'>
+
+/** What the panel sends to add a connector. With a preset, main takes everything but these user fields from the preset. */
+export type ConnectorDraft = Partial<Omit<Connector, 'id' | 'alwaysAllow' | 'auth'>> & { name: string; auth?: ConnectorAuth }
+
+/** The only fields the panel may change on a saved connector. */
+export type ConnectorPatch = Partial<Pick<Connector, 'name' | 'description' | 'projects' | 'enabled'>>

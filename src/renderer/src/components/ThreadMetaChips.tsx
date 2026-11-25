@@ -22,7 +22,7 @@ const readOpen = () => {
  * Chips under the thread title. Collapsed (default): one line with agent/model, short effort
  * and the "Permitindo tudo" alert. Expanded: route, skill, saved permissions and context too.
  */
-export function ThreadMetaChips({ thread, projectId }: { thread: Thread; projectId: string }) {
+export function ThreadMetaChips({ thread, projectId, connectorNames }: { thread: Thread; projectId: string; connectorNames?: Record<string, string> }) {
   const [open, setOpen] = useState(readOpen)
   const toggle = () => {
     const next = !open
@@ -54,7 +54,7 @@ export function ThreadMetaChips({ thread, projectId }: { thread: Thread; project
               skill {thread.skill}
             </span>
           )}
-          <ThreadChips t={thread} projectId={projectId} />
+          <ThreadChips t={thread} projectId={projectId} connectorNames={connectorNames} />
         </>
       ) : (
         <>
