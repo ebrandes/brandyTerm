@@ -30,6 +30,12 @@ export interface GuardDeps {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
 
+/**
+ * Fields the handlers turn into a path with String(): a remote call must send them as strings, or `['vivo/x']`
+ * would pass the checks below and still be read as `vivo/x`. Fail closed: refused, never coerced.
+ */
+const PATH_FIELDS = ['path', 'query']
+
 /** a component named `.x` (`.env`, `.git/`, `.ssh/`): never read remotely */
 const dotted = (path: string): boolean => path.split(/[\\/]/).some(c => c.startsWith('.'))
 
@@ -88,8 +94,9 @@ export function readGuard(deps: GuardDeps): RemoteGuard {
     if (v) throw new Error(v)
   }
 
-  /** the folder fs:browse lists: not inside a protected or dot-named folder */
+  /** the folder fs:browse lists (a string; none means home): not inside a protected or dot-named folder */
   const checkBrowse = (arg: unknown, state: AppState): void => {
+    if (arg !== undefined && typeof arg !== 'string') throw new Error(FORBIDDEN)
     const dir = resolved(browseTarget(String(arg ?? '~/'), home()).dir)
     if (dotted(dir)) throw new Error(FORBIDDEN)
     const id = memo(baseId)
@@ -133,7 +140,9 @@ export function readGuard(deps: GuardDeps): RemoteGuard {
   return {
     before(channel, arg, state) {
       if (channel === 'fs:browse') return checkBrowse(arg, state)
-      if (SCOPED[channel] && isObj(arg) && typeof arg.path === 'string') checkFile(channel, arg, state)
+      if (!SCOPED[channel] || !isObj(arg)) return
+      if (PATH_FIELDS.some(k => k in arg && typeof arg[k] !== 'string')) throw new Error(FORBIDDEN)
+      if (typeof arg.path === 'string') checkFile(channel, arg, state)
     },
     after(channel, arg, result, state) {
       if (!Array.isArray(result)) return result

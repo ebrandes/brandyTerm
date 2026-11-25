@@ -102,3 +102,36 @@ test('calls that name no file are left alone', () => {
   assert.doesNotThrow(() => guard.before('state:get', undefined, state))
   assert.deepEqual(guard.after('archive:list', ['vis'], [1], state), [1])
 })
+
+// The handlers turn any value into a path with String(): ['vivo/secret.md'] would read vivo/secret.md.
+const NOT_STRINGS: unknown[] = [['vivo/secret.md'], [['ud', 'remote-key.json']], ['.env'], { p: '.env' }, 7, null, true]
+
+for (const channel of ['artifact:read', 'artifact:bytes', 'artifact:open', 'attach:read']) {
+  test(`${channel}: a path that is not a string is refused, never turned into one`, () => {
+    const { att, state, guard } = setup()
+    for (const path of NOT_STRINGS) {
+      // attach:read takes an absolute path: the array names the hidden folder's file inside the attachments
+      const p = channel === 'attach:read' && Array.isArray(path) ? [join(att, 'vis', 'h', 'x.png')] : path
+      assert.throws(() => guard.before(channel, { projectId: 'vis', path: p }, state), FORBIDDEN, JSON.stringify(p))
+    }
+    const ok = channel === 'attach:read' ? join(att, 'vis', 'ok.png') : 'src/a.md'
+    assert.doesNotThrow(() => guard.before(channel, { projectId: 'vis', path: ok }, state))
+  })
+}
+
+test('fs:list: a query that is not a string is refused', () => {
+  const { state, guard } = setup()
+  for (const query of [['/etc'], ['..'], { q: '~' }, 3, null]) {
+    assert.throws(() => guard.before('fs:list', { projectId: 'vis', query }, state), FORBIDDEN, JSON.stringify(query))
+  }
+  assert.doesNotThrow(() => guard.before('fs:list', { projectId: 'vis', query: 'src/' }, state))
+  assert.doesNotThrow(() => guard.before('fs:list', { projectId: 'vis' }, state))
+})
+
+test('fs:browse: a folder that is not a string is refused; no folder means home', () => {
+  const { proj, state, guard } = setup()
+  for (const arg of [[`${proj}/vivo/`], [`${proj}/`], { dir: proj }, 5, null]) {
+    assert.throws(() => guard.before('fs:browse', arg, state), FORBIDDEN, JSON.stringify(arg))
+  }
+  assert.doesNotThrow(() => guard.before('fs:browse', undefined, state))
+})
