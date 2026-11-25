@@ -8,6 +8,7 @@ import type { LoginBroker } from './login.ts'
 import type { ConnectorStore } from './store.ts'
 import { HOLD_MS } from './login.ts'
 import { resultText, toolsText } from './result-text.ts'
+import { CANCELLED, hold, startDeadline, type Deadline } from './deadline.ts'
 
 export { RESULT_CAP } from './result-text.ts'
 const DETAIL_CAP = 2000
@@ -27,28 +28,6 @@ export interface CallsDeps {
   elsewhere(name: string): string | undefined
   notify(r: ThreadRef, text: string): void
   holdMs?: number
-}
-
-class HoldError extends Error {}
-
-/** Waits for the user's answer, giving up after `ms` or when the request is aborted; the ask is always aborted on the way out. */
-async function hold(ask: (signal: AbortSignal) => Promise<ApprovalDecision>, request: AbortSignal, ms: number): Promise<ApprovalDecision> {
-  const ctl = new AbortController()
-  let timer: NodeJS.Timeout | undefined
-  let onAbort = () => {}
-  const stop = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new HoldError('Tempo esgotado esperando aprovação')), ms)
-    onAbort = () => reject(new HoldError('Chamada cancelada'))
-    request.addEventListener('abort', onAbort, { once: true })
-  })
-  stop.catch(() => {})
-  try {
-    return await Promise.race([ask(ctl.signal), stop])
-  } finally {
-    clearTimeout(timer)
-    request.removeEventListener('abort', onAbort)
-    ctl.abort()
-  }
 }
 
 export function createCalls(d: CallsDeps): GwHandler {
@@ -81,14 +60,13 @@ export function createCalls(d: CallsDeps): GwHandler {
     return now
   }
 
-  async function approve(c: Connector, t: Thread, tool: string, args: unknown, signal: AbortSignal): Promise<void> {
+  async function approve(c: Connector, t: Thread, tool: string, args: unknown, dl: Deadline): Promise<void> {
     if (c.alwaysAllow.includes(tool)) return
     const detail = (JSON.stringify(args ?? {}, null, 2) ?? '{}').slice(0, DETAIL_CAP)
     const input = args && typeof args === 'object' && !Array.isArray(args) ? (args as Record<string, unknown>) : {}
     const answer = await hold(
       s => d.approvals.ask(t, { tool: `mcp__${c.id}__${tool}`, input, summary: `${c.name} · ${tool}`, detail, connector: { id: c.id, name: c.name, tool }, signal: s }),
-      signal,
-      holdMs,
+      dl,
     )
     if (answer === 'deny') throw new Error('Chamada negada pelo usuário')
     if (answer === 'forever') {
@@ -103,18 +81,22 @@ export function createCalls(d: CallsDeps): GwHandler {
     const { p, t } = found
     if (req.op === 'list') return d.store.visibleFor(p.path ?? '').map(c => ({ name: c.name, description: c.description }))
     const c = resolve(ref, p, req.name)
-    if (req.op === 'tools') {
-      if (await d.login.needsLogin(c)) await d.login.require(c, ref, signal)
-      return toolsText((await d.hub.tools(c)).map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema })))
+    if (req.op === 'call' && !req.tool) throw new Error('Informe a ferramenta')
+    if (signal.aborted) throw new Error(CANCELLED)
+    // login and approval share one deadline, from the moment the request got here
+    const dl = startDeadline(signal, holdMs)
+    try {
+      if (await d.login.needsLogin(c)) await d.login.require(c, ref, dl.signal)
+      if (req.op === 'tools') return toolsText((await d.hub.tools(c)).map(x => ({ name: x.name, description: x.description, inputSchema: x.inputSchema })))
+      await approve(still(c), t, req.tool!, req.args, dl)
+      // a cancel that lands with Permitir still wins: the call never starts
+      if (signal.aborted) throw new Error(CANCELLED)
+      const res = await d.hub.call(still(c), req.tool!, req.args, signal)
+      const text = resultText(res.content)
+      if (res.isError) throw new Error(text)
+      return text
+    } finally {
+      dl.end()
     }
-    if (!req.tool) throw new Error('Informe a ferramenta')
-    if (signal.aborted) throw new Error('Chamada cancelada')
-    if (await d.login.needsLogin(c)) await d.login.require(c, ref, signal)
-    const fresh = still(c)
-    await approve(fresh, t, req.tool, req.args, signal)
-    const res = await d.hub.call(still(c), req.tool, req.args, signal)
-    const text = resultText(res.content)
-    if (res.isError) throw new Error(text)
-    return text
   }
 }

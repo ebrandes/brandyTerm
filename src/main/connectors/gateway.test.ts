@@ -10,6 +10,8 @@ import { startGatewayServer, type GwHandler } from './gateway-server.ts'
 import { createCalls, RESULT_CAP } from './calls.ts'
 import { MAX_REPLY } from './gateway-protocol.ts'
 import type { Connector } from '../../shared/connectors.ts'
+import type { Thread } from '../../shared/types.ts'
+import { ThreadApprovals } from '../approvals.ts'
 
 const posix = process.platform !== 'win32'
 const script = resolve('src/main/connectors/gateway.ts')
@@ -109,6 +111,32 @@ test('a result over RESULT_CAP ends with the calls.ts note exactly once', async 
     assert.equal(out.split(note).length, 2)
     assert.equal(out.includes('truncado'), false)
     assert.equal(out, '"linha"\n'.repeat(20_000).slice(0, RESULT_CAP) + note)
+  })
+})
+
+test('an agent cancel removes the pending approval card and the hub is never called', { timeout: 8000 }, async () => {
+  const c: Connector = { id: 'c1', name: 'Railway', description: '', transport: 'stdio', command: 'x', enabled: true, auth: { kind: 'none' }, alwaysAllow: [] }
+  const t = { id: 't', steps: [] } as unknown as Thread
+  const approvals = new ThreadApprovals(() => {})
+  let hubCalls = 0
+  const handler = createCalls({
+    store: { list: () => [c], visibleFor: () => [c], allow: () => {} },
+    hub: { tools: async () => [], call: async () => { hubCalls++; return { content: [] } } },
+    login: { needsLogin: async () => false, require: async () => {} },
+    approvals: { ask: (th, a) => approvals.ask(th, a), releaseConnector: () => {} },
+    findThread: () => ({ p: { id: 'p', path: '/p' }, t }) as never,
+    machineName: () => 'PC', elsewhere: () => undefined, notify: () => {},
+  })
+  await withGateway(handler, async client => {
+    const ctl = new AbortController()
+    const p = client.callTool({ name: 'call_connector', arguments: { name: 'Railway', tool: 'deploy' } }, undefined, { signal: ctl.signal })
+    p.catch(() => {})
+    while (!t.approval) await new Promise(r => setTimeout(r, 5))
+    ctl.abort()
+    const t0 = Date.now()
+    while (t.approval && Date.now() - t0 < 2000) await new Promise(r => setTimeout(r, 5))
+    assert.equal(t.approval, undefined)
+    assert.equal(hubCalls, 0)
   })
 })
 

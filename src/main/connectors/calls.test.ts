@@ -1,66 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createCalls, RESULT_CAP, type CallsDeps } from './calls.ts'
-import type { Connector, ThreadRef } from '../../shared/connectors.ts'
-import type { ApprovalDecision } from '../../shared/types.ts'
-import type { ApprovalAsk } from '../adapters/types.ts'
-import type { GwRequest } from './gateway-protocol.ts'
-
-const ref: ThreadRef = { projectId: 'p1', threadId: 't1' }
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-const mk = (o: Partial<Connector> = {}): Connector => ({
-  id: 'c1', name: 'Railway', description: 'Deploys', transport: 'stdio', command: 'secret-cmd', enabled: true,
-  auth: { kind: 'none' }, alwaysAllow: [], ...o,
-})
-
-function setup(o: { connectors?: Connector[]; needsLogin?: boolean; elsewhere?: string; holdMs?: number; hold?: boolean; defer?: boolean; result?: unknown; callError?: Error; noThread?: boolean; loginError?: Error } = {}) {
-  const connectors = o.connectors ?? [mk()]
-  const log = {
-    order: [] as string[], asks: [] as ApprovalAsk[], allowed: [] as string[][], released: [] as string[][],
-    notified: [] as string[], calls: [] as unknown[][], loginSignals: [] as AbortSignal[],
-  }
-  let answer: ApprovalDecision = 'allow'
-  let release: (d: ApprovalDecision) => void = () => {}
-  const deps: CallsDeps = {
-    store: {
-      list: () => connectors,
-      visibleFor: path => connectors.filter(c => c.enabled && (!c.projects || c.projects.includes(path))),
-      allow: (id, tool) => { log.allowed.push([id, tool]); for (const c of connectors) if (c.id === id) c.alwaysAllow.push(tool) },
-    },
-    hub: {
-      tools: async () => [{ name: 'get_logs', description: 'Logs', inputSchema: { type: 'object' } }],
-      call: async (_c, tool, args, signal) => {
-        log.order.push('call'); log.calls.push([tool, args, signal])
-        if (o.callError) throw o.callError
-        return (o.result ?? { content: [{ type: 'text', text: 'ok' }] }) as { content: unknown[]; isError?: boolean }
-      },
-    },
-    login: {
-      needsLogin: async () => o.needsLogin ?? false,
-      require: async (_c, _r, signal) => { log.order.push('login'); log.loginSignals.push(signal); if (o.loginError) throw o.loginError },
-    },
-    approvals: {
-      ask: (_t, a) => {
-        log.order.push('ask'); log.asks.push(a)
-        if (o.defer) return new Promise(res => { release = res })
-        if (o.hold) return new Promise(res => a.signal.addEventListener('abort', () => res('deny'), { once: true }))
-        return Promise.resolve(answer)
-      },
-      releaseConnector: (id, tool) => { log.released.push([id, tool]) },
-    },
-    findThread: r => (o.noThread ? undefined : { p: { id: r.projectId, path: '/proj' }, t: { id: r.threadId } } as never),
-    machineName: () => 'PC',
-    elsewhere: () => o.elsewhere,
-    notify: (_r, text) => { log.notified.push(text) },
-    holdMs: o.holdMs,
-  }
-  const handle = createCalls(deps)
-  const req = (op: GwRequest['op'], extra: Partial<GwRequest> = {}): GwRequest => ({ id: 1, token: 't', op, ...extra })
-  return { handle, req, log, answerNow: (d: ApprovalDecision) => release(d), setAnswer: (d: ApprovalDecision) => { answer = d } }
-}
-const sig = () => new AbortController().signal
-const call = (s: ReturnType<typeof setup>, extra: Partial<GwRequest> = {}, signal = sig()) =>
-  s.handle(ref, s.req('call', { name: 'Railway', tool: 'get_logs', args: { n: 1 }, ...extra }), signal)
+import { RESULT_CAP } from './calls.ts'
+import { call, mk, ref, setup, sig, sleep } from './calls-fixture.ts'
 
 test('list shows only connectors visible to the thread project, without secrets or command', async () => {
   const s = setup({ connectors: [mk(), mk({ id: 'c2', name: 'Other', projects: ['/elsewhere'] }), mk({ id: 'c3', name: 'Off', enabled: false })] })
@@ -112,7 +53,7 @@ test('connector_tools lists tools as compact JSON', async () => {
 test('connector_tools is held for login first', async () => {
   const s = setup({ needsLogin: true })
   await s.handle(ref, s.req('tools', { name: 'Railway' }), sig())
-  assert.deepEqual(s.log.order, ['login'])
+  assert.deepEqual(s.log.order, ['login', 'tools'])
 })
 
 test('needs login holds, then continues to approval, then the call', async () => {

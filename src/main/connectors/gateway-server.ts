@@ -52,17 +52,32 @@ export async function startGatewayServer(path: string, handle: GwHandler): Promi
 
   const server = net.createServer(sock => {
     sockets.add(sock)
-    const ctl = new AbortController()
+    /** this socket's requests still running, by id: a close or a cancel aborts them */
+    const inflight = new Map<number, AbortController>()
     const lines = new LineReader()
     sock.on('error', () => {})
-    sock.on('close', () => { sockets.delete(sock); ctl.abort() })
+    sock.on('close', () => {
+      sockets.delete(sock)
+      for (const c of inflight.values()) c.abort()
+      inflight.clear()
+    })
     sock.on('data', (chunk: Buffer) => {
       let bad = false
       const ok = lines.feed(chunk, line => {
         if (bad) return
         const req = parse(line)
         if (!req) { bad = true; return }
-        void answer(req, ctl.signal).then(res => { if (!sock.destroyed) sock.write(JSON.stringify(res) + '\n') })
+        if (req.op === 'cancel') {
+          if (typeof req.token === 'string' && tokens.has(req.token)) inflight.get(req.id)?.abort()
+          return
+        }
+        const ctl = new AbortController()
+        inflight.set(req.id, ctl)
+        void answer(req, ctl.signal).then(res => {
+          if (inflight.get(req.id) === ctl) inflight.delete(req.id)
+          // a cancelled request gets no answer: the gateway already told the agent
+          if (!sock.destroyed && !ctl.signal.aborted) sock.write(JSON.stringify(res) + '\n')
+        })
       })
       if (!ok || bad) sock.destroy()
     })

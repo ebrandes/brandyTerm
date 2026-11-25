@@ -81,6 +81,34 @@ test('socket close aborts in-flight requests', async () => {
   } finally { await srv.close() }
 })
 
+test('a cancel op aborts only the request it names, answers nothing for it, and the socket stays usable', { timeout: 3000 }, async () => {
+  const signals = new Map<number, AbortSignal>()
+  const handler: GwHandler = (_c, req, sig) => {
+    signals.set(req.id, sig)
+    if (req.op === 'list') return Promise.resolve('vivo')
+    return new Promise(res => sig.addEventListener('abort', () => res('tarde'), { once: true }))
+  }
+  const srv = await startGatewayServer(tmpPath(), handler)
+  try {
+    const token = srv.issue({ projectId: 'p', threadId: 't' })
+    const s = await connect(srv.path)
+    const got: GwResponse[] = []
+    let buf = ''
+    s.setEncoding('utf8')
+    s.on('data', c => { buf += c; let i: number; while ((i = buf.indexOf('\n')) >= 0) { got.push(JSON.parse(buf.slice(0, i))); buf = buf.slice(i + 1) } })
+    s.write(JSON.stringify({ id: 20, token, op: 'call' }) + '\n' + JSON.stringify({ id: 21, token, op: 'call' }) + '\n')
+    while (signals.size < 2) await new Promise(r => setTimeout(r, 5))
+    s.write(JSON.stringify({ id: 20, token: 'wrong', op: 'cancel' }) + '\n')
+    s.write(JSON.stringify({ id: 20, token, op: 'cancel' }) + '\n')
+    await new Promise<void>(r => signals.get(20)!.addEventListener('abort', () => r(), { once: true }))
+    assert.equal(signals.get(21)!.aborted, false)
+    s.write(JSON.stringify({ id: 22, token, op: 'list' }) + '\n')
+    while (!got.some(r => r.id === 22)) await new Promise(r => setTimeout(r, 5))
+    assert.deepEqual(got, [{ id: 22, ok: true, result: 'vivo' }])
+    s.destroy()
+  } finally { await srv.close() }
+})
+
 test('oversized line drops the socket and the server keeps serving', async () => {
   const srv = await startGatewayServer(tmpPath(), async () => 'ok')
   try {

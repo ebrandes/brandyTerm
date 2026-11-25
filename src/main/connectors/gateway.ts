@@ -4,7 +4,7 @@ import net from 'node:net'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { LineReader, MAX_REPLY, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
+import { CALL_CANCELLED, LineReader, MAX_REPLY, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
 
 type Pending = { resolve(r: GwResponse): void; reject(e: Error): void }
 
@@ -59,13 +59,22 @@ class Link {
     try { return await this.connecting } catch { throw new Error(NOT_RESPONDING) }
   }
 
-  async request(part: Omit<GwRequest, 'id' | 'token'>): Promise<GwResponse> {
+  /** One request to main. When the agent cancels it (`signal`), main is told to drop it and this rejects at once. */
+  async request(part: Omit<GwRequest, 'id' | 'token'>, signal?: AbortSignal): Promise<GwResponse> {
+    if (signal?.aborted) throw new Error(CALL_CANCELLED)
     const conn = await this.ensure()
     const id = this.next++
     return new Promise((resolve, reject) => {
-      conn.pending.set(id, { resolve, reject })
+      const onAbort = () => {
+        if (!conn.pending.delete(id)) return
+        if (!conn.sock.destroyed) conn.sock.write(JSON.stringify({ id, token: this.token, op: 'cancel' }) + '\n')
+        reject(new Error(CALL_CANCELLED))
+      }
+      const off = () => signal?.removeEventListener('abort', onAbort)
+      conn.pending.set(id, { resolve: r => { off(); resolve(r) }, reject: e => { off(); reject(e) } })
+      signal?.addEventListener('abort', onAbort, { once: true })
       conn.sock.write(JSON.stringify({ ...part, id, token: this.token }) + '\n', e => {
-        if (e && conn.pending.delete(id)) reject(new Error(NOT_RESPONDING))
+        if (e && conn.pending.delete(id)) { off(); reject(new Error(NOT_RESPONDING)) }
       })
     })
   }
@@ -92,11 +101,12 @@ async function main(): Promise<void> {
   const link = new Link(process.env.BRANDY_GATEWAY_SOCKET ?? '', process.env.BRANDY_GATEWAY_TOKEN ?? '')
   const server = new Server({ name: 'brandy-gateway', version: '1.0.0' }, { capabilities: { tools: {} } })
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
-  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+  server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
     const req = toRequest(params.name, (params.arguments ?? {}) as Record<string, unknown>)
     if (!req) return reply(`Ferramenta desconhecida: ${params.name}`, true)
     try {
-      const res = await link.request(req)
+      // the agent's notifications/cancelled (or its tool timeout) aborts extra.signal
+      const res = await link.request(req, extra.signal)
       if (!res.ok) return reply(res.error, true)
       return reply(typeof res.result === 'string' ? res.result : (JSON.stringify(res.result) ?? 'null'))
     } catch (e) {

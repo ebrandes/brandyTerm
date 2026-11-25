@@ -1,9 +1,11 @@
 // Wire format between the per-thread gateway script and the main process:
 // one JSON object per "\n"-terminated line over a local socket.
+// `cancel` is not a request: it names, by `id`, an earlier request on the same socket that the agent gave up on.
+// Main aborts that request (its login wait, its approval card, a running call) and sends no answer for either.
 export interface GwRequest {
   id: number
   token: string
-  op: 'list' | 'tools' | 'call'
+  op: 'list' | 'tools' | 'call' | 'cancel'
   name?: string
   tool?: string
   args?: unknown
@@ -19,6 +21,7 @@ export const MAX_REPLY = MAX_RESULT + 1_000
 
 export const BAD_SESSION = 'Sessão do gateway inválida'
 export const NOT_RESPONDING = 'BrandyTerm não está respondendo'
+export const CALL_CANCELLED = 'Chamada cancelada'
 
 export const TOOLS = [
   {
