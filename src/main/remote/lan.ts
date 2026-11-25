@@ -2,8 +2,10 @@ import type os from 'node:os'
 
 type Ifaces = ReturnType<typeof os.networkInterfaces>
 
-// Virtual, tunnel and point-to-point interfaces: not the local network.
-const SKIP_NAME = /^(lo|utun|ppp|tun|tap|awdl|llw|docker|veth|br-|vmnet|vboxnet|wg)/i
+// Virtual, tunnel, VPN and point-to-point interfaces: not the local network.
+const SKIP_NAME = /^(lo|utun|ppp|tun|tap|awdl|llw|docker|veth|br-|vmnet|vboxnet|wg|ipsec|fortissl|forticlient)/i
+
+const strip = (a: string | undefined): string => (a ?? '').replace(/^::ffff:/i, '')
 
 /** 10/8, 172.16/12 or 192.168/16. */
 export function isPrivateIPv4(addr: string): boolean {
@@ -25,4 +27,9 @@ export function lanAddresses(ifaces: Ifaces): string[] {
     }
   }
   return out
+}
+
+/** Upgrade filter: the connection came in on a LAN interface from a private IPv4 peer. */
+export function acceptLan(ifaces: Ifaces, local: string | undefined, remote: string | undefined): boolean {
+  return lanAddresses(ifaces).includes(strip(local)) && isPrivateIPv4(strip(remote))
 }

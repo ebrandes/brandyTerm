@@ -4,6 +4,7 @@ import { app } from 'electron'
 import type { AppSettings, Project } from '../shared/types.ts'
 import { mergeLastSeen, seedLastSeen } from './last-seen.ts'
 import { DEFAULT_IDLE_COMPACT } from '../shared/idle.ts'
+import { mergeRemote } from './remote/remote-settings.ts'
 
 /** App-wide preferences, kept in userData/settings.json so they survive restarts. */
 
@@ -30,23 +31,13 @@ export function appSettings(): AppSettings {
   return settings
 }
 
-export const DEFAULT_REMOTE = { enabled: false, port: 47321 }
-
-function remoteOf(r: Partial<NonNullable<AppSettings['remote']>>): NonNullable<AppSettings['remote']> {
-  const port = Number(r.port)
-  return {
-    enabled: !!r.enabled,
-    port: Number.isInteger(port) && port >= 1024 && port <= 65535 ? port : DEFAULT_REMOTE.port
-  }
-}
-
 export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   const next: AppSettings = { ...settings }
   if ('allowAllThreads' in patch) next.allowAllThreads = !!patch.allowAllThreads || undefined
   if ('lastProjectId' in patch) next.lastProjectId = typeof patch.lastProjectId === 'string' ? patch.lastProjectId : undefined
   if ('lastSeen' in patch) next.lastSeen = mergeLastSeen(settings.lastSeen, patch.lastSeen)
   if ('keepAwake' in patch) next.keepAwake = patch.keepAwake !== false
-  if ('remote' in patch && patch.remote) next.remote = remoteOf(patch.remote)
+  if ('remote' in patch && patch.remote) next.remote = mergeRemote(settings.remote, patch.remote)
   if ('idleCompact' in patch && patch.idleCompact) next.idleCompact = { ...DEFAULT_IDLE_COMPACT, ...patch.idleCompact }
   settings = next
   save()

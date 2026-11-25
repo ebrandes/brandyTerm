@@ -196,16 +196,65 @@ test('pairing refused when the window was never opened', () => withHost(async e 
   assert.equal(r?.reason, 'pareamento fechado')
 }))
 
-test('malformed pair counts as a bad attempt; wrong protocol is reported', () => withHost(async e => {
+test('malformed pair counts as a bad attempt: it plus two wrong codes closes pairing', () => withHost(async e => {
   const code = e.host.openPairing()
   const key = newKeyPair()
   let ws = await e.raw()
   assert.equal(parsePairFail(await exchange(ws, JSON.stringify({ t: 'pair', cpub: 'x' })))?.reason, 'código inválido')
+  for (let i = 0; i < 2; i++) {
+    ws = await e.raw()
+    assert.equal(parsePairFail(await exchange(ws, pairMsg('0000-0000-0000-0000', key).text))?.reason, 'código inválido')
+  }
   ws = await e.raw()
-  assert.equal(parsePairFail(await exchange(ws, pairMsg(code, key, { protocol: 99 }).text))?.reason, 'versão diferente')
+  assert.equal(parsePairFail(await exchange(ws, pairMsg(code, key).text))?.reason, 'pareamento fechado')
   assert.equal(e.trust.get(toB64(key.pub)), undefined)
-  ws = await e.raw() // the window is still open after those two
+}))
+
+test('wrong protocol is reported and does not use up an attempt', () => withHost(async e => {
+  const code = e.host.openPairing()
+  const key = newKeyPair()
+  for (let i = 0; i < 4; i++) {
+    const ws = await e.raw()
+    assert.equal(parsePairFail(await exchange(ws, pairMsg(code, key, { protocol: 99 }).text))?.reason, 'versão diferente')
+  }
+  const ws = await e.raw()
   assert.ok(parsePaired(await exchange(ws, pairMsg(code, key).text)))
+}))
+
+test('a pairing socket is closed after the reply and ignores further messages', () => withHost(async e => {
+  const ws = await e.raw()
+  const reply = exchange(ws, JSON.stringify({ t: 'pair', cpub: 'x' }))
+  for (let i = 0; i < 50; i++) ws.send('spam')
+  await reply
+  await new Promise(r => ws.once('close', r))
+}))
+
+test('hiding a project mid-session blocks it and drops it from the next push', () => withHost(async e => {
+  const ch = await e.connect()
+  const pushes: AppState[] = []
+  ch.onPush((t, p) => { if (t === 'state') pushes.push(p as AppState) })
+  assert.equal(await ch.request('chat:send', { projectId: 'a' }), 'sent:a')
+  e.state.projects[0].remoteHidden = true
+  await assert.rejects(ch.request('chat:send', { projectId: 'a' }), /^Error: Projeto não disponível remotamente$/)
+  await assert.rejects(ch.request('chat:send', { projectId: ['a'] }), /^Error: Projeto não disponível remotamente$/)
+  e.bus.emit('change')
+  await new Promise(r => setTimeout(r, 300))
+  assert.equal(pushes.length, 1)
+  assert.deepEqual(pushes[0].projects, [])
+  ch.close()
+}))
+
+test('revoking during the handshake leaves no live channel', () => withHost(async e => {
+  const orig = e.trust.get.bind(e.trust)
+  let n = 0
+  e.trust.get = pub => {
+    const r = orig(pub)
+    if (++n === 1) e.trust.revoke(pub) // the accept callback: revoked right after it said yes
+    return r
+  }
+  const ch = await e.connect().catch(() => null)
+  if (ch) await closed(ch)
+  assert.equal(e.host.clients().length, 0)
 }))
 
 test('stop closes channels and sockets', () => withHost(async e => {

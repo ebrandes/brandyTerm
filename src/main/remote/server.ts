@@ -11,9 +11,9 @@ import { acceptChannel, type SecureChannel } from '../../shared/remote/channel.t
 import type { Socket } from '../../shared/remote/protocol.ts'
 import type { AppState } from '../../shared/types.ts'
 import type { CallCtx } from '../rpc/registry.ts'
-import { filterState, projectOf } from './host-filter.ts'
+import { authorize, filterState } from './host-filter.ts'
 import { handlePair, type PairingCtx } from './host-pairing.ts'
-import { isPrivateIPv4, lanAddresses } from './lan.ts'
+import { acceptLan } from './lan.ts'
 import type { TrustStore } from './trust.ts'
 import { wsSocket } from './ws-socket.ts'
 
@@ -34,13 +34,8 @@ const IDLE_MS = 10_000
 const PUSH_DEBOUNCE_MS = 100
 const MAX_UNAUTH = 32
 const REMOVED = 'dispositivo removido'
-const HIDDEN = 'Projeto não disponível remotamente'
 
-const strip = (a: string | undefined): string => (a ?? '').replace(/^::ffff:/i, '')
-
-function defaultAccept(local: string, remote: string): boolean {
-  return lanAddresses(os.networkInterfaces()).includes(local) && isPrivateIPv4(remote)
-}
+const defaultAccept = (local: string, remote: string): boolean => acceptLan(os.networkInterfaces(), local, remote)
 
 interface Live { ch: SecureChannel; since: string }
 
@@ -132,7 +127,7 @@ export class HostServer extends EventEmitter {
   private upgrade(wss: WebSocketServer, req: http.IncomingMessage, sock: Duplex, head: Buffer): void {
     const accept = this.deps.acceptAddress ?? defaultAccept
     let ok = false
-    try { ok = accept(strip(req.socket.localAddress), strip(req.socket.remoteAddress)) } catch { ok = false }
+    try { ok = accept(req.socket.localAddress ?? '', req.socket.remoteAddress ?? '') } catch { ok = false }
     if (!ok || this.stopped || this.unauth.size >= MAX_UNAUTH) { sock.destroy(); return }
     wss.handleUpgrade(req, sock, head, ws => wss.emit('connection', ws, req))
   }
@@ -145,10 +140,12 @@ export class HostServer extends EventEmitter {
     let first: Uint8Array | string | null = null
     let forward: ((d: Uint8Array | string) => void) | null = null
     const buffered: (Uint8Array | string)[] = []
+    let pairing = false
     sock.onMessage(d => {
+      if (pairing) return // one message per pairing socket; never buffer for it
       if (first === null) {
         first = d
-        if (isPair(d)) this.pair(ws, sock, d as string)
+        if (isPair(d)) { pairing = true; this.pair(ws, sock, d as string) }
         else this.channel(ws, replaying(sock, d, cb => { forward = cb; for (const b of buffered.splice(0)) cb(b) }), idle)
       } else if (forward) forward(d)
       else buffered.push(d)
@@ -160,8 +157,9 @@ export class HostServer extends EventEmitter {
     let res: { reply: string; paired: boolean }
     try { res = handlePair(text, ctx) } catch { res = { reply: JSON.stringify({ t: 'pair-fail', reason: 'código inválido' }), paired: false } }
     try { sock.send(res.reply) } catch { /* peer already gone */ }
-    // closing flushes the reply first; the socket is single-use either way
+    // single-use socket: close politely, then cut it if the peer does not answer
     ws.close()
+    setTimeout(() => ws.terminate(), 1000).unref()
     if (res.paired) this.emit('change')
   }
 
@@ -174,6 +172,8 @@ export class HostServer extends EventEmitter {
       ch.serve((channel, arg) => this.dispatch(ch, channel, arg))
       ch.onPush(() => {})
       if (this.stopped) return ch.close('servidor parado')
+      // revoked while the handshake was in flight
+      if (!trust.get(ch.peerPub)) return ch.close(REMOVED)
       this.unauth.delete(ws)
       this.live.add(entry)
       ch.onClose(() => { this.live.delete(entry); this.emit('change') })
@@ -190,14 +190,9 @@ export class HostServer extends EventEmitter {
     }
     const state = this.deps.state()
     if (channel === 'state:get') return filterState(state)
-    const visible = (id: string): boolean => state.projects.some(p => p.id === id && !p.remoteHidden)
-    if (channel === 'archive:list') {
-      arg = Array.isArray(arg) ? arg.filter((id): id is string => typeof id === 'string' && visible(id)) : []
-    } else {
-      const pid = projectOf(channel, arg)
-      if (pid !== null && !visible(pid)) throw new Error(HIDDEN)
-    }
-    return this.deps.invoke(channel, arg, { remote: { deviceId: ch.peerPub, terminal: dev.terminal } })
+    const auth = authorize(channel, arg, state)
+    if (!auth.ok) throw new Error(auth.error)
+    return this.deps.invoke(channel, auth.arg, { remote: { deviceId: ch.peerPub, terminal: dev.terminal } })
   }
 
   private readonly onTrust = (): void => {
