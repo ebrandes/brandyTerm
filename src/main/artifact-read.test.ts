@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MAX_ARTIFACT, artifactKind, readArtifact, resolveInside } from './artifact-read.ts'
+import { MAX_ARTIFACT, artifactKind, readArtifact, resolveInside, textContentType } from './artifact-read.ts'
 
 function fixture() {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'brandy-art-')))
@@ -44,4 +44,11 @@ test('readArtifact reads, reports missing and too-big files', () => {
   assert.deepEqual(readArtifact(root, 'link.md'), { kind: 'missing' })
   writeFileSync(join(root, 'big.txt'), Buffer.alloc(MAX_ARTIFACT + 1))
   assert.deepEqual(readArtifact(root, 'big.txt'), { kind: 'too-big', size: 2097153 })
+})
+
+test('textContentType declares utf-8 for text artifacts served to the iframe', () => {
+  assert.equal(textContentType('a/p.html'), 'text/html; charset=utf-8')
+  assert.equal(textContentType('p.HTM'), 'text/html; charset=utf-8')
+  assert.equal(textContentType('x.svg'), 'image/svg+xml; charset=utf-8')
+  assert.equal(textContentType('x.png'), null)
 })

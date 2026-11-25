@@ -46,3 +46,11 @@ export function readArtifact(root: string, rel: string): ArtifactContent {
   const text = readFileSync(abs, 'utf8')
   return lang ? { kind, text, lang } : { kind, text }
 }
+
+/** Content type with utf-8 for HTML/SVG, so pages without a <meta charset> keep their accents; null for anything else. */
+export function textContentType(path: string): string | null {
+  const { kind } = artifactKind(path)
+  if (kind === 'html') return 'text/html; charset=utf-8'
+  if (kind === 'svg') return 'image/svg+xml; charset=utf-8'
+  return null
+}

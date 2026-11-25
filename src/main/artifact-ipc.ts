@@ -1,6 +1,6 @@
 import { ipcMain, net, protocol, shell } from 'electron'
 import { pathToFileURL } from 'node:url'
-import { readArtifact, resolveInside } from './artifact-read.ts'
+import { readArtifact, resolveInside, textContentType } from './artifact-read.ts'
 
 /**
  * Artifact viewer access to project files. `artifact:read` returns text for the
@@ -35,6 +35,8 @@ export function registerArtifactIpc(rootOf: RootOf): void {
     const headers = new Headers(file.headers)
     headers.set('Content-Security-Policy', ARTIFACT_CSP)
     headers.set('X-Content-Type-Options', 'nosniff')
+    const type = textContentType(abs)
+    if (type) headers.set('Content-Type', type)
     return new Response(file.body, { status: file.status, headers })
   })
   ipcMain.handle('artifact:read', (_e, a: { projectId: string; path: string }) => {
