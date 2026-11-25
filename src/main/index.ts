@@ -17,6 +17,8 @@ import { setClaudeAuth } from './adapters/auth.ts'
 import { loadIdentity } from './remote/identity.ts'
 import { startBackground } from './background.ts'
 import { startRemote, type Remote } from './remote/index.ts'
+import { startClient } from './remote/client-ipc.ts'
+import type { RemoteHosts } from './remote/hosts.ts'
 import { registerAppIpc } from './app-ipc.ts'
 import { registry } from './rpc/registry.ts'
 import { bindIpc } from './rpc/ipc.ts'
@@ -34,6 +36,7 @@ let pushTimer: NodeJS.Timeout | null = null
 
 let stopBackground = (): void => {}
 let remote: Remote | null = null
+let hosts: RemoteHosts | null = null
 
 function pushState(): void {
   if (pushTimer || !win || win.isDestroyed()) return
@@ -112,6 +115,7 @@ app.whenReady().then(async () => {
   registerArchiveIpc(engine, archiveDirFor(stateFile))
   stopBackground = startBackground(engine)
   remote = startRemote(engine)
+  hosts = startClient({ engine, remote, getWin: () => win })
   void refreshLimits(accounts)
   registerAppIpc({ engine, getWin: () => win, pushState })
   registerAttachmentIpc()
@@ -133,6 +137,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   stopBackground()
+  hosts?.stop()
   void remote?.stop()
   engine?.shutdown()
   killAllTerminals()

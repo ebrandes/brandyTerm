@@ -1,3 +1,4 @@
+import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustedDevice } from './remote/machine.ts'
 import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, ArtifactContent, Attachment, FsEntry, SlashCommand } from './types.ts'
 
 export interface BrandyApi {
@@ -53,6 +54,23 @@ export interface BrandyApi {
     /** runs `claude setup-token` in the 'account-login' terminal */
     loginStart(args: { label: string; rows: number }): Promise<void>
     loginCancel(): Promise<void>
+  }
+  /** other BrandyTerm machines: the ones this machine controls (client) and the devices that control it (host) */
+  remote: {
+    hosts(): Promise<RemoteHostInfo[]>
+    onHosts(cb: (h: RemoteHostInfo[]) => void): () => void
+    onState(cb: (e: { machineId: string; state: AppState }) => void): () => void
+    call(args: { machineId: string; channel: string; arg: unknown }): Promise<unknown>
+    /** host side */
+    openPairing(): Promise<string>
+    closePairing(): Promise<void>
+    devices(): Promise<TrustedDevice[]>
+    revoke(pub: string): Promise<void>
+    setTerminal(args: { pub: string; on: boolean }): Promise<void>
+    /** client side: hosts seen by mDNS that are not paired yet */
+    discovered(): Promise<DiscoveredHost[]>
+    pair(args: { address: string; code: string }): Promise<MachineInfo>
+    rename(name: string): Promise<MachineInfo>
   }
   /** integrated terminal, one shell per project (id = project id), started in the project folder */
   term: {

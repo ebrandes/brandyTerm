@@ -40,7 +40,18 @@ export const RULES = {
   'accounts:login-start': 'deny',
   'accounts:login-cancel': 'deny',
   'clipboard:read': 'deny',
-  'clipboard:write': 'deny'
+  'clipboard:write': 'deny',
+  // pairing and device management never run on behalf of a remote
+  'remote:hosts': 'deny',
+  'remote:call': 'deny',
+  'remote:open-pairing': 'deny',
+  'remote:close-pairing': 'deny',
+  'remote:devices': 'deny',
+  'remote:revoke': 'deny',
+  'remote:set-terminal': 'deny',
+  'remote:discovered': 'deny',
+  'remote:pair': 'deny',
+  'remote:rename': 'deny'
 } as const satisfies Record<string, RemoteRule>
 
 export type Channel = keyof typeof RULES

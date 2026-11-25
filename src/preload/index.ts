@@ -49,6 +49,20 @@ const api: BrandyApi = {
     loginStart: (a) => ipcRenderer.invoke('accounts:login-start', a),
     loginCancel: () => ipcRenderer.invoke('accounts:login-cancel')
   },
+  remote: {
+    hosts: () => ipcRenderer.invoke('remote:hosts'),
+    onHosts: (cb) => listen('remote:hosts', cb),
+    onState: (cb) => listen('remote:state', cb),
+    call: (a) => ipcRenderer.invoke('remote:call', a),
+    openPairing: () => ipcRenderer.invoke('remote:open-pairing'),
+    closePairing: () => ipcRenderer.invoke('remote:close-pairing'),
+    devices: () => ipcRenderer.invoke('remote:devices'),
+    revoke: (pub) => ipcRenderer.invoke('remote:revoke', pub),
+    setTerminal: (a) => ipcRenderer.invoke('remote:set-terminal', a),
+    discovered: () => ipcRenderer.invoke('remote:discovered'),
+    pair: (a) => ipcRenderer.invoke('remote:pair', a),
+    rename: (name) => ipcRenderer.invoke('remote:rename', name)
+  },
   term: {
     open: (a) => ipcRenderer.invoke('term:open', a),
     write: (a) => ipcRenderer.invoke('term:write', a),

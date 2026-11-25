@@ -3,17 +3,9 @@ import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import { join } from 'node:path'
 import { newKeyPair, toB64, fromB64, type KeyPair } from '../../shared/remote/crypto.ts'
-import type { MachineOs } from '../../shared/remote/machine.ts'
+import type { TrustedDevice } from '../../shared/remote/machine.ts'
 
-export interface TrustedDevice {
-  pub: string
-  machineId: string
-  name: string
-  os: MachineOs | 'phone'
-  addedAt: string
-  lastSeen?: string
-  terminal: boolean
-}
+export type { TrustedDevice }
 
 function writeAtomic(file: string, data: string, mode?: number): void {
   const tmp = `${file}.${process.pid}.tmp`

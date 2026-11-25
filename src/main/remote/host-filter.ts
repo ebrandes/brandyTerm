@@ -61,7 +61,9 @@ const UNSCOPED = new Set([
   'state:get', 'archive:list', 'settings:set', 'plugin:install', 'plugin:open-report',
   'project:open-folder', 'attach:open', 'process:open-port', 'clipboard:read', 'clipboard:write',
   'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
-  'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel'
+  'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',
+  'remote:hosts', 'remote:call', 'remote:open-pairing', 'remote:close-pairing', 'remote:devices',
+  'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename'
 ])
 
 /** The project id a scoped call refers to; null when the channel is unscoped or the id is not a string. */
