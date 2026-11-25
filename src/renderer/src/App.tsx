@@ -1,20 +1,57 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AppState } from './types'
+import { MAX_FILES, type AppState } from './types'
 import { Chat } from './components/Chat'
 import { Overview } from './components/Overview'
 import { Sidebar } from './components/Sidebar'
+import { Board } from './components/Board'
+import { upload } from './attach'
+import { useDraftFiles } from './useDraftFiles'
+import { useResizablePanel } from './useResizablePanel'
+import { ResizeHandle } from './components/ResizeHandle'
+import logo from './assets/logo.png'
 
-const MIN_PANEL = 280
-const MAX_PANEL = 640
+const PANEL = { storageKey: 'brandy:overview-width', defaultWidth: 420, minWidth: 280, maxRatio: 0.5 }
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [selected, setSelected] = useState<Record<string, string | undefined>>({})
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const files = useDraftFiles()
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState<string>()
   const [removing, setRemoving] = useState<string | null>(null)
-  const [panelWidth, setPanelWidth] = useState(492)
-  const dragging = useRef(false)
+  const [board, setBoard] = useState(false)
+  const [terminals, setTerminals] = useState<Record<string, boolean>>({})
+  const toggleTerminal = useCallback((id: string) => setTerminals((t) => ({ ...t, [id]: !t[id] })), [])
+  const closeBoard = useCallback(() => setBoard(false), [])
+
+  // Cmd/Ctrl+B opens the agents board, also when the side panel is hidden on narrow windows
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === '`' && activeRef.current) {
+        e.preventDefault()
+        toggleTerminal(activeRef.current)
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        setBoard((v) => !v)
+      }
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
+  }, [])
+
+  // a "Rodar" button in a message opens that project's terminal
+  useEffect(() => {
+    const open = (e: Event) => {
+      const id = (e as CustomEvent<{ projectId: string }>).detail.projectId
+      setTerminals((t) => ({ ...t, [id]: true }))
+    }
+    window.addEventListener('brandy:terminal', open)
+    return () => window.removeEventListener('brandy:terminal', open)
+  }, [])
+  const panel = useResizablePanel(PANEL)
+  const activeRef = useRef<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -26,18 +63,37 @@ export function App() {
     }
   }, [])
 
-  const project = state?.projects.find((p) => p.id === activeId) ?? state?.projects[0]
+  const lastId = state?.settings?.lastProjectId
+  const project = state?.projects.find((p) => p.id === (activeId ?? lastId)) ?? state?.projects[0]
+  // reopen on the project used last
+  useEffect(() => {
+    if (project && project.id !== lastId) void window.brandy.setSettings({ lastProjectId: project.id })
+  }, [project?.id, lastId])
+  activeRef.current = project && !project.demo ? project.id : null
   const threadId = project ? selected[project.id] : undefined
   const thread = project?.threads.find((t) => t.id === threadId)
   const draftKey = project ? `${project.id}:${thread?.id ?? 'main'}` : ''
 
-  const send = useCallback(() => {
+  const pending = files.get(draftKey)
+  const send = useCallback(async () => {
     if (!project) return
     const text = (drafts[draftKey] ?? '').trim()
-    if (!text) return
-    setDrafts((d) => ({ ...d, [draftKey]: '' }))
-    void window.brandy.send({ projectId: project.id, text, threadId: thread?.id })
-  }, [project, drafts, draftKey, thread?.id])
+    if (!text && !pending.length) return
+    if (pending.length > MAX_FILES) return setSendError(`Envie no máximo ${MAX_FILES} arquivos por mensagem.`)
+    setSending(true)
+    setSendError(undefined)
+    try {
+      const attachments = pending.length ? await upload(project.id, pending) : undefined
+      // only what was sent leaves the composer: text typed or files added during the upload stay
+      setDrafts((d) => ((d[draftKey] ?? '').trim() === text ? { ...d, [draftKey]: '' } : d))
+      for (const f of pending) files.remove(draftKey, f.key)
+      await window.brandy.send({ projectId: project.id, text, threadId: thread?.id, attachments })
+    } catch (e) {
+      setSendError(String((e as Error).message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+    } finally {
+      setSending(false)
+    }
+  }, [project, drafts, draftKey, thread?.id, pending, files])
 
   const openFolder = async () => {
     const id = await window.brandy.openFolder()
@@ -50,7 +106,7 @@ export function App() {
       <div className="app empty-app">
         <div className="titlebar" />
         <div className="empty-hero">
-          <h1>BrandyTerm</h1>
+          <img className="hero-logo" src={logo} alt="BrandyTerm" draggable={false} />
           <p>Abra uma pasta para começar um projeto.</p>
           <button className="primary" onClick={openFolder}>Abrir pasta</button>
         </div>
@@ -58,22 +114,15 @@ export function App() {
     )
   }
 
-  const onDividerDown = (e: React.PointerEvent) => {
-    dragging.current = true
-    e.currentTarget.setPointerCapture(e.pointerId)
-  }
-  const onDividerMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return
-    setPanelWidth(Math.min(MAX_PANEL, Math.max(MIN_PANEL, window.innerWidth - e.clientX)))
-  }
-
   return (
-    <div className="app" style={{ ['--panel-w' as string]: `${panelWidth}px` }}>
+    <div className="app" style={{ ['--panel-w' as string]: `${panel.width}px` }}>
       <div className="titlebar" />
       <Sidebar
         projects={state.projects}
         agents={state.agents}
         plugins={state.plugins}
+        accounts={state.accounts}
+        userPlugins={state.userPlugins}
         activeId={project.id}
         onSelect={setActiveId}
         onOpen={openFolder}
@@ -84,17 +133,19 @@ export function App() {
         thread={thread}
         draft={drafts[draftKey] ?? ''}
         onDraft={(t) => setDrafts((d) => ({ ...d, [draftKey]: t }))}
-        onSend={send}
+        files={pending}
+        onAddFiles={(f) => void files.add(draftKey, f)}
+        onRemoveFile={(k) => files.remove(draftKey, k)}
+        onMarked={(k, blob, marks, original) => files.mark(draftKey, k, blob, marks, original)}
+        sending={sending}
+        sendError={sendError}
+        onSend={() => void send()}
         onBack={() => setSelected((s) => ({ ...s, [project.id]: undefined }))}
+        terminalOpen={!!terminals[project.id]}
+        onToggleTerminal={() => toggleTerminal(project.id)}
+        onOpenThread={(id) => setSelected((s) => ({ ...s, [project.id]: id }))}
       />
-      <div
-        className="divider"
-        role="separator"
-        aria-orientation="vertical"
-        onPointerDown={onDividerDown}
-        onPointerMove={onDividerMove}
-        onPointerUp={() => (dragging.current = false)}
-      />
+      <ResizeHandle handle={panel.handleProps} dragging={panel.dragging} label="Redimensionar a visão do projeto" controls="overview" />
       {removing && (
         <div className="modal-back" role="dialog" aria-modal="true" aria-label="Remover projeto">
           <div className="modal">
@@ -117,10 +168,24 @@ export function App() {
       )}
       <Overview
         project={project}
+        allowAllThreads={!!state.settings?.allowAllThreads}
         selectedId={thread?.id}
         onSelect={(id) => setSelected((s) => ({ ...s, [project.id]: s[project.id] === id ? undefined : id }))}
         onCancel={(id) => void window.brandy.cancelThread({ projectId: project.id, threadId: id })}
+        onBoard={() => setBoard(true)}
       />
+      {board && (
+        <Board
+          projects={state.projects}
+          currentId={project.id}
+          onClose={closeBoard}
+          onOpenThread={(projectId, threadId) => {
+            setBoard(false)
+            setActiveId(projectId)
+            setSelected((s) => ({ ...s, [projectId]: threadId }))
+          }}
+        />
+      )}
     </div>
   )
 }

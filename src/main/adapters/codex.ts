@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import type { AgentAdapter, AgentEvent, RunHandle, RunOpts } from './types.ts'
 import { resolveCli, spawnCli } from './proc.ts'
+import { attachmentText } from '../attach-content.ts'
 
 function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
   return new Promise((resolve) => {
@@ -18,7 +19,7 @@ export const codexAdapter: AgentAdapter = {
     const cli = resolveCli('codex')
     if (!cli) return { id: 'codex', name: 'Codex', installed: false, note: 'não instalado' }
     const version = await versionOf(cli.cmd, cli.prefix)
-    return { id: 'codex', name: 'Codex', installed: true, version, note: 'codex exec --json, sandbox somente leitura' }
+    return { id: 'codex', name: 'Codex', installed: true, version, note: 'codex exec --json, sandbox na pasta do projeto' }
   },
 
   run(opts: RunOpts, onEvent: (e: AgentEvent) => void): RunHandle {
@@ -29,10 +30,15 @@ export const codexAdapter: AgentAdapter = {
     }
     const args = ['exec']
     if (opts.sessionId) args.push('resume', opts.sessionId)
+    // -i takes several values, so it goes before the other flags and never swallows the final "-"
+    const atts = opts.attachments ?? []
+    for (const a of atts) if (a.kind === 'image') args.push('-i', a.path)
     args.push('--json', '--skip-git-repo-check')
-    // always read-only: headless runs cannot ask for approval
-    if (opts.sessionId) args.push('-c', 'sandbox_mode="read-only"')
-    else args.push('-s', 'read-only', '-C', opts.cwd)
+    // headless runs cannot ask for approval: a working thread gets codex's sandbox (writes only
+    // inside the project, no network), everything else stays read-only
+    const mode = opts.tools === 'work' ? 'workspace-write' : 'read-only'
+    if (opts.sessionId) args.push('-c', `sandbox_mode="${mode}"`)
+    else args.push('-s', mode, '-C', opts.cwd)
     if (opts.model) args.push('-m', opts.model)
     if (opts.effort) args.push('-c', `model_reasoning_effort="${opts.effort}"`)
     if (opts.autocompact) args.push('-c', `model_auto_compact_token_limit=${opts.autocompact}`)
@@ -49,7 +55,7 @@ export const codexAdapter: AgentAdapter = {
 
     const run = spawnCli(cli, args, {
       cwd: opts.cwd,
-      input: opts.prompt,
+      input: opts.prompt + attachmentText(atts),
       onLine: (line) => {
         let ev: any
         try {

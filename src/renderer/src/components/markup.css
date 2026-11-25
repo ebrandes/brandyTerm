@@ -1,0 +1,18 @@
+/* image markup editor (modal) */
+.markup-backdrop { position: fixed; inset: 0; z-index: 100; background: rgba(6,6,9,.78); display: grid; place-items: center; padding: 28px; }
+.markup { width: min(1200px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line-hi); border-radius: 14px; padding: 12px; box-shadow: 0 24px 64px rgba(0,0,0,.55); }
+.markup-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.markup-tools, .markup-actions { display: flex; gap: 4px; }
+.markup-actions { margin-left: auto; }
+.markup-bar button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 8px; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.markup-bar button:hover:not(:disabled) { background: var(--card-hi); color: var(--text); }
+.markup-bar button:disabled { opacity: .4; cursor: default; }
+.markup-tools button.on { background: var(--accent-soft); color: var(--accent); }
+.markup-actions button.primary { background: var(--accent); color: #fff; }
+.markup-actions button.primary:hover { filter: brightness(1.1); background: var(--accent); }
+.markup-colors { display: flex; gap: 6px; }
+.markup-colors button { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid transparent; box-shadow: 0 0 0 1px var(--line-hi); }
+.markup-colors button.on { border-color: var(--panel); box-shadow: 0 0 0 2px var(--text); }
+.markup-stage { min-height: 0; flex: 1; display: grid; place-items: center; overflow: auto; background: repeating-conic-gradient(#1c1c22 0 25%, #16161b 0 50%) 50% / 20px 20px; border-radius: 10px; }
+.markup-stage canvas { max-width: 100%; max-height: calc(100vh - 190px); display: block; touch-action: none; cursor: crosshair; }
+.markup-hint { color: var(--faint); font-size: 12px; }

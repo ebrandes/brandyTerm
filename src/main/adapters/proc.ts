@@ -62,6 +62,8 @@ export function killAll(): void {
 export interface SpawnOpts {
   cwd: string
   input: string
+  /** full environment for the child; defaults to the app's */
+  env?: NodeJS.ProcessEnv
   onLine: (line: string) => void
 }
 
@@ -73,6 +75,7 @@ export interface Running {
 export function spawnCli(cli: ResolvedCli, args: string[], opts: SpawnOpts): Running {
   const child = spawn(cli.cmd, [...cli.prefix, ...args], {
     cwd: opts.cwd,
+    env: opts.env,
     windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe']
   })

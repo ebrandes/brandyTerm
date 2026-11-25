@@ -1,0 +1,43 @@
+/* Vertical splitter: a 1px line in its grid track, with a 9px hit area around it. */
+.resize-handle {
+  position: relative;
+  z-index: 6;
+  background: var(--line);
+  cursor: col-resize;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+  outline: none;
+}
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0 -4px;
+}
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -1px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.12s 0.08s, inset 0.12s 0.08s;
+  pointer-events: none;
+}
+.resize-handle:hover::after,
+.resize-handle.dragging::after {
+  background: var(--accent-line);
+}
+.resize-handle.dragging::after {
+  background: var(--accent);
+  transition-delay: 0s;
+}
+.resize-handle:focus-visible::after {
+  inset: 0 -2px;
+  background: var(--accent);
+  transition-delay: 0s;
+}
+
+body.resizing-col,
+body.resizing-col * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}

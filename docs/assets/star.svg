@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96" role="img" aria-labelledby="t">
+  <title id="t">Animated star: star this repo</title>
+  <!-- Original artwork made for BrandyTerm. Released under CC0 1.0 (public domain). -->
+  <style>
+    .glow { fill: #8b5cf6; opacity: .25; transform-origin: 48px 50px; animation: pulse 1.6s ease-in-out infinite; }
+    .star { fill: #facc15; stroke: #a16207; stroke-width: 2; stroke-linejoin: round; transform-origin: 48px 50px; animation: pop 1.6s ease-in-out infinite; }
+    .spark { fill: #fde68a; opacity: 0; animation: twinkle 1.6s ease-in-out infinite; }
+    .s2 { animation-delay: .4s; }
+    .s3 { animation-delay: .8s; }
+    @keyframes pop { 0%, 100% { transform: scale(.88) rotate(-6deg); } 50% { transform: scale(1.06) rotate(6deg); } }
+    @keyframes pulse { 0%, 100% { transform: scale(.7); opacity: .15; } 50% { transform: scale(1.1); opacity: .35; } }
+    @keyframes twinkle { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .glow, .star, .spark { animation: none; } .spark { opacity: 1; } }
+  </style>
+  <circle class="glow" cx="48" cy="50" r="38"/>
+  <path class="star" d="M48 14 L57.6 36.8 L82 38.8 L63.4 54.8 L69.2 78.6 L48 65.8 L26.8 78.6 L32.6 54.8 L14 38.8 L38.4 36.8 Z"/>
+  <circle class="spark" cx="82" cy="18" r="3"/>
+  <circle class="spark s2" cx="14" cy="16" r="2.5"/>
+  <circle class="spark s3" cx="84" cy="80" r="2"/>
+</svg>

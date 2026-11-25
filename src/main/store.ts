@@ -12,7 +12,7 @@ export class JsonStore {
   private timer: NodeJS.Timeout | null = null
   private pending: (() => Persisted) | null = null
 
-  private file: string
+  readonly file: string
 
   constructor(file: string) {
     this.file = file

@@ -1,0 +1,226 @@
+/* Thread cards in the "Visão do projeto" panel. The panel is a size container, so the
+   cards adapt to the panel width (which the user drags), not to the window width. */
+.overview { container: overview / inline-size; }
+
+.tcard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.tcard {
+  --tone: var(--muted);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+}
+.tcard.tone-run { --tone: var(--yellow); }
+.tcard.tone-wait { --tone: var(--accent); }
+.tcard.tone-done { --tone: var(--green); }
+.tcard.tone-fail { --tone: var(--red); }
+
+/* states that need attention get a colour stripe; finished ones stay quiet */
+.tcard.tone-run,
+.tcard.tone-wait,
+.tcard.tone-fail { box-shadow: inset 3px 0 0 var(--tone); }
+
+.tcard:hover { border-color: var(--line-hi); background: var(--card-hi); }
+.tcard.selected { border-color: var(--accent-line); background: var(--accent-soft); }
+.tcard:has(.tcard-open:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* status row: the badge lives on its own line, so it never squeezes the title */
+.tcard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+.tcard-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 550;
+  line-height: 1.4;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 13%, transparent);
+  white-space: nowrap;
+}
+.tcard-status svg { flex: none; }
+
+.tcard-cancel {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 11.5px;
+  color: var(--muted);
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.tcard-cancel:hover {
+  color: #ffb4b4;
+  border-color: rgba(239, 106, 106, 0.35);
+  background: rgba(239, 106, 106, 0.1);
+}
+
+/* title: up to two lines; its button covers the whole card (one tab stop, one target) */
+.tcard-title { font-size: 14px; font-weight: 600; line-height: 1.35; letter-spacing: -0.005em; }
+.tcard-open {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  color: var(--text);
+}
+.tcard-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  cursor: pointer;
+}
+.tcard-open[aria-disabled='true']::after { cursor: default; }
+.tcard-open:focus-visible { outline: none; }
+.tcard-title-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* metadata wraps instead of overflowing when the panel is narrow */
+.tcard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.tcard-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.tcard-meta svg { flex: none; color: var(--faint); }
+.tcard-meta .agent-badge svg { color: inherit; }
+.tcard-agent .agent-badge.sm { width: 16px; height: 16px; }
+.tcard-model { color: var(--faint); overflow-wrap: anywhere; }
+.tcard-progress {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+}
+
+.tcard-bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.tcard-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--tone);
+  transition: width 0.3s;
+}
+
+.tcard-pending {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+/* summary: three lines, expands in place when clicked */
+.tcard-summary-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.tcard-summary-wrap.can-expand { position: relative; z-index: 1; }
+.tcard-summary {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #b4b4c2;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.can-expand .tcard-summary { cursor: pointer; }
+.tcard-summary.expanded { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.tcard-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: -2px;
+  padding: 1px 4px;
+  border-radius: 5px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tcard-more:hover { color: var(--text); background: var(--line); }
+.tcard-more .chev { transition: transform 0.15s; }
+.tcard-more[aria-expanded='true'] .chev { transform: rotate(180deg); }
+
+/* folded "resolvidas" group (starts collapsed; see ResolvedGroup.tsx) */
+.resolved-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.resolved-toggle:hover { color: var(--text); }
+.resolved-toggle .ok { color: var(--green); }
+.resolved-toggle .chev { color: var(--faint); transition: transform 0.15s; }
+.resolved-toggle[aria-expanded='true'] .chev { transform: rotate(90deg); }
+.resolved .tcard-grid { margin-top: 8px; }
+.resolved .tcard { opacity: 0.8; }
+.resolved .tcard:hover,
+.resolved .tcard:focus-within,
+.resolved .tcard.selected { opacity: 1; }
+
+/* panel under ~340px: 304px of content after the 18px side paddings */
+@container overview (max-width: 304px) {
+  .tcard { padding: 10px 12px 11px; gap: 7px; }
+  .tcard-meta { gap: 3px 10px; font-size: 12px; }
+  .tcard-progress { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tcard,
+  .tcard-bar i,
+  .tcard-more .chev,
+  .resolved-toggle .chev { transition: none; }
+}
+
+.tcard-alert {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--yellow);
+  overflow-wrap: anywhere;
+}
+
+.tcard-ctx { font-variant-numeric: tabular-nums; }
+.tcard-ctx.high { color: var(--yellow); }

@@ -1,0 +1,50 @@
+/* Claude accounts block in the sidebar + add-account modal */
+.acct-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.acct-head h3 { margin-bottom: 0; }
+.acct { position: relative; border-radius: 9px; }
+.acct-main { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 6px; border-radius: 9px; text-align: left; }
+.acct-main:hover { background: var(--card); }
+.acct.active .acct-main { background: var(--accent-soft); }
+.acct-radio { width: 12px; height: 12px; flex: none; border-radius: 50%; border: 2px solid var(--line-hi); }
+.acct.active .acct-radio { border-color: var(--accent); background: radial-gradient(var(--accent) 0 3px, transparent 3.5px); }
+.acct-text { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.acct-name { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.acct-name > :first-child { overflow: hidden; text-overflow: ellipsis; }
+.acct-plan { flex: none; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border: 1px solid var(--line-hi); border-radius: 5px; padding: 0 4px; }
+.acct-detail { font-size: 11px; line-height: 1.35; color: var(--faint); }
+.acct.blocked .acct-detail { color: var(--red); }
+.acct-bar { height: 3px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.acct-bar span { display: block; height: 100%; border-radius: 2px; background: var(--green); }
+.acct-bar.mid span { background: var(--yellow); }
+.acct-bar.high span { background: var(--red); }
+.acct-edit { width: 100%; font-size: 13px; background: var(--card); border: 1px solid var(--accent-line); border-radius: 6px; padding: 2px 6px; color: var(--text); }
+.acct-ring { position: relative; display: grid; place-items: center; flex: none; }
+.acct-pct { position: absolute; font-size: 8.5px; font-weight: 600; color: var(--muted); }
+.ring-bg { fill: none; stroke: var(--line-hi); stroke-width: 2.5; }
+.ring-fg { fill: none; stroke: var(--green); stroke-width: 2.5; stroke-linecap: round; transition: stroke-dasharray .3s; }
+.ring.mid .ring-fg { stroke: var(--yellow); }
+.ring.high .ring-fg { stroke: var(--red); }
+.ring.unknown .ring-fg { stroke: transparent; }
+.acct-actions { position: absolute; right: 36px; top: 6px; display: none; gap: 2px; }
+.acct:hover .acct-actions { display: flex; }
+.acct-actions button { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: var(--muted); background: var(--panel); }
+.acct-actions button:hover:not(:disabled) { color: var(--text); background: var(--card-hi); }
+.acct-auto { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); padding: 8px 6px 0; cursor: pointer; }
+.acct-auto input { accent-color: var(--accent); }
+.acct-switch { font-size: 11px; color: var(--accent); padding: 4px 6px 0; }
+
+.acct-modal { width: min(720px, calc(100vw - 48px)); display: flex; flex-direction: column; gap: 12px; }
+.acct-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.acct-field { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--muted); }
+.acct-field input, .acct-paste-row input { background: var(--card); border: 1px solid var(--line-hi); border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 13.5px; }
+.acct-help { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.acct-primary { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; background: var(--accent); color: #fff; padding: 8px 14px; border-radius: 9px; font-weight: 500; }
+.acct-primary:hover { filter: brightness(1.1); }
+.acct-paste summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+.acct-paste-row { display: flex; gap: 8px; margin-top: 8px; }
+.acct-paste-row input { flex: 1; }
+.acct-paste-row button { padding: 0 14px; border-radius: 8px; background: var(--card-hi); }
+.acct-paste-row button:disabled { opacity: .4; }
+.acct-term { height: 300px; background: #0c0c10; border-radius: 10px; padding: 8px; overflow: hidden; }
+.acct-term .term-host { height: 100%; }
+.acct-error { color: var(--red); font-size: 12.5px; }

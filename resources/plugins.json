@@ -1,0 +1,27 @@
+{
+  "plugins": [
+    {
+      "id": "superpowers",
+      "repo": "https://github.com/obra/superpowers.git",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7"
+    },
+    {
+      "id": "tokeneconomizer",
+      "repo": "https://github.com/microsoft/TokenEconomizer.git",
+      "commit": "46b0a356dc08f01064fa683d9f7d6988dc5deade",
+      "subdir": "plugin"
+    },
+    {
+      "id": "claude-code-setup",
+      "repo": "https://github.com/anthropics/claude-plugins-official.git",
+      "commit": "6985b2d88dc08b4a0d202f5f0301f02e360b9cb1",
+      "subdir": "plugins/claude-code-setup"
+    },
+    {
+      "id": "claude-security",
+      "repo": "https://github.com/anthropics/claude-plugins-official.git",
+      "commit": "6985b2d88dc08b4a0d202f5f0301f02e360b9cb1",
+      "subdir": "plugins/claude-security"
+    }
+  ]
+}
