@@ -75,7 +75,7 @@ test('addThreadFile accepts a root file whose name starts with two dots', () => 
 test('addThreadFile matches files reported through the real path of a symlinked project', () => {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'brandy-link-')))
   mkdirSync(join(base, 'real', 'docs'), { recursive: true })
-  symlinkSync(join(base, 'real'), join(base, 'link'))
+  symlinkSync(join(base, 'real'), join(base, 'link'), 'junction') // junction: no privilege needed on Windows, ignored elsewhere
   const list = addThreadFile([], join(base, 'link'), join(base, 'real', 'docs', 'a.md'), 'write', t1)
   assert.deepEqual(list, [{ path: 'docs/a.md', op: 'write', at: t1 }])
 })

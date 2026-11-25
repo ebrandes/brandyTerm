@@ -11,7 +11,12 @@ function fixture() {
   mkdirSync(join(root, 'docs'), { recursive: true })
   writeFileSync(join(root, 'docs', 'a.md'), '# Olá')
   writeFileSync(join(base, 'outside.md'), 'segredo')
-  symlinkSync(join(base, 'outside.md'), join(root, 'link.md'))
+  try {
+    symlinkSync(join(base, 'outside.md'), join(root, 'link.md'))
+  } catch (e) {
+    // Windows without symlink privilege: the link is absent, which resolveInside also refuses
+    if (process.platform !== 'win32') throw e
+  }
   return { base, root }
 }
 
@@ -53,7 +58,8 @@ test('textContentType declares utf-8 for text artifacts served to the iframe', (
   assert.equal(textContentType('x.png'), null)
 })
 
-test('readArtifact reads an unreadable file as missing instead of throwing', () => {
+// chmod 000 does not block reads on Windows (POSIX-only behavior)
+test('readArtifact reads an unreadable file as missing instead of throwing', { skip: process.platform === 'win32' }, () => {
   const { root } = fixture()
   writeFileSync(join(root, 'locked.md'), 'x')
   chmodSync(join(root, 'locked.md'), 0o000)

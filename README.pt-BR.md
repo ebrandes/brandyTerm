@@ -92,7 +92,7 @@ As capturas usam um projeto de demonstração com dados fictícios. Um GIF de de
 
 ## Requisitos
 
-- **macOS.** É onde o BrandyTerm é desenvolvido e testado. Existem alguns caminhos de código para Windows (shell e processos), mas o Windows ainda não é suportado.
+- **macOS.** É onde o BrandyTerm é desenvolvido e testado. O Windows também é verificado pelo CI (veja [Rodar no Windows](#rodar-no-windows)), mas ainda não foi testado a fundo.
 - **Node.js 22+** e npm.
 - **Git**, usado no `npm install` para baixar os plugins do Claude que acompanham o app.
 - Pelo menos uma CLI de agente, instalada e com login feito:
@@ -120,6 +120,19 @@ Outros scripts do `package.json`:
 | `npm run plugins` | Baixa de novo os plugins do Claude fixados |
 
 O estado do app (projetos, threads, configurações, anexos e o arquivo morto) fica na pasta de dados do Electron, `~/Library/Application Support/brandyterm` no macOS.
+
+## Rodar no Windows
+
+O CI roda typecheck, testes e build no Windows a cada push. Para usar o app:
+
+```powershell
+git clone https://github.com/ebrandes/brandyTerm.git
+cd brandyTerm
+npm ci
+npm run dev
+```
+
+Precisa de Node.js e Git no PATH, e da CLI do agente (`claude` e/ou `codex`) instalada e com login feito. Com **Acesso remoto** ligado, o Windows mostra um aviso do firewall na primeira vez: permita o acesso em **redes privadas**.
 
 ## Arquitetura
 

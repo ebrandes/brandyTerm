@@ -92,7 +92,7 @@ The screenshots use a demo project with fake data. A demo GIF is coming; see [`d
 
 ## Requirements
 
-- **macOS.** This is where BrandyTerm is developed and tested. Some Windows code paths exist (shell and process handling), but Windows is not supported yet.
+- **macOS.** This is where BrandyTerm is developed and tested. Windows is also checked by CI (see [Run on Windows](#run-on-windows)) but is not tested in depth yet.
 - **Node.js 22+** and npm.
 - **Git**, used on `npm install` to fetch the bundled Claude plugins.
 - At least one agent CLI, installed and logged in:
@@ -120,6 +120,19 @@ Other scripts from `package.json`:
 | `npm run plugins` | Fetches the pinned Claude plugins again |
 
 App state (projects, threads, settings, attachments and the thread archive) lives in the Electron user data folder, `~/Library/Application Support/brandyterm` on macOS.
+
+## Run on Windows
+
+CI runs typecheck, tests and build on Windows on every push. To use the app:
+
+```powershell
+git clone https://github.com/ebrandes/brandyTerm.git
+cd brandyTerm
+npm ci
+npm run dev
+```
+
+Node.js and Git must be on PATH, and the agent CLI (`claude` and/or `codex`) installed and logged in. When **Acesso remoto** (remote access) is on, Windows shows a firewall prompt the first time: allow access on **private networks**.
 
 ## Architecture
 
