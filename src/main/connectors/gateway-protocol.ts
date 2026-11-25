@@ -53,7 +53,7 @@ export const TOOLS = [
  * MAX_LINE bytes is refused before it is parsed: feed() returns false and the caller drops the socket.
  */
 export class LineReader {
-  private buf = Buffer.alloc(0)
+  private buf: Buffer = Buffer.alloc(0)
   feed(chunk: Buffer, onLine: (line: string) => void): boolean {
     this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk
     let nl: number
