@@ -19,7 +19,7 @@ interface Props {
   state?: ConnectorsState
   /** this machine's projects, for the "limited to" choice */
   projects: Project[]
-  /** set when the project in view belongs to a paired machine: its connectors show, read-only */
+  /** set when the project in view belongs to a paired machine: its connectors also show, read-only */
   viewing?: MachineInfo
 }
 
@@ -36,28 +36,9 @@ export function ConnectorsSection({ state, projects, viewing }: Props) {
     seen.current = live
   }, [state?.logins])
 
-  if (viewing) {
-    const theirs = hosts.find((h) => h.machine.id === viewing.id)?.list ?? []
-    return (
-      <div className="side-section">
-        <h3>Conectores · {viewing.name}</h3>
-        {theirs.length === 0 && <p className="conn-hint">Nenhum conector instalado em {viewing.name}.</p>}
-        {theirs.map((c) => (
-          <div key={c.id} className="conn-row">
-            <div className="conn-main">
-              <span className="conn-name">{c.name}</span>
-              <span className={`conn-chip ${statusClass(c.status)}`}>{c.status}</span>
-              {c.toolCount !== undefined && <span className="conn-count">{c.toolCount} ferramentas</span>}
-            </div>
-          </div>
-        ))}
-        <p className="conn-hint">Instale, configure e remova pelo painel Conectores em {viewing.name}.</p>
-      </div>
-    )
-  }
-
   const list = state?.list ?? []
   const elsewhere = onlyElsewhere(list, hosts)
+  const theirs = viewing ? hosts.find((h) => h.machine.id === viewing.id)?.list ?? [] : []
   return (
     <div className="side-section">
       <h3>Conectores</h3>
@@ -75,6 +56,21 @@ export function ConnectorsSection({ state, projects, viewing }: Props) {
         <button onClick={() => setAdding({})}><Plus size={12} /> Adicionar</button>
         <button onClick={() => setImporting(true)}>Importar do Claude Code</button>
       </div>
+      {viewing && (
+        <div className="conn-remote">
+          <h4>Em {viewing.name}</h4>
+          {theirs.length === 0 && <p className="conn-hint">Nenhum conector instalado em {viewing.name}.</p>}
+          {theirs.map((c) => (
+            <div key={c.id} className="conn-row">
+              <div className="conn-main">
+                <span className="conn-name">{c.name}</span>
+                <span className={`conn-chip ${statusClass(c.status)}`}>{c.status}</span>
+              </div>
+            </div>
+          ))}
+          <p className="conn-hint">Threads deste projeto rodam em {viewing.name} e usam os conectores de lá.</p>
+        </div>
+      )}
       {importing && <ImportConnectors onClose={() => setImporting(false)} />}
       {adding && <AddConnectorDialog initial={adding.preset} onClose={() => setAdding(null)} />}
     </div>

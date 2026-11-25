@@ -49,3 +49,5 @@
 .conn-modal .conn-actions button, .conn-modal .conn-pairs button { font-size: 13px; padding: 6px 14px; }
 .conn-import { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
 .conn-import input { accent-color: var(--accent); }
+.conn-remote { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line-hi); }
+.conn-remote h4 { margin: 0 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--faint); }
