@@ -14,6 +14,11 @@ export const RETRY_MS = [1000, 2000, 4000, 8000, 16000, 30000]
 /** mDNS browsing stops this long after the last discover(true) or discovered() call */
 export const DISCOVER_MS = 15_000
 
+const VERSION_MISMATCH = 'versão diferente'
+/** what to do about a peer on another protocol version (pairing or dialing) */
+const updateText = (name?: string): string =>
+  name ? `atualize o BrandyTerm em ${name}` : 'atualize o BrandyTerm no outro computador'
+
 export interface HostsDeps {
   trust: TrustStore
   /** this machine's key; a function so remote-key.json is created only when a pairing or a dial needs it */
@@ -154,7 +159,11 @@ export class RemoteHosts extends EventEmitter {
     const host = await pairWithHost(
       { dial, ownPub: own.pub, me: this.me(), setTimeout: this.setT, clearTimeout: this.clearT },
       address, code
-    )
+    ).catch((e: unknown) => {
+      if (!(e instanceof Error) || e.message !== VERSION_MISMATCH) throw e
+      // the name the list showed for that address, when it did
+      throw new Error(updateText([...this.seen.values()].find(h => h.address === address)?.name))
+    })
     const existing = this.entries.get(host.machine.id)
     if (existing) existing.address = address
     this.addresses.set(host.machine.id, address) // before trust.add: its 'change' makes sync() see the address
@@ -317,7 +326,7 @@ export class RemoteHosts extends EventEmitter {
     e.connecting = false
     e.sock = null
     const msg = err instanceof Error ? err.message : String(err)
-    e.error = msg === 'versão diferente' ? `atualize o BrandyTerm em ${e.device.name}` : msg
+    e.error = msg === VERSION_MISMATCH ? updateText(e.device.name) : msg
     this.schedule(e, id)
     this.emit('hosts', this.list())
   }
