@@ -9,20 +9,12 @@ Images used by `README.md` and `README.pt-BR.md`.
 | `screenshot-chat.png` | Coordinator chat: a request split into threads, a question card, project overview | Same as the project (MIT) |
 | `screenshot-thread.png` | Agent thread with its plan and an approval card for a shell command | Same as the project (MIT) |
 | `screenshot-board.png` | Kanban board of agents with all five columns | Same as the project (MIT) |
-
-## TODO: missing screenshots
-
-Both READMEs already reference these files inside HTML comments. Add each file, then remove
-the comment markers around its block. Follow the privacy rule below.
-
-| File | What it should show |
-| --- | --- |
-| `screenshot-overview.png` | Main window: projects with status in the sidebar, coordinator chat, overview |
-| `screenshot-coordinator.png` | Coordinator delegating a request to Claude Code and Codex threads |
-| `screenshot-questions.png` | Thread questions in the stepper, with a recommended option |
-| `screenshot-apply-queue.png` | **Aplicações** panel with a request waiting for its turn or for approval |
-| `screenshot-processes.png` | **PROCESSOS** panel with origins, ports and the stop button |
-| `screenshot-logs.png` | **Ver logs** window with the summary |
+| `screenshot-overview.png` | Main window: projects with status in the sidebar, coordinator chat, project overview and processes | Same as the project (MIT) |
+| `screenshot-coordinator.png` | Coordinator delegating a request to Claude Code and Codex threads, with their summaries | Same as the project (MIT) |
+| `screenshot-questions.png` | Thread questions in the stepper, with a recommended option | Same as the project (MIT) |
+| `screenshot-apply-queue.png` | **Aplicações** panel: applied, waiting for approval and waiting for its turn | Same as the project (MIT) |
+| `screenshot-processes.png` | **PROCESSOS** panel with origins, ports and the stop button | Same as the project (MIT) |
+| `screenshot-logs.png` | **Ver logs** window with the summary, search and level filter | Same as the project (MIT) |
 
 ## How the screenshots were made
 
@@ -35,6 +27,17 @@ messages and accounts were written into a seed, not taken from real use.
 - `claude` and `codex` on `PATH` were small stub scripts, so no real agent run could start.
 - The window was 1440×900 and captured with `webContents.capturePage()` (2× scale), then
   resized to 1600 px wide with `sips -Z 1600`.
+
+The six newer ones (`overview`, `coordinator`, `questions`, `apply-queue`, `processes`,
+`logs`) came from the same kind of separate instance, with these differences:
+
+- They were captured through the Chrome DevTools Protocol (`--remote-debugging-port` and
+  `Page.captureScreenshot`) at 1440×900, 2× scale. The narrow ones are clipped to a panel;
+  anything wider than 1600 px was resized to 1600 px with ImageMagick.
+- The demo copy of the app was patched so that it never scans the real machine: the process
+  panel reads made-up `lsof`/`ps` output. The patches also keep the seeded running threads
+  and the apply queue frozen. None of them are in the repository.
+- The log entries are made up, and the log summary text comes from the `claude` stub.
 
 When you retake them, keep the same rule: nothing personal on screen (no e-mails, real
 account names, tokens, home-folder paths with your user name, or private repo names). The

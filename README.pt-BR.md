@@ -110,53 +110,41 @@
   <img src="docs/assets/screenshot-chat.png" alt="Chat do coordenador do BrandyTerm com chips de threads e um card de pergunta de uma thread do Codex" width="860">
 </p>
 
-<!-- Captura pendente (ainda não feita: não pode mostrar dados privados). Adicione docs/assets/screenshot-overview.png e remova as marcas deste comentário.
 **Visão geral. Projetos com status, o chat do coordenador e a visão do projeto.**
 
 <p align="center">
   <img src="docs/assets/screenshot-overview.png" alt="Janela principal do BrandyTerm: projetos com status na barra lateral, chat do coordenador e visão do projeto" width="860">
 </p>
--->
 
-<!-- Captura pendente (ainda não feita: não pode mostrar dados privados). Adicione docs/assets/screenshot-coordinator.png e remova as marcas deste comentário.
 **Coordenador. Um pedido delegado a threads do Claude Code e do Codex.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-coordinator.png" alt="Coordenador do BrandyTerm delegando tarefas a threads de agentes Claude Code e Codex" width="860">
+  <img src="docs/assets/screenshot-coordinator.png" alt="Coordenador do BrandyTerm delegando tarefas a threads de agentes Claude Code e Codex" width="700">
 </p>
--->
 
-<!-- Captura pendente (ainda não feita: não pode mostrar dados privados). Adicione docs/assets/screenshot-questions.png e remova as marcas deste comentário.
 **Perguntas das threads. Uma decisão por vez, com opção recomendada.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-questions.png" alt="Perguntas de uma thread do BrandyTerm uma de cada vez, em stepper, com opção recomendada" width="860">
+  <img src="docs/assets/screenshot-questions.png" alt="Perguntas de uma thread do BrandyTerm uma de cada vez, em stepper, com opção recomendada" width="600">
 </p>
--->
 
-<!-- Captura pendente (ainda não feita: não pode mostrar dados privados). Adicione docs/assets/screenshot-apply-queue.png e remova as marcas deste comentário.
 **Aplicações. Mudanças de worktrees esperando a vez ou, quando reiniciam o app, sua aprovação.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-apply-queue.png" alt="Painel Aplicações do BrandyTerm, a fila de aplicação de worktrees com mudanças pendentes" width="860">
+  <img src="docs/assets/screenshot-apply-queue.png" alt="Painel Aplicações do BrandyTerm, a fila de aplicação de worktrees com mudanças pendentes" width="300">
 </p>
--->
 
-<!-- Captura pendente (ainda não feita: não pode mostrar dados privados). Adicione docs/assets/screenshot-processes.png e remova as marcas deste comentário.
 **PROCESSOS. Processos rodando com origem, portas e botão de parar.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-processes.png" alt="Painel PROCESSOS do BrandyTerm com origem, portas e botões de parar" width="860">
+  <img src="docs/assets/screenshot-processes.png" alt="Painel PROCESSOS do BrandyTerm com origem, portas e botões de parar" width="420">
 </p>
--->
 
-<!-- Captura pendente (ainda não feita: não pode mostrar dados privados). Adicione docs/assets/screenshot-logs.png e remova as marcas deste comentário.
 **Ver logs. Um resumo curto acima do log pesquisável.**
 
 <p align="center">
   <img src="docs/assets/screenshot-logs.png" alt="Janela Ver logs do BrandyTerm com resumo curto, busca e filtro por nível" width="860">
 </p>
--->
 
 As capturas usam um projeto de demonstração com dados fictícios. Um GIF de demonstração está a caminho; veja [`docs/assets/README.md`](docs/assets/README.md).
 

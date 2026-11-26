@@ -110,53 +110,41 @@
   <img src="docs/assets/screenshot-chat.png" alt="BrandyTerm coordinator chat with thread chips and a question card from a Codex thread" width="860">
 </p>
 
-<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-overview.png, then remove these comment markers.
 **Overview. Projects with their status, the coordinator chat and the project overview.**
 
 <p align="center">
   <img src="docs/assets/screenshot-overview.png" alt="BrandyTerm main window: projects with status in the sidebar, coordinator chat and project overview" width="860">
 </p>
--->
 
-<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-coordinator.png, then remove these comment markers.
 **Coordinator. A request delegated to Claude Code and Codex threads.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-coordinator.png" alt="BrandyTerm coordinator delegating tasks to Claude Code and Codex agent threads" width="860">
+  <img src="docs/assets/screenshot-coordinator.png" alt="BrandyTerm coordinator delegating tasks to Claude Code and Codex agent threads" width="700">
 </p>
--->
 
-<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-questions.png, then remove these comment markers.
 **Thread questions. One decision at a time, with a recommended option.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-questions.png" alt="BrandyTerm thread questions shown one at a time in a stepper with a recommended option" width="860">
+  <img src="docs/assets/screenshot-questions.png" alt="BrandyTerm thread questions shown one at a time in a stepper with a recommended option" width="600">
 </p>
--->
 
-<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-apply-queue.png, then remove these comment markers.
 **Apply queue. Worktree changes waiting for their turn or, when they restart the app, for approval.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-apply-queue.png" alt="BrandyTerm worktree apply queue panel with pending worktree changes" width="860">
+  <img src="docs/assets/screenshot-apply-queue.png" alt="BrandyTerm worktree apply queue panel with pending worktree changes" width="300">
 </p>
--->
 
-<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-processes.png, then remove these comment markers.
 **Process panel. Running processes with origin, ports and a stop button.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-processes.png" alt="BrandyTerm process panel with origins, ports and stop buttons" width="860">
+  <img src="docs/assets/screenshot-processes.png" alt="BrandyTerm process panel with origins, ports and stop buttons" width="420">
 </p>
--->
 
-<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-logs.png, then remove these comment markers.
 **View logs. A short summary above the searchable log.**
 
 <p align="center">
   <img src="docs/assets/screenshot-logs.png" alt="BrandyTerm view logs window with a short summary, search and level filter" width="860">
 </p>
--->
 
 The screenshots use a demo project with fake data. A demo GIF is coming; see [`docs/assets/README.md`](docs/assets/README.md).
 
