@@ -169,6 +169,10 @@ export interface Thread {
   aliveAt?: string
   /** context window of the last call: tokens in use and the model's limit */
   context?: ContextUse
+  /** a report is being written in the thread's session ("Escrevendo resumo…") */
+  reporting?: boolean
+  /** when the thread last sent a report to the coordinator */
+  reportedAt?: string
   sessionId?: string
   /** files of the request that opened the thread, sent with its first run */
   attachments?: Attachment[]

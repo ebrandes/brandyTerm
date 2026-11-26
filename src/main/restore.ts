@@ -13,8 +13,9 @@ export function restoreProjects(projects: Project[]): void {
     for (const t of p.threads) {
       t.todos ??= []
       t.steps ??= []
-      // a pending approval belonged to a run that died with the app
+      // a pending approval or a report in progress belonged to a run that died with the app
       t.approval = undefined
+      t.reporting = undefined
       if (p.demo) continue
       if (t.state === 'running' || t.state === 'queued') {
         t.state = 'interrupted'
