@@ -86,31 +86,49 @@ function failedScan(spec: string, error: string): ScanResult {
   return { ok: false, counts: {}, blocked: true, error }
 }
 
-/** Scans the plugin `spec` with claude-security. `scanner` is the claude-security plugin dir. */
-export async function scanPlugin(spec: string, scanner: string): Promise<ScanResult> {
+/** Runs claude-security over `<dir>/alvo`, which the caller already filled. `label` names it in the logs. */
+async function scanPrepared(dir: string, label: string, scanner: string): Promise<ScanResult> {
+  git(['init', '-q'], dir)
+  git(['add', '-A'], dir)
+  git(['-c', 'user.email=scan@brandyterm', '-c', 'user.name=BrandyTerm', 'commit', '-qm', 'alvo'], dir)
+  const { handle, result } = runOnce(claudeAdapter, { cwd: dir, prompt: PROMPT, model: 'opus', tools: 'scan', plugins: [scanner] })
+  const timer = setTimeout(() => handle.cancel(), SCAN_TIMEOUT_MS)
+  const r = await result.finally(() => clearTimeout(timer))
+  if (!r.done?.ok) return failedScan(label, r.done?.error ?? 'o scan não terminou')
+  const found = readReport(dir)
+  if (!found) return failedScan(label, r.done?.error ?? 'o scan terminou sem relatório')
+  // keep the report next to the app's data; the scanned copy is deleted
+  const keep = mkdtempSync(join(tmpdir(), 'brandyterm-report-'))
+  cpSync(found.report, join(keep, 'CLAUDE-SECURITY-RESULTS.md'))
+  // a finding the app could not read counts as serious
+  const blocked = (found.counts.CRITICAL ?? 0) + (found.counts.HIGH ?? 0) + (found.counts.UNKNOWN ?? 0) > 0
+  return { ok: true, counts: found.counts, blocked, report: join(keep, 'CLAUDE-SECURITY-RESULTS.md') }
+}
+
+/** Fetches `<dir>/alvo` with `fill`, scans it and always removes the throwaway folder. */
+async function scanWith(label: string, scanner: string, fill: (dir: string) => void): Promise<ScanResult> {
   const dir = mkdtempSync(join(tmpdir(), 'brandyterm-scan-'))
   try {
-    fetchSource(spec, dir)
-    git(['init', '-q'], dir)
-    git(['add', '-A'], dir)
-    git(['-c', 'user.email=scan@brandyterm', '-c', 'user.name=BrandyTerm', 'commit', '-qm', 'alvo'], dir)
-    const { handle, result } = runOnce(claudeAdapter, { cwd: dir, prompt: PROMPT, model: 'opus', tools: 'scan', plugins: [scanner] })
-    const timer = setTimeout(() => handle.cancel(), SCAN_TIMEOUT_MS)
-    const r = await result.finally(() => clearTimeout(timer))
-    if (!r.done?.ok) return failedScan(spec, r.done?.error ?? 'o scan não terminou')
-    const found = readReport(dir)
-    if (!found) return failedScan(spec, r.done?.error ?? 'o scan terminou sem relatório')
-    // keep the report next to the app's data; the scanned copy is deleted
-    const keep = mkdtempSync(join(tmpdir(), 'brandyterm-report-'))
-    cpSync(found.report, join(keep, 'CLAUDE-SECURITY-RESULTS.md'))
-    // a finding the app could not read counts as serious
-    const blocked = (found.counts.CRITICAL ?? 0) + (found.counts.HIGH ?? 0) + (found.counts.UNKNOWN ?? 0) > 0
-    return { ok: true, counts: found.counts, blocked, report: join(keep, 'CLAUDE-SECURITY-RESULTS.md') }
+    fill(dir)
+    return await scanPrepared(dir, label, scanner)
   } catch (err) {
-    return failedScan(spec, (err as Error).message)
+    return failedScan(label, (err as Error).message)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+}
+
+/** Scans the plugin `spec` with claude-security. `scanner` is the claude-security plugin dir. */
+export function scanPlugin(spec: string, scanner: string): Promise<ScanResult> {
+  return scanWith(spec, scanner, (dir) => fetchSource(spec, dir))
+}
+
+/** Scans a local folder (a staged skill) the same way: copied into `alvo/`, `.git` left out. */
+export function scanDir(src: string, scanner: string): Promise<ScanResult> {
+  return scanWith(src, scanner, (dir) => {
+    if (!existsSync(src)) throw new Error(`pasta ${src} não encontrada`)
+    cpSync(src, join(dir, 'alvo'), { recursive: true, filter: (s) => !s.split(/[\\/]/).includes('.git') })
+  })
 }
 
 export function describeCounts(counts: Record<string, number>): string {
