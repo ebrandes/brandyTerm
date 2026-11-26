@@ -20,7 +20,7 @@ the comment markers around its block. Follow the privacy rule below.
 | `screenshot-overview.png` | Main window: projects with status in the sidebar, coordinator chat, overview |
 | `screenshot-coordinator.png` | Coordinator delegating a request to Claude Code and Codex threads |
 | `screenshot-questions.png` | Thread questions in the stepper, with a recommended option |
-| `screenshot-apply-queue.png` | **Aplicações** panel with a request waiting for approval |
+| `screenshot-apply-queue.png` | **Aplicações** panel with a request waiting for its turn or for approval |
 | `screenshot-processes.png` | **PROCESSOS** panel with origins, ports and the stop button |
 | `screenshot-logs.png` | **Ver logs** window with the summary |
 

@@ -59,7 +59,7 @@
 ### Control and safety
 
 - **Approvals before risky actions.** Claude threads run through the Claude Agent SDK. Read-only tools are pre-allowed; anything else (a shell command that changes something, a file edit, web access) stops and shows an approval card. Allow once, always allow that command family, or allow everything for the thread. An opt-in setting lets new threads run without asking; it is off by default.
-- **Worktree apply queue.** A thread that worked in a git worktree can ask to apply its commit to the project folder. Requests show up in the **Aplicações** (applications) panel in the sidebar. You approve each one once; BrandyTerm then applies them one at a time, in order, when nothing is running in any project. The patch is fixed at the moment of the request, checked with `git apply --check`, applied all-or-nothing and never committed. A failed request holds the queue until you retry or discard it.
+- **Worktree apply queue.** A thread that worked in a git worktree can ask to apply its commit to the project folder. Requests show up in the **Aplicações** (applications) panel in the sidebar. BrandyTerm applies them automatically, one at a time and in order, when nothing is running in any project. It asks for your approval only when the change would restart BrandyTerm itself (running from source, with changes to `src/main`, `src/preload`, `src/shared`, dependencies or the build setup). The patch is fixed at the moment of the request, checked with `git apply --check`, applied all-or-nothing and never committed. A failed request holds the queue until you retry or discard it.
 - **Sandboxed Codex.** Codex work threads run `codex exec` with its own sandbox: writes only inside the project folder and no network.
 - **No bypass flags.** Prompts go over stdin, your global Claude hooks and MCP servers stay out of threads, and plugins are scanned before they load.
 
@@ -110,7 +110,7 @@
   <img src="docs/assets/screenshot-chat.png" alt="BrandyTerm coordinator chat with thread chips and a question card from a Codex thread" width="860">
 </p>
 
-<!-- Missing screenshot: add docs/assets/screenshot-overview.png, then remove these comment markers.
+<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-overview.png, then remove these comment markers.
 **Overview. Projects with their status, the coordinator chat and the project overview.**
 
 <p align="center">
@@ -118,7 +118,7 @@
 </p>
 -->
 
-<!-- Missing screenshot: add docs/assets/screenshot-coordinator.png, then remove these comment markers.
+<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-coordinator.png, then remove these comment markers.
 **Coordinator. A request delegated to Claude Code and Codex threads.**
 
 <p align="center">
@@ -126,7 +126,7 @@
 </p>
 -->
 
-<!-- Missing screenshot: add docs/assets/screenshot-questions.png, then remove these comment markers.
+<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-questions.png, then remove these comment markers.
 **Thread questions. One decision at a time, with a recommended option.**
 
 <p align="center">
@@ -134,15 +134,15 @@
 </p>
 -->
 
-<!-- Missing screenshot: add docs/assets/screenshot-apply-queue.png, then remove these comment markers.
-**Apply queue. Worktree changes waiting for approval or their turn.**
+<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-apply-queue.png, then remove these comment markers.
+**Apply queue. Worktree changes waiting for their turn or, when they restart the app, for approval.**
 
 <p align="center">
-  <img src="docs/assets/screenshot-apply-queue.png" alt="BrandyTerm worktree apply queue panel with approval buttons" width="860">
+  <img src="docs/assets/screenshot-apply-queue.png" alt="BrandyTerm worktree apply queue panel with pending worktree changes" width="860">
 </p>
 -->
 
-<!-- Missing screenshot: add docs/assets/screenshot-processes.png, then remove these comment markers.
+<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-processes.png, then remove these comment markers.
 **Process panel. Running processes with origin, ports and a stop button.**
 
 <p align="center">
@@ -150,7 +150,7 @@
 </p>
 -->
 
-<!-- Missing screenshot: add docs/assets/screenshot-logs.png, then remove these comment markers.
+<!-- Pending screenshot (not captured yet: it must show no private data). Add docs/assets/screenshot-logs.png, then remove these comment markers.
 **View logs. A short summary above the searchable log.**
 
 <p align="center">
@@ -162,12 +162,12 @@ The screenshots use a demo project with fake data. A demo GIF is coming; see [`d
 
 ## Requirements
 
-- **macOS or Windows.** BrandyTerm is developed and used on macOS. Windows is covered by CI (typecheck, tests and build); notifications, the process panel, the right-click menu, Codex plugins and the logs window have not been tested by hand there yet (see [Run on Windows](#run-on-windows)).
-- **Node.js 22+** and npm.
+- **macOS or Windows.** There are no installers or releases yet, so you run it from source. Linux is not tested. BrandyTerm is developed and used on macOS. Windows is covered by CI (typecheck, tests and build); notifications, the process panel, the right-click menu, Codex plugins and the logs window have not been tested by hand there yet (see [Run on Windows](#run-on-windows)).
+- **Node.js 22+** and npm. `npm test` runs TypeScript directly and needs Node.js 22.18 or newer; CI uses Node.js 26.
 - **Git**, used on `npm install` to fetch the bundled Claude plugins.
 - At least one agent CLI, installed and logged in:
   - **[Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code)** (`claude`). Run `claude` once and log in.
-  - **[Codex CLI](https://github.com/openai/codex)** (`codex`). Run `codex` once and log in.
+  - **[Codex CLI](https://github.com/openai/codex)** (`codex`). Run `codex` once and log in. Use **0.171.0 or newer**: TokenEconomizer and RTK on Codex need it.
 
 Antigravity (`agy`) is detected but not wired yet.
 
@@ -210,25 +210,82 @@ Node.js and Git must be on PATH, and the agent CLI (`claude` and/or `codex`) ins
 
 BrandyTerm is a standard Electron app built with [electron-vite](https://electron-vite.org):
 
-- **`src/main`** (main process, Node.js). The **engine** (`engine.ts`) runs the coordinator, queues and settles threads, and keeps the state. **Adapters** (`src/main/adapters/`) give every agent the same interface: `claude` (Claude Agent SDK, with `canUseTool` for approvals), `codex` (`codex exec --json`) and an `antigravity` stub. Around them: approvals and allow rules, project memory, the router, attachments, the archive, the terminal (node-pty), the process panel, the apply queue, MCP connectors and their gateway, notifications, usage reports and the update check.
+- **`src/main`** (main process, Node.js). The **engine** (`engine.ts`) runs the coordinator, queues and settles threads, and keeps the state in a JSON file. **Adapters** (`src/main/adapters/`) give agents the same interface: `claude` (the Claude Agent SDK for work threads, with `canUseTool` for approvals, and `claude -p` for other one-shot calls), `codex` (`codex exec --json`) and an `antigravity` stub. Around them: the router, project memory, the terminal (node-pty), the apply queue (`apply-queue.ts`), process scan and stop (`proc-scan.ts`, `proc-stop.ts`), diagnostic logs (`diag-log.ts`), the update check (`update-check.ts`), notifications and remote access.
+- **MCP gateway** (`src/main/connectors/`). Each Claude or Codex work thread gets a small stdio MCP server that talks to the main process over a local socket. It exposes the external connectors, plus `app_status` and `queue_apply`.
 - **`src/preload`**. A small `contextBridge` API (`window.brandy`) over IPC. The renderer has no direct Node access.
 - **`src/renderer`** (React 18). Chat, composer with `@` and `/` menus, thread view, kanban board, approval cards, terminal (xterm.js), and the process, apply queue, connector and account panels.
 - **`src/shared`**. Types and the API contract shared by both sides.
 
 ```mermaid
-flowchart LR
-  UI["Renderer (React)<br/>chat · board · terminal"] <-->|"IPC via preload<br/>window.brandy"| E["Main: engine<br/>coordinator · queue · state"]
-  E --> R["Router<br/>model + effort"]
-  E --> A{{Adapters}}
-  A --> C["Claude Agent SDK<br/>canUseTool → approval card"]
-  A --> X["Codex CLI<br/>codex exec --json"]
-  E --> M[".brandyterm/memoria.md"]
-  E --> P["Terminal (node-pty)<br/>Processes"]
+flowchart TB
+  subgraph R["Renderer (src/renderer, React 18)"]
+    UI["Chat · kanban board · terminal<br/>approval cards · panels"]
+  end
+  subgraph PL["Preload (src/preload)"]
+    API["window.brandy<br/>contextBridge"]
+  end
+  subgraph M["Main process (src/main, Node.js)"]
+    IPC["IPC channel registry<br/>rpc/"]
+    ENG["Engine<br/>state · queue · approvals"]
+    CO["Coordinator<br/>plan · synthesis · project memory"]
+    TH["Agent threads<br/>router · up to 2 per project"]
+    AD{{"Adapters"}}
+    GW["MCP gateway server<br/>connector hub"]
+    AQ["Apply queue<br/>one at a time, when idle"]
+    PS["Process scan and stop<br/>PIDs · ports"]
+    LG["Diagnostic logs<br/>redacted on write"]
+    UP["Update check<br/>at startup and every 6 h"]
+  end
+  subgraph EXT["External processes and services"]
+    CL["Claude Code<br/>Agent SDK (work threads, approvals)<br/>claude -p (other one-shot calls)"]
+    CX["Codex CLI<br/>codex exec --json"]
+    BR["Gateway MCP script<br/>stdio, one per work thread"]
+    MCP["External MCP servers"]
+  end
+  UI <--> API
+  API <-->|IPC| IPC
+  IPC <--> ENG
+  IPC --> AQ
+  IPC --> PS
+  IPC --> LG
+  IPC --> UP
+  ENG --> CO
+  ENG --> TH
+  CO --> AD
+  TH --> AD
+  AD --> CL
+  AD --> CX
+  CL -.->|"work threads"| BR
+  CX -.->|"work threads"| BR
+  BR <-->|"local socket"| GW
+  GW --> MCP
+  GW -->|"app_status · queue_apply"| AQ
+  AQ -->|"git apply"| WT["git worktree commit →<br/>project folder"]
+  PS --> OS["OS processes and ports"]
+  LG -->|"Haiku summary"| CL
+  UP --> GH["GitHub releases ·<br/>origin/main"]
 ```
 
 ## Roadmap
 
-- [ ] **Packaged app**: `.app`/`.dmg` builds with electron-builder, using the icon in `build/` (`icon.icns`).
+**Delivered**
+
+- [x] Claude threads on the Claude Agent SDK, with approvals in the UI.
+- [x] `@` file autocomplete in the composer.
+- [x] Worktree apply queue with automatic apply.
+- [x] One-at-a-time stepper for thread questions.
+- [x] Stop processes from the process panel.
+- [x] Version number and update notice.
+- [x] Native notifications.
+- [x] MCP connectors.
+- [x] Token economy: TokenEconomizer, RTK and the monthly usage report.
+- [x] **View logs** with a summary.
+
+**Next**
+
+- [ ] **App icon for packaged builds**: platform formats (`.icns`, `.ico`) of the BrandyTerm icon.
+- [ ] **Dock badge** on macOS for threads that need you.
+- [ ] **Releases and installers** for macOS and Windows, built with electron-builder.
 - [ ] **Antigravity** adapter (`agy` headless).
 - [ ] **Archive follow-ups**: open archived threads from chat chips, run retention while the app is open (today it runs at startup).
 - [ ] **SQLite state** instead of a single JSON file.
