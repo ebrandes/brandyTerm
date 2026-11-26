@@ -10,6 +10,20 @@ Images used by `README.md` and `README.pt-BR.md`.
 | `screenshot-thread.png` | Agent thread with its plan and an approval card for a shell command | Same as the project (MIT) |
 | `screenshot-board.png` | Kanban board of agents with all five columns | Same as the project (MIT) |
 
+## TODO: missing screenshots
+
+Both READMEs already reference these files inside HTML comments. Add each file, then remove
+the comment markers around its block. Follow the privacy rule below.
+
+| File | What it should show |
+| --- | --- |
+| `screenshot-overview.png` | Main window: projects with status in the sidebar, coordinator chat, overview |
+| `screenshot-coordinator.png` | Coordinator delegating a request to Claude Code and Codex threads |
+| `screenshot-questions.png` | Thread questions in the stepper, with a recommended option |
+| `screenshot-apply-queue.png` | **Aplicações** panel with a request waiting for approval |
+| `screenshot-processes.png` | **PROCESSOS** panel with origins, ports and the stop button |
+| `screenshot-logs.png` | **Ver logs** window with the summary |
+
 ## How the screenshots were made
 
 All data on screen is fake: the projects (Lumen Notes, Orbita API, Pomar Shop), threads,
