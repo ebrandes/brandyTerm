@@ -11,6 +11,7 @@ import { ArtifactCards } from './ArtifactCards'
 import { filesForSummary } from '../artifacts'
 import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention } from './ThreadAttention'
+import { ThreadReportButton } from './ThreadReportButton'
 import { AskCard } from './AskCard'
 import { ThreadMetaChips } from './ThreadMetaChips'
 import { MachineChip } from './MachineChip'
@@ -279,6 +280,7 @@ export function Chat(props: Props) {
           </div>
         ) : null}
         {thread && <ThreadAttention t={thread} projectId={project.id} machine={project.machine} onOpenThread={onOpenThread} />}
+        {thread && !project.demo && <ThreadReportButton t={thread} projectId={project.id} />}
         {!thread && project.busy && (
           <div className="working pad">
             <Loader2 size={14} className="spin" /> O coordenador está pensando…
