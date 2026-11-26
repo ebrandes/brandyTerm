@@ -26,6 +26,7 @@ import {
   parsePlan,
   type PlannedTask
 } from './coordinator.ts'
+import { createReporter } from './thread-report-host.ts'
 import { demoProjects } from './demo.ts'
 import { newThread, zeroUsage } from './new-thread.ts'
 import { dispatchReplies, retireReplaced, withNotes } from './plan-dispatch.ts'
@@ -48,6 +49,7 @@ export class Engine extends EventEmitter {
   private handles = new Map<string, RunHandle>()
   private chains = new Map<string, Promise<void>>()
   readonly approvals = new ThreadApprovals(() => this.touch())
+  readonly reporter = createReporter(this, (path) => this.pluginsFor(path))
 
   private store: JsonStore
 
@@ -278,6 +280,7 @@ export class Engine extends EventEmitter {
   }
 
   startThread(p: Project, t: Thread, prompt: string, direct: boolean, attachments?: Attachment[]): void {
+    this.reporter.cancel(t.id)
     t.state = 'running'
     t.resolved = false
     t.pending = undefined
@@ -322,6 +325,7 @@ export class Engine extends EventEmitter {
         // the question card is already in the main chat; synthesis waits for the answer
       } else if (direct && t.state !== 'cancelled') reportDirect(this, p, t)
       else maybeSynthesize(this, p, t.requestId)
+      this.reporter.afterRun(p, t)
       this.pump(p)
     })
   }
@@ -372,10 +376,12 @@ export class Engine extends EventEmitter {
 
   /** the user closes a thread left with something pending (solved by hand or not needed) */
   resolveThread(projectId: string, threadId: string): void {
-    const t = this.project(projectId)?.threads.find((x) => x.id === threadId)
-    if (!t || t.state !== 'done') return
+    const p = this.project(projectId)
+    const t = p?.threads.find((x) => x.id === threadId)
+    if (!p || !t || t.state !== 'done') return
     t.pending = undefined
     t.resolved = true
+    this.reporter.report(p, t, 'curto')
     this.touch()
   }
 

@@ -10,6 +10,7 @@ import { refreshSkills } from './skills/wiring.ts'
 import { updateSettings } from './settings.ts'
 import { registry } from './rpc/registry.ts'
 import { ruleOf } from './rpc/channels.ts'
+import { reportThreadById } from './thread-report-host.ts'
 import { ownedProcess } from './owns-process.ts'
 import type { AppSettings } from '../shared/types.ts'
 
@@ -94,6 +95,7 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     engine.state.settings = updateSettings(patch ?? {})
     engine.touch()
   }, ruleOf('settings:set'))
+  registry.add('thread:report', (a: { projectId: string; threadId: string }) => reportThreadById(engine, String(a.projectId), String(a.threadId)), ruleOf('thread:report'))
   registry.add('thread:resolve', (a: { projectId: string; threadId: string }) => engine.resolveThread(String(a.projectId), String(a.threadId)), ruleOf('thread:resolve'))
   registry.add('thread:retire', (a: { projectId: string; threadId: string }) => engine.retireThread(String(a.projectId), String(a.threadId)), ruleOf('thread:retire'))
   registry.add('thread:cancel', (a: { projectId: string; threadId: string }) =>

@@ -9,7 +9,7 @@ export const SCOPED: Record<string, Where> = {
   'commands:list': 'arg', 'project:remove': 'arg',
   'term:open': 'id', 'term:write': 'id', 'term:resize': 'id', 'term:kill': 'arg-or-id',
   'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
-  'thread:resolve': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
+  'thread:resolve': 'projectId', 'thread:report': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
   'thread:retire': 'projectId',
   'artifact:read': 'projectId', 'artifact:diff': 'projectId', 'artifact:open': 'projectId', 'process:start': 'projectId',
   'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId',

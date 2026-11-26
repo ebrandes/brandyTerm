@@ -9,6 +9,7 @@ export const RULES = {
   'thread:cancel': 'pass',
   'thread:approve': 'pass',
   'thread:resolve': 'pass',
+  'thread:report': 'pass',
   'thread:retire': 'pass',
   'thread:allowAll': 'pass',
   'archive:list': 'pass',

@@ -34,6 +34,7 @@ const api: BrandyApi = {
   listFiles: (a) => ipcRenderer.invoke('fs:list', a),
   cancelThread: (a) => ipcRenderer.invoke('thread:cancel', a),
   approveTool: (a) => ipcRenderer.invoke('thread:approve', a),
+  reportThread: (a) => ipcRenderer.invoke('thread:report', a),
   resolveThread: (a) => ipcRenderer.invoke('thread:resolve', a),
   retireThread: (a) => ipcRenderer.invoke('thread:retire', a),
   setAllowAll: (a) => ipcRenderer.invoke('thread:allowAll', a),

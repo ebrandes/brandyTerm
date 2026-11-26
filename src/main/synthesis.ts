@@ -10,8 +10,12 @@ export function reportDirect(engine: Engine, p: Project, t: Thread): void {
   const text = t.state === 'done' ? `A thread “${t.title}” respondeu.` : `A thread “${t.title}” falhou: ${t.note}`
   const summaries: Summary[] | undefined =
     t.state === 'done' && t.summary ? [{ agent: t.agent, title: t.title, text: t.summary, threadId: t.id }] : undefined
-  p.messages.push(engine.msg('agent', text, { summaries, isError: t.state === 'failed' }))
-  engine.touch()
+  const post = (): void => {
+    p.messages.push(engine.msg('agent', text, { summaries, isError: t.state === 'failed' }))
+    engine.touch()
+  }
+  if (t.state === 'done' && t.resolved && engine.reporter.report(p, t, 'curto', post)) return
+  post()
 }
 
 /** When every thread of a request has finished, the coordinator writes one closing answer. */

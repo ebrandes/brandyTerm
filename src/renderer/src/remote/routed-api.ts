@@ -62,6 +62,7 @@ export function createRoutedApi(
     listFiles: a => via('fs:list', a, x => local.listFiles(x)),
     cancelThread: a => via('thread:cancel', a, x => local.cancelThread(x)),
     approveTool: a => via('thread:approve', a, x => local.approveTool(x)),
+    reportThread: a => via('thread:report', a, x => local.reportThread(x)),
     resolveThread: a => via('thread:resolve', a, x => local.resolveThread(x)),
     retireThread: a => via('thread:retire', a, x => local.retireThread(x)),
     setAllowAll: a => via('thread:allowAll', a, x => local.setAllowAll(x)),
