@@ -114,7 +114,7 @@ export class ThreadReporter {
     const entry: Running = { run: this.host.run(p, t, prompt), thread: t, question }
     this.running.set(t.id, entry)
     void entry.run.result
-      .catch((e: unknown): SilentResult => ({ ok: false, text: '', error: String(e) }))
+      .catch((e: unknown): SilentResult => ({ ok: false, text: '', error: e instanceof Error ? e.message : String(e) }))
       .then((res) => {
         // cancelled: the user took the thread over, nothing of this run is kept
         if (this.running.get(t.id) !== entry) return
