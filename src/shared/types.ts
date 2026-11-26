@@ -250,6 +250,8 @@ export interface AppSettings {
   idleCompact?: IdleCompactCfg
   /** LAN host server for other BrandyTerm machines (default off) */
   remote?: { enabled: boolean; port: number }
+  /** skills library repo, `dono/repo` or an https URL (default 'ebrandes/claude-kit') */
+  skillsLibrary?: string
 }
 
 export interface AgentInfo {
@@ -260,7 +262,6 @@ export interface AgentInfo {
   note: string
 }
 
-/** A plugin from the user's own Claude Code install that threads may load. */
 /** An entry of the skills library catalog (`biblioteca/catalogo.json`). */
 export interface CatalogItem {
   id: string
@@ -284,6 +285,7 @@ export interface SkillsList {
   sem: string[]
 }
 
+/** A plugin from the user's own Claude Code install that threads may load. */
 export interface UserPlugin {
   id: string
   name: string
