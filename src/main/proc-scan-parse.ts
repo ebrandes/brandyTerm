@@ -37,8 +37,20 @@ export function parsePs(out: string): ProcEntry[] {
   })
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/** `ps -o pid=,lstart=` in an English locale: "17948 Thu Nov  5 09:04:28 2026", local time → epoch ms */
+export function parsePsStarts(out: string): Map<number, number> {
+  const starts = new Map<number, number>()
+  for (const line of out.split('\n')) {
+    const m = /^\s*(\d+)\s+\w{3}\s+(\w{3})\s+(\d+)\s+(\d+):(\d+):(\d+)\s+(\d{4})/.exec(line)
+    if (m && MONTHS.includes(m[2])) starts.set(+m[1], new Date(+m[7], MONTHS.indexOf(m[2]), +m[3], +m[4], +m[5], +m[6]).getTime())
+  }
+  return starts
+}
+
 interface WinPort { LocalPort: number; OwningProcess: number }
-interface WinProc { ProcessId: number; ParentProcessId: number; Name?: string | null; CommandLine?: string | null }
+interface WinProc { ProcessId: number; ParentProcessId: number; Name?: string | null; CommandLine?: string | null; Started?: number | null }
 
 /** ConvertTo-Json writes a lone item as an object, not as an array */
 const listOf = <T>(v: T | T[] | null | undefined): T[] => (v == null ? [] : Array.isArray(v) ? v : [v])
@@ -48,7 +60,8 @@ export function parseWindows(out: string): ProcSnapshot {
   const ports = new Map<number, number[]>()
   for (const p of listOf(raw.ports)) addPort(ports, p.OwningProcess, p.LocalPort)
   const procs = listOf(raw.procs).map((p) => ({
-    pid: p.ProcessId, ppid: p.ParentProcessId, command: p.CommandLine || p.Name || ''
+    pid: p.ProcessId, ppid: p.ParentProcessId, command: p.CommandLine || p.Name || '',
+    ...(typeof p.Started === 'number' && { startedAt: p.Started })
   }))
   return { procs, ports }
 }

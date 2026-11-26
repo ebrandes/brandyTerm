@@ -1,29 +1,27 @@
 import { useState, type ReactNode } from 'react'
-import { ExternalLink, Play, Plus, Square, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { Project } from '../types'
 import { api } from '../api'
-import { report } from '../notice'
-import { parseId } from '../remote/route'
+import { ManagedProc } from './ManagedProc'
 import { DetectedProcs } from './DetectedProcs'
 import type { DetectedProc } from '../../../shared/proc-attribution.ts'
 
-const REMOTE_PORT_TIP = 'Abre pela rede local; o servidor precisa escutar além de localhost'
-
 interface Props {
   project: Project
-  /** running without the "+" button: read-only */
+  /** running without the "+" button */
   detected: DetectedProc[]
+  /** reads that list again, after a stop */
+  refresh: () => void
   /** false: only the header line shows (the add form keeps its draft) */
   open: boolean
   /** the minimize/expand button, owned by OverviewDock */
   toggle: ReactNode
 }
 
-export function ProcessPanel({ project, detected, open, toggle }: Props) {
+export function ProcessPanel({ project, detected, refresh, open, toggle }: Props) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
   const [command, setCommand] = useState('')
-  const remote = parseId(project.id).machineId !== null
   const canStart = !project.demo && !!project.path
 
   const start = () => {
@@ -70,59 +68,18 @@ export function ProcessPanel({ project, detected, open, toggle }: Props) {
           </form>
         )}
 
-        {project.processes.length === 0 && detected.length === 0 && !adding && <p className="empty small">Servidores e comandos longos (frontend, backend…) aparecem aqui com as portas.</p>}
-
         {project.processes.map((x) => (
-          <div key={x.id} className="proc">
-            <div className="proc-top">
-              <span className={`dot ${x.state === 'running' ? 'dot-ok' : 'dot-off'}`} />
-              <strong>{x.name}</strong>
-              <span className="proc-state">{x.state === 'running' ? 'rodando' : `saiu (${x.exitCode ?? '?'})`}</span>
-              <span className="proc-actions">
-                {x.state === 'running' ? (
-                  <button className="icon-btn sm" aria-label="Parar" title="Parar" onClick={() => void api.stopProcess({ projectId: project.id, processId: x.id })}>
-                    <Square size={12} />
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      className="icon-btn sm"
-                      aria-label="Reiniciar"
-                      title="Iniciar de novo"
-                      onClick={() => {
-                        void api.removeProcess({ projectId: project.id, processId: x.id })
-                        void api.startProcess({ projectId: project.id, name: x.name, command: x.command })
-                      }}
-                    >
-                      <Play size={12} />
-                    </button>
-                    <button className="icon-btn sm" aria-label="Remover" title="Remover da lista" onClick={() => void api.removeProcess({ projectId: project.id, processId: x.id })}>
-                      <Trash2 size={12} />
-                    </button>
-                  </>
-                )}
-              </span>
-            </div>
-            <code className="proc-cmd">{x.command}</code>
-            {x.ports.length > 0 && (
-              <div className="ports">
-                {x.ports.map((port) => (
-                  <button key={port} className="port" onClick={() => void api.openPort(port, project.id).catch(report)} title={remote ? REMOTE_PORT_TIP : `Abrir http://localhost:${port}`}>
-                    :{port} <ExternalLink size={11} />
-                  </button>
-                ))}
-              </div>
-            )}
-            {x.log.length > 0 && (
-              <details className="proc-log">
-                <summary>log ({x.log.length})</summary>
-                <pre>{x.log.slice(-60).join('\n')}</pre>
-              </details>
-            )}
-          </div>
+          <ManagedProc key={x.id} projectId={project.id} proc={x} />
         ))}
 
-        <DetectedProcs projectId={project.id} detected={detected} />
+        <DetectedProcs
+          key={project.id}
+          project={project}
+          detected={detected}
+          open={open}
+          refresh={refresh}
+          empty={project.processes.length === 0 && !adding && <p className="empty small">Servidores e comandos longos (frontend, backend…) aparecem aqui com as portas.</p>}
+        />
       </div>
     </section>
   )

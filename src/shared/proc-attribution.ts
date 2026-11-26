@@ -1,7 +1,12 @@
 /**
  * Which running OS processes belong to which project (pure: no node, no electron).
- * Detected processes are read-only information: never persisted, never stopped.
+ * Detected processes are never persisted; the user may stop a listed one (main/proc-stop.ts validates it).
  */
+
+import { isInfra } from './proc-filter.ts'
+import { indexOf, lineage } from './proc-tree.ts'
+
+export { procLabel } from './proc-kind.ts'
 
 export interface ProcEntry {
   pid: number
@@ -12,6 +17,8 @@ export interface ProcEntry {
   tpgid?: number
   /** absent on Windows, or when the system does not tell */
   cwd?: string
+  /** epoch ms; absent when the system does not tell */
+  startedAt?: number
 }
 
 export interface ProcSnapshot {
@@ -28,6 +35,10 @@ export interface DetectedProc {
   origin: ProcOrigin
   command: string
   ports: number[]
+  cwd?: string
+  /** cwd relative to the project root; '' at the root; absent outside it or when unknown */
+  folder?: string
+  startedAt?: number
 }
 
 export interface ProcRoot {
@@ -41,21 +52,6 @@ export interface OwnedPids {
   /** processes started from the panel's "+" button, which already lists them */
   managed: number[]
 }
-
-/** Windows reuses pids, so a parent chain may loop: it is walked once per pid, up to this depth */
-const MAX_DEPTH = 64
-
-/** the process itself, then its parents */
-function lineage(byPid: Map<number, ProcEntry>, pid: number): number[] {
-  const seen = new Set<number>()
-  for (let at: number | undefined = pid; at !== undefined && at > 0 && seen.size < MAX_DEPTH; at = byPid.get(at)?.ppid) {
-    if (seen.has(at)) break
-    seen.add(at)
-  }
-  return [...seen]
-}
-
-const indexOf = (snapshot: ProcSnapshot) => new Map(snapshot.procs.map((p) => [p.pid, p]))
 
 /** the job in the foreground of an integrated terminal, one entry each, when none of its members listens */
 function foregroundJobs(snapshot: ProcSnapshot, byPid: Map<number, ProcEntry>, owned: OwnedPids): number[] {
@@ -123,12 +119,33 @@ export function attributeProcs(
     return { projectId, origin: chain.includes(appPid) ? 'thread' : 'external' }
   }
 
+  const rootDirs = new Map(roots.map((r) => [r.projectId, norm(r.path).replace(/\/+$/, '')]))
+  const folderIn = (cwd: string, projectId: string): string | undefined => {
+    const dir = rootDirs.get(projectId) as string
+    const at = norm(cwd)
+    if (at === dir) return ''
+    if (!at.startsWith(`${dir}/`)) return
+    // the original spelling: normalizing only changes case and separators
+    const original = cwd.normalize('NFC')
+    return (platform === 'win32' ? original.replace(/\\/g, '/') : original).slice(dir.length + 1)
+  }
+  const detail = (entry: ProcEntry, projectId: string): Pick<DetectedProc, 'cwd' | 'folder' | 'startedAt'> => {
+    const folder = entry.cwd === undefined ? undefined : folderIn(entry.cwd, projectId)
+    return {
+      ...(entry.cwd !== undefined && { cwd: entry.cwd }),
+      ...(folder !== undefined && { folder }),
+      ...(entry.startedAt !== undefined && { startedAt: entry.startedAt })
+    }
+  }
+
+  const shellPids = new Set(owned.terminals.values())
   const found = new Map<number, DetectedProc>()
   for (const pid of new Set(candidatePids(snapshot, owned))) {
     const owner = attribute(pid)
-    if (!owner) continue
+    const entry = byPid.get(pid) as ProcEntry
+    if (!owner || isInfra(entry, byPid, appPid, shellPids)) continue
     const ports = [...new Set(snapshot.ports.get(pid) ?? [])].sort((a, b) => a - b)
-    found.set(pid, { pid, ...owner, command: (byPid.get(pid) as ProcEntry).command, ports })
+    found.set(pid, { pid, ...owner, command: entry.command, ports, ...detail(entry, owner.projectId) })
   }
 
   // forked workers share their parent's sockets: one row is enough
@@ -138,24 +155,4 @@ export function attributeProcs(
       return !!parent && parent.projectId === d.projectId && parent.ports.join() === d.ports.join()
     })
   return [...found.values()].filter((d) => !repeats(d)).sort((a, b) => a.pid - b.pid)
-}
-
-const INTERPRETERS = /^(node|nodejs|python[\d.]*|ruby|bun)(\.exe)?$/i
-const MAX_LABEL = 60
-
-const baseName = (s: string) => s.split(/[\\/]/).pop() || s
-
-/** "…/bin/node …/astro/bin/astro.mjs preview" → "astro preview" */
-export function procLabel(command: string): string {
-  // ps does not quote paths, and this macOS folder has a space
-  const whole = command.replace(/\/Application Support\//g, '/ApplicationSupport/')
-  const words = (whole.match(/"[^"]*"|\S+/g) ?? []).map((w) => w.replace(/^"|"$/g, ''))
-  if (words.length > 1 && INTERPRETERS.test(baseName(words[0])) && !words[1].startsWith('-')) words.shift()
-  if (words.length) {
-    const isPath = /[\\/]/.test(words[0])
-    const name = baseName(words[0])
-    words[0] = isPath ? name.replace(/\.(m|c)?js$|\.exe$/i, '') : name
-  }
-  const label = words.join(' ')
-  return label.length > MAX_LABEL ? `${label.slice(0, MAX_LABEL - 1)}…` : label
 }

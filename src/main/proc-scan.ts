@@ -1,10 +1,10 @@
 /**
  * Reads the system's processes and listening TCP ports. Runs only when asked (nothing ticks here),
- * one scan at a time, cached. It only reads: nothing here signals a process.
+ * one scan at a time, cached. It only reads: signaling is proc-stop.ts's job.
  */
 import { execFile } from 'node:child_process'
 import { candidatePids, type OwnedPids, type ProcSnapshot } from '../shared/proc-attribution.ts'
-import { parseLsofCwds, parseLsofPorts, parsePs, parseWindows } from './proc-scan-parse.ts'
+import { parseLsofCwds, parseLsofPorts, parsePs, parsePsStarts, parseWindows } from './proc-scan-parse.ts'
 
 export type Run = (file: string, args: string[]) => Promise<string>
 
@@ -18,7 +18,9 @@ const WINDOWS_SCRIPT = [
   "$ErrorActionPreference='Stop'",
   '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8',
   '$ports=@(Get-NetTCPConnection -State Listen | Select-Object LocalPort,OwningProcess)',
-  '$procs=@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine)',
+  // creation time as epoch ms: ConvertTo-Json writes dates differently on each PowerShell
+  "$started=@{n='Started';e={if($_.CreationDate){[DateTimeOffset]::new($_.CreationDate).ToUnixTimeMilliseconds()}else{$null}}}",
+  '$procs=@(Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine,$started)',
   '@{ports=$ports;procs=$procs} | ConvertTo-Json -Compress -Depth 3'
 ].join(';')
 
@@ -35,23 +37,38 @@ const execRun: Run = (file, args) =>
 
 export function createProcScanner(platform: string, run: Run = execRun, now: () => number = Date.now) {
   const ttl = platform === 'win32' ? TTL_WINDOWS : TTL_UNIX
-  /** a server keeps its folder: asked once per pid (the command guards against a reused pid) */
-  const cwds = new Map<number, { command: string; cwd: string | undefined }>()
+  /** a server keeps its folder and start time: asked once per pid (the command guards against a reused pid) */
+  const known = new Map<number, { command: string; cwd: string | undefined; startedAt: number | undefined }>()
   let last: ProcSnapshot = { procs: [], ports: new Map() }
   let at = -Infinity
   let pending: Promise<ProcSnapshot> | null = null
 
-  async function fillCwds(snapshot: ProcSnapshot, owned: OwnedPids): Promise<void> {
+  async function fillDetails(snapshot: ProcSnapshot, owned: OwnedPids): Promise<void> {
     const byPid = new Map(snapshot.procs.map((p) => [p.pid, p]))
-    for (const [pid, seen] of cwds) if (byPid.get(pid)?.command !== seen.command) cwds.delete(pid)
-    const candidates = candidatePids(snapshot, owned)
-    const missing = [...new Set(candidates)].filter((pid) => !cwds.has(pid))
+    for (const [pid, seen] of known) if (byPid.get(pid)?.command !== seen.command) known.delete(pid)
+    const candidates = [...new Set(candidatePids(snapshot, owned))]
+    const missing = candidates.filter((pid) => !known.has(pid))
+    let starts = new Map<number, number>()
     if (missing.length) {
-      const found = parseLsofCwds(await run('lsof', ['-a', '-d', 'cwd', '-Fpn', '-p', missing.join(',')]))
-      // nothing at all may be lsof failing: remember nothing, ask again next time
-      if (found.size) for (const pid of missing) cwds.set(pid, { command: byPid.get(pid)!.command, cwd: found.get(pid) })
+      const list = missing.join(',')
+      const [cwdOut, startOut] = await Promise.all([
+        run('lsof', ['-a', '-d', 'cwd', '-Fpn', '-p', list]),
+        // the start time is only information: without it the list still holds
+        run('ps', ['-o', 'pid=,lstart=', '-p', list]).catch(() => '')
+      ])
+      const cwds = parseLsofCwds(cwdOut)
+      starts = parsePsStarts(startOut)
+      // no folder at all may be lsof failing: remember nothing, ask again next time
+      if (cwds.size) {
+        for (const pid of missing) known.set(pid, { command: byPid.get(pid)!.command, cwd: cwds.get(pid), startedAt: starts.get(pid) })
+      }
     }
-    for (const pid of candidates) byPid.get(pid)!.cwd = cwds.get(pid)?.cwd
+    for (const pid of candidates) {
+      const entry = byPid.get(pid)!
+      entry.cwd = known.get(pid)?.cwd
+      const startedAt = known.get(pid)?.startedAt ?? starts.get(pid)
+      if (startedAt !== undefined) entry.startedAt = startedAt
+    }
   }
 
   async function read(owned: OwnedPids): Promise<ProcSnapshot> {
@@ -64,19 +81,30 @@ export function createProcScanner(platform: string, run: Run = execRun, now: () 
     ])
     const snapshot = { procs: parsePs(table), ports: parseLsofPorts(listening) }
     if (!snapshot.procs.length) throw new Error('ps não listou nada')
-    await fillCwds(snapshot, owned)
+    await fillDetails(snapshot, owned)
     return snapshot
   }
 
-  return (owned: OwnedPids): Promise<ProcSnapshot> => {
-    if (pending) return pending
-    if (now() - at < ttl) return Promise.resolve(last)
-    pending = read(owned)
-      .then((snapshot) => (last = snapshot), () => last)
+  function begin(owned: OwnedPids): Promise<ProcSnapshot> {
+    const reading = read(owned)
+      .then((snapshot) => (last = snapshot))
       .finally(() => {
         at = now()
         pending = null
       })
-    return pending
+    pending = reading
+    return reading
+  }
+
+  /** `fresh` (before signaling a pid): a read that starts now and fails loudly instead of answering with an old one */
+  return async (owned: OwnedPids, fresh = false): Promise<ProcSnapshot> => {
+    if (fresh) {
+      while (pending) await pending.catch(() => {})
+      known.clear()
+      return begin(owned)
+    }
+    if (pending) return pending.catch(() => last)
+    if (now() - at < ttl) return last
+    return begin(owned).catch(() => last)
   }
 }

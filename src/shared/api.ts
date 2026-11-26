@@ -1,3 +1,4 @@
+import type { StopResult } from './proc-stop-labels.ts'
 import type { LogArea, LogSummary, LogsRead } from './logs.ts'
 import type { DetectedProc } from './proc-attribution.ts'
 import type { FileDiff } from './diff-summary.ts'
@@ -79,6 +80,8 @@ export interface BrandyApi {
   /** opens http://localhost:PORT in the default browser */
   openPort(port: number, projectId: string): Promise<void>
   /** owner only: hides (or shows again) a project from the machines paired to this one */
+  /** stops a listed one with its children; the main process refuses anything else */
+  stopDetected(a: { projectId: string; pid: number }): Promise<StopResult>
   setRemoteHidden(args: { projectId: string; hidden: boolean }): Promise<void>
   /** installs an optional plugin through Claude's marketplace */
   installPlugin(args: { id: string; force?: boolean }): Promise<void>

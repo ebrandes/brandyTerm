@@ -6,7 +6,7 @@ export const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 
 
 /** Where a project-scoped channel carries its project id. */
 export const SCOPED: Record<string, Where> = {
-  'commands:list': 'arg', 'project:remove': 'arg', 'process:detected': 'arg',
+  'commands:list': 'arg', 'project:remove': 'arg', 'process:detected': 'arg', 'process:stop-detected': 'projectId',
   'term:open': 'id', 'term:write': 'id', 'term:resize': 'id', 'term:kill': 'arg-or-id',
   'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
   'thread:resolve': 'projectId', 'thread:report': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',

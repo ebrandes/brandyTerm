@@ -2,6 +2,9 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import type { ProcessInfo } from '../shared/types.ts'
 import { killTree, trackChild } from './adapters/proc.ts'
+import type { RunningProcess } from '../shared/proc-stop-labels.ts'
+import { createProcScanner } from './proc-scan.ts'
+import { stopTree, systemDeps } from './proc-stop.ts'
 
 const MAX_LOG = 300
 const PORT_RE = /(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\]):(\d{2,5})/gi
@@ -15,6 +18,8 @@ const ANSI_RE = /\u001b\[[0-9;]*[A-Za-z]/g
  */
 export class ProcessManager {
   private children = new Map<string, ChildProcess>()
+  private stopping = new Set<string>()
+  private reports = new Map<string, (error: string) => void>()
 
   start(cwd: string, name: string, command: string, onChange: () => void): ProcessInfo {
     const info: ProcessInfo = {
@@ -29,6 +34,11 @@ export class ProcessManager {
     const child = spawn(info.command, { cwd, shell: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
     trackChild(child)
     this.children.set(info.id, child)
+    ;(info as RunningProcess).pid = child.pid
+    this.reports.set(info.id, (error) => {
+      info.log.push(`erro ao parar: ${error}`)
+      onChange()
+    })
     const feed = (chunk: string) => {
       for (const raw of chunk.split(/\r?\n/)) {
         const line = raw.replace(ANSI_RE, '').trimEnd()
@@ -49,12 +59,14 @@ export class ProcessManager {
       info.state = 'exited'
       info.exitCode = -1
       this.children.delete(info.id)
+      this.reports.delete(info.id)
       onChange()
     })
     child.on('close', (code) => {
       info.state = 'exited'
       info.exitCode = code
       this.children.delete(info.id)
+      this.reports.delete(info.id)
       onChange()
     })
     return info
@@ -65,9 +77,23 @@ export class ProcessManager {
     return [...this.children.values()].flatMap((c) => (c.pid ? [c.pid] : []))
   }
 
-  stop(id: string): void {
-    const c = this.children.get(id)
-    if (c) killTree(c)
+  /** the shell and everything under it, asked politely first; a failure goes to the process log */
+  async stop(id: string): Promise<void> {
+    const pid = this.children.get(id)?.pid
+    if (!pid || this.stopping.has(id)) return
+    this.stopping.add(id)
+    try {
+      // without a table only the shell is known; on Windows taskkill /T still finds the rest
+      const snapshot = await createProcScanner(process.platform)({ terminals: new Map(), managed: [pid] }, true)
+        .catch(() => ({ procs: [], ports: new Map<number, number[]>() }))
+      if (!this.children.has(id)) return
+      const result = await stopTree(pid, snapshot, systemDeps())
+      if (!result.ok) this.reports.get(id)?.(result.error)
+    } catch (e) {
+      this.reports.get(id)?.(String(e))
+    } finally {
+      this.stopping.delete(id)
+    }
   }
 
   stopAll(): void {

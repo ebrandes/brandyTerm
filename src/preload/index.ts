@@ -48,6 +48,7 @@ const api: BrandyApi = {
   stopProcess: (a) => ipcRenderer.invoke('process:stop', a),
   removeProcess: (a) => ipcRenderer.invoke('process:remove', a),
   detectedProcesses: (id) => ipcRenderer.invoke('process:detected', id),
+  stopDetected: (a) => ipcRenderer.invoke('process:stop-detected', a),
   openPort: (p) => ipcRenderer.invoke('process:open-port', p),
   installPlugin: (a) => ipcRenderer.invoke('plugin:install', a),
   openPluginReport: (id) => ipcRenderer.invoke('plugin:open-report', id),

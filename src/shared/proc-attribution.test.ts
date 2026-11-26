@@ -17,7 +17,8 @@ const brief = (s: ProcSnapshot, owned = none, r = roots, platform = 'darwin') =>
 
 test('a detached daemon with its cwd in a subfolder belongs to the project (the astro preview case)', () => {
   const s = snap([p(17948, 1, { cwd: '/Users/u/Projects/fix-everything/apps/site' })], { 17948: [4321] })
-  assert.deepEqual(run(s), [{ pid: 17948, projectId: 'fix', origin: 'external', command: 'cmd-17948', ports: [4321] }])
+  assert.deepEqual(run(s), [{ pid: 17948, projectId: 'fix', origin: 'external', command: 'cmd-17948', ports: [4321],
+    cwd: '/Users/u/Projects/fix-everything/apps/site', folder: 'apps/site' }])
 })
 
 test('a descendant of the project terminal is "terminal", wherever its cwd is', () => {
@@ -32,7 +33,7 @@ test('a pty whose id is not a project (account login) names no project', () => {
 })
 
 test('a grandchild of a thread with its cwd in the project is "thread"', () => {
-  const s = snap([p(300, APP), p(301, 300), p(302, 301, { cwd: roots[0].path })], { 302: [3000] })
+  const s = snap([p(300, APP), p(301, 300, { command: '/bin/zsh -c x' }), p(302, 301, { cwd: roots[0].path })], { 302: [3000] })
   assert.deepEqual(brief(s), [[302, 'fix', 'thread']])
 })
 

@@ -37,6 +37,7 @@ export const RULES = {
   'artifact:open': 'local-only',
   'process:open-port': 'local-only',
   'process:detected': 'local-only',
+  'process:stop-detected': 'local-only',
   'term:open': 'terminal',
   'term:write': 'terminal',
   'term:resize': 'terminal',

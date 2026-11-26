@@ -74,6 +74,9 @@ export function createRoutedApi(
     stopProcess: a => via('process:stop', a, x => local.stopProcess(x)),
     removeProcess: a => via('process:remove', a, x => local.removeProcess(x)),
     // the scan reads this machine only: a remote project shows none
+    // stopping what another computer runs is not offered: its list is never shown here
+    stopDetected: a => isRemote('process:stop-detected', a)
+      ? Promise.resolve({ ok: false as const, error: 'não disponível em projetos remotos' }) : local.stopDetected(a),
     detectedProcesses: id => isRemote('process:detected', id) ? Promise.resolve([]) : local.detectedProcesses(id),
     term: {
       ...local.term,

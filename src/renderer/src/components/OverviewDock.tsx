@@ -25,7 +25,7 @@ export function OverviewDock({ project, ...footer }: Props) {
   const saved = project.coordinator.context
   // old saves carry the model's 1M window: the coordinator is held to its own ceiling
   const context = saved && saved.used > 0 ? { used: saved.used, limit: coordinatorLimit(saved.limit) } : undefined
-  const detected = useDetectedProcs(project.id)
+  const { list: detected, refresh } = useDetectedProcs(project.id)
   const summary = dockSummary(project.processes, context, footer.allowAllThreads, detected)
 
   // one button for both states, so keyboard focus stays on it after toggling
@@ -59,7 +59,7 @@ export function OverviewDock({ project, ...footer }: Props) {
 
   return (
     <>
-      <ProcessPanel project={project} detected={detected} open={open} toggle={button} />
+      <ProcessPanel project={project} detected={detected} refresh={refresh} open={open} toggle={button} />
       <OverviewFooter project={project} context={context} hidden={!open} {...footer} />
     </>
   )

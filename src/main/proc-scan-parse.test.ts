@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseLsofCwds, parseLsofPorts, parsePs, parseWindows } from './proc-scan-parse.ts'
+import { parseLsofCwds, parseLsofPorts, parsePs, parsePsStarts, parseWindows } from './proc-scan-parse.ts'
 
 // trimmed from real macOS output
 const LSOF_PORTS = `p477
@@ -72,4 +72,15 @@ test('windows json: a single item comes as an object; broken output throws', () 
   assert.deepEqual([...s.ports], [[10, [80]]])
   assert.equal(s.procs[0].command, 'a.exe')
   assert.throws(() => parseWindows('Get-NetTCPConnection : error'))
+})
+
+test('ps lstart: one and two digit days, as local time; junk is skipped', () => {
+  assert.deepEqual([...parsePsStarts('45505 Thu Nov 26 12:24:28 2026\n    7 Thu Nov  5 09:04:08 2026    \nx\n')], [
+    [45505, new Date(2026, 10, 26, 12, 24, 28).getTime()], [7, new Date(2026, 10, 5, 9, 4, 8).getTime()]
+  ])
+})
+
+test('windows json: the start time in ms; absent when the system has none', () => {
+  const { procs } = parseWindows('{"procs":[{"ProcessId":1,"ParentProcessId":0,"Started":123},{"ProcessId":2,"ParentProcessId":0,"Started":null}]}')
+  assert.deepEqual(procs.map((p) => p.startedAt), [123, undefined])
 })
