@@ -6,6 +6,8 @@ import type { UserPlugin, UserPluginsState } from '../shared/types.ts'
 import { diagLog, diagLogOnChange } from './diag-log.ts'
 import { OWN_PLUGIN_NAMES } from './plugins.ts'
 import { countSkills } from './skills/count.ts'
+import { skillsPaths } from './skills/paths.ts'
+import { projectDirs } from './skills/project-dirs.ts'
 
 /**
  * The user's own Claude Code skills and plugins, offered to BrandyTerm threads.
@@ -156,8 +158,30 @@ export function setUserPlugin(id: string, on: boolean): void {
   found = scan()
 }
 
-/** Plugin dirs the user turned on, for a thread in `projectPath`. */
+/** Installed plugins by plain id (no `#project`), preferring the user-scope install. */
+export function installedMap(): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const f of found) {
+    const id = f.id.split('#')[0]
+    if (f.scope === 'user' || !out.has(id)) out.set(id, f.dir)
+  }
+  return out
+}
+
+/**
+ * Plugin dirs for a thread in `projectPath`. A project with `.brandyterm/skills.json` gets
+ * what its list resolves to; one without a list (or with a broken one) keeps the old
+ * behaviour: the plugins turned on in thread-plugins.json plus "pessoal".
+ */
 export function userPluginDirs(projectPath: string | null): string[] {
+  if (projectPath) {
+    try {
+      const own = projectDirs(projectPath, skillsPaths(app.getPath('userData')), installedMap(), process.platform)
+      if (own) return own
+    } catch (error) {
+      diagLogOnChange(`skills:project:${projectPath}`, 'skills', 'error', 'falha ao montar as skills do projeto', { projectPath, error: String(error) })
+    }
+  }
   const dirs = found.filter((f) => prefs.on.includes(f.id) && (!f.projectPath || f.projectPath === projectPath)).map((f) => f.dir)
   const own = prefs.personal ? personalDir() : null
   return own ? [own, ...dirs] : dirs
