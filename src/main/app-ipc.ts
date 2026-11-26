@@ -1,4 +1,6 @@
-import { dialog, shell, type BrowserWindow } from 'electron'
+import fs from 'node:fs'
+import { app, dialog, shell, type BrowserWindow } from 'electron'
+import { diagLogDir } from './diag-log.ts'
 import type { Engine } from './engine.ts'
 import { discoverPlugins, installPlugin } from './plugins.ts'
 import { validAttachments } from './attachments.ts'
@@ -74,6 +76,13 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     const report = engine.state.plugins.find((x) => x.id === String(id))?.review?.report
     if (report) void shell.openPath(report)
   }, ruleOf('plugin:open-report'))
+  registry.add('logs:open', async () => {
+    const dir = diagLogDir() ?? app.getPath('logs')
+    fs.mkdirSync(dir, { recursive: true })
+    // openPath answers with an error text instead of throwing (Windows Explorer, Finder, xdg-open)
+    const err = await shell.openPath(dir)
+    if (err) throw new Error(`Não foi possível abrir a pasta de logs: ${err}`)
+  }, ruleOf('logs:open'))
   registry.add('thread:approve', (a: { projectId: string; threadId: string; id: string; decision: string }) => {
     const d = a.decision === 'allow' || a.decision === 'always' || a.decision === 'all' || a.decision === 'forever' ? a.decision : 'deny'
     engine.respondApproval(String(a.projectId), String(a.threadId), String(a.id), d)
@@ -84,6 +93,7 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     engine.touch()
   }, ruleOf('settings:set'))
   registry.add('thread:resolve', (a: { projectId: string; threadId: string }) => engine.resolveThread(String(a.projectId), String(a.threadId)), ruleOf('thread:resolve'))
+  registry.add('thread:retire', (a: { projectId: string; threadId: string }) => engine.retireThread(String(a.projectId), String(a.threadId)), ruleOf('thread:retire'))
   registry.add('thread:cancel', (a: { projectId: string; threadId: string }) =>
     engine.cancelThread(String(a.projectId), String(a.threadId)),
     ruleOf('thread:cancel'))

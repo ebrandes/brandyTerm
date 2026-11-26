@@ -51,6 +51,8 @@ export function createRoutedApi(
     revealProject: a => isRemote('project:reveal', a)
       ? Promise.resolve({ ok: false, error: 'A pasta está em outra máquina.' })
       : local.revealProject(a),
+    // the logs are this machine's, whatever project is open
+    openLogs: () => local.openLogs(),
     send: a => via('chat:send', a, x => local.send(x)),
     saveAttachment: a => via('attach:save', a, x => local.saveAttachment(x)),
     readArtifact: a => via('artifact:read', a, x => local.readArtifact(x)),
@@ -61,6 +63,7 @@ export function createRoutedApi(
     cancelThread: a => via('thread:cancel', a, x => local.cancelThread(x)),
     approveTool: a => via('thread:approve', a, x => local.approveTool(x)),
     resolveThread: a => via('thread:resolve', a, x => local.resolveThread(x)),
+    retireThread: a => via('thread:retire', a, x => local.retireThread(x)),
     setAllowAll: a => via('thread:allowAll', a, x => local.setAllowAll(x)),
     reopenArchived: a => via('archive:reopen', a, x => local.reopenArchived(x)),
     startProcess: a => via('process:start', a, x => local.startProcess(x)),

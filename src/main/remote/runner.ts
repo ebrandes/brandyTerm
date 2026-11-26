@@ -1,5 +1,6 @@
 // Keeps one host server running on the wanted port (null: none) and says how it went. No Electron.
 import type { RemoteStatus } from '../../shared/remote/status.ts'
+import { diagLog } from '../diag-log.ts'
 
 export interface Startable {
   start(port: number): Promise<void>
@@ -54,6 +55,7 @@ export function hostRunner<S extends Startable>(deps: RunnerDeps<S>): Runner<S> 
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e)
       console.error('[remote] não foi possível iniciar o servidor:', error)
+      diagLog('remote', 'error', 'não foi possível iniciar o servidor', { port: want, error })
       set({ state: 'failed', port: want, error })
       await next.stop()
     }

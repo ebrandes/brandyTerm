@@ -24,6 +24,7 @@ import type { RemoteHosts } from './remote/hosts.ts'
 import { registerAppIpc } from './app-ipc.ts'
 import { registry } from './rpc/registry.ts'
 import { bindIpc } from './rpc/ipc.ts'
+import { configureDiagLog } from './diag-log.ts'
 import { startConnectors } from './connectors/index.ts'
 import { registerConnectorsIpc } from './connectors/connectors-ipc.ts'
 
@@ -110,6 +111,8 @@ if (dataOverride) {
 if (!dataOverride && !app.requestSingleInstanceLock()) app.quit()
 
 app.whenReady().then(async () => {
+  const debugLogs = !app.isPackaged || process.env.BRANDYTERM_DEBUG === '1'
+  configureDiagLog({ dir: app.getPath('logs'), debug: debugLogs })
   const stateFile = join(app.getPath('userData'), 'brandyterm-state.json')
   engine = new Engine(new JsonStore(stateFile))
   engine.on('change', pushState)

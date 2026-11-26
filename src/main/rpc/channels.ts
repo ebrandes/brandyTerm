@@ -9,6 +9,7 @@ export const RULES = {
   'thread:cancel': 'pass',
   'thread:approve': 'pass',
   'thread:resolve': 'pass',
+  'thread:retire': 'pass',
   'thread:allowAll': 'pass',
   'archive:list': 'pass',
   'archive:reopen': 'pass',
@@ -43,6 +44,8 @@ export const RULES = {
   'project:set-remote-hidden': 'deny',
   'plugin:install': 'deny',
   'plugin:open-report': 'deny',
+  // the diagnostic logs folder of this machine
+  'logs:open': 'deny',
   'accounts:activate': 'deny',
   'accounts:auto': 'deny',
   'accounts:rename': 'deny',

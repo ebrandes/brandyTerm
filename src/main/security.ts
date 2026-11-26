@@ -4,6 +4,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { claudeAdapter } from './adapters/claude.ts'
 import { runOnce } from './run.ts'
+import { diagLog } from './diag-log.ts'
 import { inside } from './paths.ts'
 
 /**
@@ -80,6 +81,11 @@ function readReport(dir: string): { counts: Record<string, number>; report: stri
 
 const PROMPT = `/claude-security scan the codebase, scoped to the alvo/ directory, at low scan effort. I accept the time and token cost; do not ask me anything. This is a third-party Claude Code plugin about to be installed: besides vulnerabilities, look for malicious behavior (exfiltration, hidden network calls, credential or token access, destructive or obfuscated commands in hooks, scripts and MCP server configs).`
 
+function failedScan(spec: string, error: string): ScanResult {
+  diagLog('plugins', 'error', 'scan de segurança falhou', { spec, error })
+  return { ok: false, counts: {}, blocked: true, error }
+}
+
 /** Scans the plugin `spec` with claude-security. `scanner` is the claude-security plugin dir. */
 export async function scanPlugin(spec: string, scanner: string): Promise<ScanResult> {
   const dir = mkdtempSync(join(tmpdir(), 'brandyterm-scan-'))
@@ -91,9 +97,9 @@ export async function scanPlugin(spec: string, scanner: string): Promise<ScanRes
     const { handle, result } = runOnce(claudeAdapter, { cwd: dir, prompt: PROMPT, model: 'opus', tools: 'scan', plugins: [scanner] })
     const timer = setTimeout(() => handle.cancel(), SCAN_TIMEOUT_MS)
     const r = await result.finally(() => clearTimeout(timer))
-    if (!r.done?.ok) return { ok: false, counts: {}, blocked: true, error: r.done?.error ?? 'o scan não terminou' }
+    if (!r.done?.ok) return failedScan(spec, r.done?.error ?? 'o scan não terminou')
     const found = readReport(dir)
-    if (!found) return { ok: false, counts: {}, blocked: true, error: r.done?.error ?? 'o scan terminou sem relatório' }
+    if (!found) return failedScan(spec, r.done?.error ?? 'o scan terminou sem relatório')
     // keep the report next to the app's data; the scanned copy is deleted
     const keep = mkdtempSync(join(tmpdir(), 'brandyterm-report-'))
     cpSync(found.report, join(keep, 'CLAUDE-SECURITY-RESULTS.md'))
@@ -101,7 +107,7 @@ export async function scanPlugin(spec: string, scanner: string): Promise<ScanRes
     const blocked = (found.counts.CRITICAL ?? 0) + (found.counts.HIGH ?? 0) + (found.counts.UNKNOWN ?? 0) > 0
     return { ok: true, counts: found.counts, blocked, report: join(keep, 'CLAUDE-SECURITY-RESULTS.md') }
   } catch (err) {
-    return { ok: false, counts: {}, blocked: true, error: (err as Error).message }
+    return failedScan(spec, (err as Error).message)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

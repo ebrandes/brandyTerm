@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { app } from 'electron'
 import type { UserPlugin, UserPluginsState } from '../shared/types.ts'
+import { diagLog, diagLogOnChange } from './diag-log.ts'
 import { OWN_PLUGIN_NAMES } from './plugins.ts'
 
 /**
@@ -33,7 +34,10 @@ const prefsFile = () => join(app.getPath('userData'), 'thread-plugins.json')
 function readJson(p: string): any {
   try {
     return JSON.parse(readFileSync(p, 'utf8'))
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      diagLogOnChange(`json:${p}`, 'plugins', 'warn', 'JSON ilegível', { file: p, error: String(error) })
+    }
     return null
   }
 }
@@ -70,7 +74,10 @@ function scan(): Found[] {
     if (OWN_PLUGIN_NAMES.has(name) || !Array.isArray(entries)) continue
     for (const e of entries) {
       const dir = String(e?.installPath ?? '')
-      if (!dir || !existsSync(join(dir, '.claude-plugin', 'plugin.json'))) continue
+      if (!dir || !existsSync(join(dir, '.claude-plugin', 'plugin.json'))) {
+        diagLogOnChange(`user:${key}:${dir}`, 'plugins', 'warn', 'plugin do usuário ignorado: sem .claude-plugin/plugin.json', { plugin: key, dir })
+        continue
+      }
       const projectPath = e.scope === 'user' ? undefined : String(e.projectPath ?? '')
       if (projectPath === '') continue
       out.push({
@@ -109,7 +116,8 @@ function personalDir(): string | null {
       symlinkSync(join(CLAUDE_HOME, p), link, process.platform === 'win32' ? 'junction' : 'dir')
     }
     return dir
-  } catch {
+  } catch (error) {
+    diagLogOnChange('skills:personal', 'skills', 'error', 'falha ao montar as skills pessoais', { dir, error: String(error) })
     return null
   }
 }
@@ -118,6 +126,9 @@ export function loadUserPlugins(): void {
   const saved = readJson(prefsFile())
   if (saved) prefs = { personal: saved.personal !== false, on: Array.isArray(saved.on) ? saved.on.map(String) : [] }
   found = scan()
+  diagLog('plugins', 'info', 'plugins do usuário lidos', {
+    found: found.map((f) => f.id), on: prefs.on, personal: prefs.personal
+  })
 }
 
 export function userPluginsState(): UserPluginsState {
@@ -134,7 +145,13 @@ export function userPluginsState(): UserPluginsState {
 export function setUserPlugin(id: string, on: boolean): void {
   if (id === 'personal') prefs.personal = on
   else prefs.on = on ? [...new Set([...prefs.on, id])] : prefs.on.filter((x) => x !== id)
-  writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2))
+  try {
+    writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2))
+  } catch (error) {
+    diagLog('plugins', 'error', 'falha ao salvar a escolha de plugins', { id, on, error })
+    throw error
+  }
+  diagLog('plugins', 'info', on ? 'plugin ligado nas threads' : 'plugin desligado nas threads', { id })
   found = scan()
 }
 

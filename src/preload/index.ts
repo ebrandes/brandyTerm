@@ -35,6 +35,7 @@ const api: BrandyApi = {
   cancelThread: (a) => ipcRenderer.invoke('thread:cancel', a),
   approveTool: (a) => ipcRenderer.invoke('thread:approve', a),
   resolveThread: (a) => ipcRenderer.invoke('thread:resolve', a),
+  retireThread: (a) => ipcRenderer.invoke('thread:retire', a),
   setAllowAll: (a) => ipcRenderer.invoke('thread:allowAll', a),
   listArchived: (ids) => ipcRenderer.invoke('archive:list', ids),
   reopenArchived: (a) => ipcRenderer.invoke('archive:reopen', a),
@@ -44,6 +45,7 @@ const api: BrandyApi = {
   openPort: (p) => ipcRenderer.invoke('process:open-port', p),
   installPlugin: (a) => ipcRenderer.invoke('plugin:install', a),
   openPluginReport: (id) => ipcRenderer.invoke('plugin:open-report', id),
+  openLogs: () => ipcRenderer.invoke('logs:open'),
   setUserPlugin: (a) => ipcRenderer.invoke('userPlugins:set', a),
   accounts: {
     activate: (id) => ipcRenderer.invoke('accounts:activate', id),

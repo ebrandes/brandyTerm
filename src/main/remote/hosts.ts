@@ -5,6 +5,7 @@ import { fromB64, toB64, type KeyPair } from '../../shared/remote/crypto.ts'
 import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustedDevice } from '../../shared/remote/machine.ts'
 import type { Socket } from '../../shared/remote/protocol.ts'
 import type { AppState } from '../../shared/types.ts'
+import { diagLog } from '../diag-log.ts'
 import type { Browse, BrowseHandle } from './browse.ts'
 import { HostAddresses } from './host-addresses.ts'
 import { pairWithHost } from './host-pair-client.ts'
@@ -156,10 +157,12 @@ export class RemoteHosts extends EventEmitter {
       s.close = () => { sockets.delete(s); close() }
       return s
     }
+    diagLog('remote', 'info', 'pareando com host', { address })
     const host = await pairWithHost(
       { dial, ownPub: own.pub, me: this.me(), setTimeout: this.setT, clearTimeout: this.clearT },
       address, code
     ).catch((e: unknown) => {
+      diagLog('remote', 'warn', 'pareamento com host falhou', { address, error: e instanceof Error ? e.message : String(e) })
       if (!(e instanceof Error) || e.message !== VERSION_MISMATCH) throw e
       // the name the list showed for that address, when it did
       throw new Error(updateText([...this.seen.values()].find(h => h.address === address)?.name))
@@ -168,6 +171,7 @@ export class RemoteHosts extends EventEmitter {
     if (existing) existing.address = address
     this.addresses.set(host.machine.id, address) // before trust.add: its 'change' makes sync() see the address
     this.deps.trust.add({ pub: host.pub, role: 'host', machineId: host.machine.id, name: host.machine.name, os: host.machine.os })
+    diagLog('remote', 'info', 'pareado com host', { host: host.machine.name, address })
     // a re-paired machine replaces its old key
     this.deps.trust.revokeOthers(host.machine.id, host.pub, 'host')
     this.sync()
@@ -237,6 +241,7 @@ export class RemoteHosts extends EventEmitter {
     const e = this.entries.get(id)
     if (!e) return
     this.entries.delete(id)
+    diagLog('remote', 'info', 'host removido', { host: e.device.name })
     this.lastState.delete(id)
     this.release(e)
   }
@@ -271,6 +276,7 @@ export class RemoteHosts extends EventEmitter {
     if (!e || !this.started || e.connecting || e.ch) return
     e.connecting = true
     const gen = ++e.gen
+    diagLog('remote', 'debug', 'conectando ao host', { host: e.device.name, address: e.address, attempt: e.attempt })
     let sock: Socket
     try { sock = this.deps.dial(e.address) } catch (err) { return this.failed(id, gen, err) }
     e.sock = sock
@@ -298,6 +304,7 @@ export class RemoteHosts extends EventEmitter {
     if (ch.peer.id !== e.device.machineId || toB64(fromB64(ch.peerPub)) !== e.device.pub) {
       e.error = 'identidade não confere'
       e.ch = ch
+      diagLog('remote', 'error', 'identidade do host não confere', { host: e.device.name, address: e.address })
       ch.close('identidade não confere')
       return
     }
@@ -305,6 +312,7 @@ export class RemoteHosts extends EventEmitter {
     e.online = true
     e.error = undefined
     e.attempt = 0
+    diagLog('remote', 'info', 'conectado ao host', { host: e.device.name, address: e.address })
     this.addresses.set(id, e.address)
     this.emit('hosts', this.list())
   }
@@ -314,7 +322,10 @@ export class RemoteHosts extends EventEmitter {
     if (!e || e.gen !== gen || e.ch !== ch) return
     e.ch = null
     e.connecting = false
-    if (e.online) e.since = new Date().toISOString()
+    if (e.online) {
+      e.since = new Date().toISOString()
+      diagLog('remote', 'info', 'desconectado do host', { host: e.device.name, address: e.address })
+    }
     e.online = false
     this.schedule(e, id)
     this.emit('hosts', this.list())
@@ -327,6 +338,8 @@ export class RemoteHosts extends EventEmitter {
     e.sock = null
     const msg = err instanceof Error ? err.message : String(err)
     e.error = msg === VERSION_MISMATCH ? updateText(e.device.name) : msg
+    // the first failure is news; the retries that follow it are not
+    diagLog('remote', e.attempt === 0 ? 'warn' : 'debug', 'falha ao conectar ao host', { host: e.device.name, address: e.address, attempt: e.attempt, error: msg })
     this.schedule(e, id)
     this.emit('hosts', this.list())
   }

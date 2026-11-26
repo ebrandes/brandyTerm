@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { PluginInfo } from '../shared/types.ts'
 import { resolveCli } from './adapters/proc.ts'
+import { diagLog, diagLogOnChange } from './diag-log.ts'
 import { rtkInfo } from './rtk.ts'
 import { describeCounts, scanPlugin } from './security.ts'
 
@@ -80,7 +81,8 @@ function bundled(w: Wanted): { dir: string; version: string } | null {
     if (!existsSync(manifest)) continue
     try {
       return { dir, version: String(JSON.parse(readFileSync(manifest, 'utf8')).version ?? 'incluído') }
-    } catch {
+    } catch (error) {
+      diagLogOnChange(`manifest:${manifest}`, 'plugins', 'warn', 'plugin.json inválido', { id: w.id, manifest, error: String(error) })
       return { dir, version: 'incluído' }
     }
   }
@@ -111,7 +113,15 @@ export function discoverPlugins(): PluginInfo[] {
     else note = w.optional ? 'opcional; clique para instalar' : 'não encontrado; rode npm run plugins'
     return { id: w.id, name: w.name, kind: w.kind, dir: best?.dir, version: best?.version, optional: !!w.optional, scanner: !!w.scanner, note }
   })
+  logLoaded(plugins)
   return [...plugins, rtkInfo()]
+}
+
+function logLoaded(plugins: PluginInfo[]): void {
+  const loaded = plugins.filter((p) => p.dir).map((p) => ({ id: p.id, version: p.version, dir: p.dir }))
+  diagLogOnChange('plugins:loaded', 'plugins', 'info', 'plugins carregados', { loaded })
+  const missing = plugins.filter((p) => !p.dir && !p.optional).map((p) => p.id)
+  if (missing.length) diagLogOnChange('plugins:missing', 'plugins', 'warn', 'plugins incluídos não encontrados', { missing, searched: bundledRoots() })
 }
 
 export type InstallResult = { ok: boolean; error?: string; review?: PluginInfo['review'] }
@@ -122,6 +132,20 @@ export type InstallResult = { ok: boolean; error?: string; review?: PluginInfo['
  * install until the user confirms with `force`.
  */
 export async function installPlugin(id: string, force = false): Promise<InstallResult> {
+  diagLog('plugins', 'info', 'instalação iniciada', { id, force })
+  try {
+    const result = await runInstall(id, force)
+    if (result.ok) diagLog('plugins', 'info', 'plugin instalado', { id, review: result.review?.summary })
+    else if (result.review?.blocked) diagLog('plugins', 'warn', 'instalação retida pela revisão de segurança', { id, review: result.review.summary })
+    else diagLog('plugins', 'error', 'instalação falhou', { id, error: result.error })
+    return result
+  } catch (error) {
+    diagLog('plugins', 'error', 'instalação falhou', { id, error })
+    throw error
+  }
+}
+
+async function runInstall(id: string, force: boolean): Promise<InstallResult> {
   const w = PLUGINS.find((p) => p.id === id)
   if (!w?.spec) return { ok: false, error: 'plugin desconhecido' }
   const cli = resolveCli('claude')

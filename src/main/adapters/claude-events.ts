@@ -1,6 +1,7 @@
 import { fileFromTool } from '../artifact-files.ts'
 import type { AgentEvent } from './types.ts'
 import { claudeAuth } from './auth.ts'
+import { skillLoads } from './skill-log.ts'
 
 /** Short one-line description of a tool call, for the thread's activity log and approval cards. */
 export function describeTool(name: string, input: Record<string, unknown> | undefined): string {
@@ -21,11 +22,13 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
   let lastCall = ''
   // Write/Edit calls waiting for their result: a denied or failed call makes no card
   const pendingFiles = new Map<string, { path: string; op: 'write' | 'edit' }>()
+  const skills = skillLoads()
   // Claude Code 2.1.x plans with TaskCreate/TaskUpdate; ids are sequential per session
   const tasks: { text: string; status: 'pending' | 'in_progress' | 'completed' }[] = []
   const emitTasks = () => onEvent({ kind: 'todos', items: tasks.map((t) => ({ ...t })) })
 
   const toolUse = (b: any) => {
+    skills.use(b)
     if (b.name === 'TaskCreate' && typeof b.input?.subject === 'string') {
       tasks.push({ text: b.input.subject, status: 'pending' })
       emitTasks()
@@ -78,6 +81,7 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
         }
       } else if (ev.type === 'user') {
         for (const b of Array.isArray(ev.message?.content) ? ev.message.content : []) {
+          skills.result(b)
           const file = b?.type === 'tool_result' ? pendingFiles.get(String(b.tool_use_id)) : undefined
           if (!file) continue
           pendingFiles.delete(String(b.tool_use_id))

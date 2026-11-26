@@ -10,6 +10,7 @@ export const SCOPED: Record<string, Where> = {
   'term:open': 'id', 'term:write': 'id', 'term:resize': 'id', 'term:kill': 'arg-or-id',
   'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
   'thread:resolve': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
+  'thread:retire': 'projectId',
   'artifact:read': 'projectId', 'artifact:diff': 'projectId', 'artifact:open': 'projectId', 'process:start': 'projectId',
   'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId',
   'attach:read': 'projectId', 'artifact:bytes': 'projectId',
@@ -19,7 +20,7 @@ export const SCOPED: Record<string, Where> = {
 
 /** Channels known to name no project (archive:list names several, in an array). Anything not here or in SCOPED is refused by the host. */
 export const UNSCOPED = new Set([
-  'state:get', 'archive:list', 'settings:set', 'project:set-remote-hidden', 'plugin:install', 'plugin:open-report',
+  'state:get', 'archive:list', 'settings:set', 'project:set-remote-hidden', 'plugin:install', 'plugin:open-report', 'logs:open',
   'project:open-folder', 'attach:open', 'process:open-port', 'clipboard:read', 'clipboard:write',
   'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
   'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',

@@ -11,7 +11,9 @@ import { PairingWindow } from '../../shared/remote/pairing.ts'
 import { acceptChannel, type SecureChannel } from '../../shared/remote/channel.ts'
 import type { Socket } from '../../shared/remote/protocol.ts'
 import type { AppState } from '../../shared/types.ts'
+import { diagLog, diagLogOnChange } from '../diag-log.ts'
 import type { CallCtx } from '../rpc/registry.ts'
+import { deviceTag, errorText, pairOutcome } from './diag.ts'
 import { authorize, filterState } from './host-filter.ts'
 import { handlePair, type PairingCtx } from './host-pairing.ts'
 import { adapterDescriptions, loadAdapterDescriptions } from './adapters.ts'
@@ -86,6 +88,7 @@ export class HostServer extends EventEmitter {
     this.deps.trust.on('change', this.onTrust)
     this.offs.push(() => this.deps.trust.off('change', this.onTrust))
     this.announce()
+    diagLog('remote', 'info', 'servidor ouvindo', { port: this.port() })
   }
 
   /** (Re)announces the host on the LAN when it has no announcement yet or the machine was renamed. */
@@ -106,6 +109,7 @@ export class HostServer extends EventEmitter {
   async stop(): Promise<void> {
     if (this.stopped) return
     this.stopped = true
+    diagLog('remote', 'info', 'servidor parado', { clients: this.live.size })
     if (this.pushTimer) clearTimeout(this.pushTimer)
     this.pushTimer = null
     for (const off of this.offs.splice(0)) off()
@@ -132,10 +136,12 @@ export class HostServer extends EventEmitter {
 
   openPairing(): string {
     this.code = this.window.open()
+    diagLog('remote', 'info', 'pareamento aberto')
     return this.code
   }
 
   closePairing(): void {
+    if (this.code !== null) diagLog('remote', 'info', 'pareamento fechado pelo host')
     this.window.close()
     this.code = null
   }
@@ -148,11 +154,16 @@ export class HostServer extends EventEmitter {
     const accept = this.deps.acceptAddress ?? defaultAccept
     let ok = false
     try { ok = accept(sock.localAddress ?? '', sock.remoteAddress ?? '') } catch { ok = false }
+    if (!ok) diagLogOnChange(`lan:${sock.remoteAddress}`, 'remote', 'warn', 'conexão recusada: fora da rede local', { address: sock.remoteAddress, local: sock.localAddress })
     if (!ok || this.stopped) sock.destroy()
   }
 
   private upgrade(wss: WebSocketServer, req: http.IncomingMessage, sock: Duplex, head: Buffer): void {
-    if (this.stopped || this.unauth.size >= MAX_UNAUTH) { sock.destroy(); return }
+    if (this.stopped || this.unauth.size >= MAX_UNAUTH) {
+      diagLog('remote', 'warn', 'conexão recusada', { reason: this.stopped ? 'servidor parado' : 'muitas conexões sem autenticação', address: req.socket.remoteAddress })
+      sock.destroy()
+      return
+    }
     wss.handleUpgrade(req, sock, head, ws => wss.emit('connection', ws, req))
   }
 
@@ -185,6 +196,7 @@ export class HostServer extends EventEmitter {
     // single-use socket: close politely, then cut it if the peer does not answer
     ws.close()
     setTimeout(() => ws.terminate(), 1000).unref()
+    pairOutcome(res)
     if (res.paired) this.emit('change')
   }
 
@@ -199,15 +211,27 @@ export class HostServer extends EventEmitter {
       ch.onPush(() => {})
       if (this.stopped) return ch.close('servidor parado')
       // revoked while the handshake was in flight
-      if (!trust.get(ch.peerPub, 'client')) return ch.close(REMOVED)
+      if (!trust.get(ch.peerPub, 'client')) {
+        diagLog('remote', 'warn', 'conexão encerrada: dispositivo removido', { device: deviceTag(ch.peerPub) })
+        return ch.close(REMOVED)
+      }
+      const who = { device: deviceTag(ch.peerPub), name: ch.peer.name, os: ch.peer.os }
+      diagLog('remote', 'info', 'dispositivo conectado', who)
       this.unauth.delete(ws)
       this.live.add(entry)
-      ch.onClose(() => { this.live.delete(entry); this.emit('change') })
+      ch.onClose(reason => {
+        diagLog('remote', 'info', 'dispositivo desconectado', { ...who, reason })
+        this.live.delete(entry)
+        this.emit('change')
+      })
       trust.touch(ch.peerPub, entry.since)
       // the client starts from the current state, not from the next change
       ch.push('state', filterState(this.deps.state()))
       this.emit('change')
-    }, () => ws.terminate())
+    }, (error: unknown) => {
+      diagLog('remote', 'warn', 'autenticação falhou', { error: errorText(error) })
+      ws.terminate()
+    })
   }
 
   private async dispatch(ch: SecureChannel, channel: string, arg: unknown): Promise<unknown> {
@@ -219,10 +243,16 @@ export class HostServer extends EventEmitter {
     const state = this.deps.state()
     if (channel === 'state:get') return filterState(state)
     const auth = authorize(channel, arg, state)
-    if (!auth.ok) throw new Error(auth.error)
-    this.deps.guard.before(channel, auth.arg, state)
-    const out = await this.deps.invoke(channel, auth.arg, { remote: { deviceId: ch.peerPub, terminal: dev.terminal } })
-    return this.deps.guard.after(channel, auth.arg, out, this.deps.state())
+    try {
+      if (!auth.ok) throw new Error(auth.error)
+      this.deps.guard.before(channel, auth.arg, state)
+      const out = await this.deps.invoke(channel, auth.arg, { remote: { deviceId: ch.peerPub, terminal: dev.terminal } })
+      return this.deps.guard.after(channel, auth.arg, out, this.deps.state())
+    } catch (error) {
+      const msg = auth.ok ? 'chamada falhou' : 'chamada recusada'
+      diagLog('remote', 'warn', msg, { channel, device: deviceTag(ch.peerPub), error: errorText(error) })
+      throw error
+    }
   }
 
   private readonly onTrust = (): void => {

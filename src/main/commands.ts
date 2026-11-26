@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { SlashCommand } from '../shared/types.ts'
+import { diagLogOnChange } from './diag-log.ts'
 
 /**
  * Slash commands of the composer. `/clear`, `/compact` and `/help` are handled by the
@@ -63,6 +64,10 @@ function scan(root: string, commandsDirs: string[], prefix: string, source: Slas
   for (const s of entries(join(root, 'skills'), true)) {
     const fm = frontmatter(join(root, 'skills', s, 'SKILL.md'))
     if (fm.name || existsSync(join(root, 'skills', s, 'SKILL.md'))) out.push({ name: name(fm.name || s), description: short(fm.description), source, skill: true })
+    else {
+      const dir = join(root, 'skills', s)
+      diagLogOnChange(`skill:${dir}`, 'skills', 'warn', 'pasta de skill sem SKILL.md legível', { dir })
+    }
   }
   for (const dir of commandsDirs) {
     for (const f of entries(join(root, dir), false)) {
@@ -76,8 +81,11 @@ function pluginCommands(dir: string): SlashCommand[] {
   let manifest: { name?: string; commands?: string | string[] } = {}
   try {
     manifest = JSON.parse(readFileSync(join(dir, '.claude-plugin', 'plugin.json'), 'utf8'))
-  } catch {
+  } catch (error) {
     // no manifest: use the folder name
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      diagLogOnChange(`manifest:${dir}`, 'skills', 'warn', 'plugin.json ilegível', { dir, error: String(error) })
+    }
   }
   const cmds = manifest.commands ? [manifest.commands].flat() : ['commands']
   return scan(dir, cmds.map((c) => c.replace(/^\.\//, '').replace(/\/$/, '')), manifest.name || basename(dir), 'plugin')
@@ -88,7 +96,10 @@ export function discoverCommands(pluginDirs: string[], projectPath: string | nul
   const all = [...APP_COMMANDS, ...pluginDirs.flatMap(pluginCommands)]
   if (projectPath) all.push(...scan(join(projectPath, '.claude'), ['commands'], '', 'project'))
   const seen = new Set<string>()
-  return all.filter((c) => !seen.has(c.name) && seen.add(c.name))
+  const unique = all.filter((c) => !seen.has(c.name) && seen.add(c.name))
+  const names = unique.filter((c) => c.skill).map((c) => c.name)
+  diagLogOnChange(`discovery:${projectPath ?? ''}`, 'skills', 'info', 'skills descobertas', { project: projectPath, pluginDirs, count: names.length, names })
+  return unique
 }
 
 export function helpText(cmds: SlashCommand[]): string {

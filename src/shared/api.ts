@@ -48,6 +48,8 @@ export interface BrandyApi {
   approveTool(args: { projectId: string; threadId: string; id: string; decision: ApprovalDecision }): Promise<void>
   /** mark a thread with something pending as resolved */
   resolveThread(args: { projectId: string; threadId: string }): Promise<void>
+  /** sets aside an interrupted or failed thread ("descartada"): no longer pending */
+  retireThread(args: { projectId: string; threadId: string }): Promise<void>
   setAllowAll(args: { projectId: string; threadId: string; on: boolean }): Promise<void>
   /** archived threads of these projects, newest first (read on demand, never pushed with the state) */
   listArchived(projectIds: string[]): Promise<ArchivedThreadInfo[]>
@@ -63,6 +65,8 @@ export interface BrandyApi {
   /** installs an optional plugin through Claude's marketplace */
   installPlugin(args: { id: string; force?: boolean }): Promise<void>
   openPluginReport(id: string): Promise<void>
+  /** opens this machine's diagnostic logs folder (mcp, plugins, skills, remote) */
+  openLogs(): Promise<void>
   /** turns one of the user's own Claude Code plugins (or 'personal' skills) on/off for threads */
   setUserPlugin(args: { id: string; on: boolean }): Promise<void>
   /** Claude accounts: which subscription pays, limits, automatic switch */
