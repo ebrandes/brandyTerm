@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { marketplaceOf, matchesPlugin, viewPlugins } from './plugin-list.ts'
+import { countLine, marketplaceOf, matchesPlugin, viewPlugins } from './plugin-list.ts'
 
 const plugin = (n: number, on = false, market = 'oficial') => ({ id: `p${n}@${market}`, name: `plugin-${n}`, on })
 const many = (count: number, onAt: number[] = []) => Array.from({ length: count }, (_, i) => plugin(i, onAt.includes(i)))
@@ -55,4 +55,10 @@ test('expanded shows all; searching shows every match and no toggle', () => {
   const none = viewPlugins(many(25), 'nada', false)
   assert.equal(none.matches, 0)
   assert.equal(none.searchable, true)
+})
+
+test('countLine: skills, commands and agents, or "sem skills"', () => {
+  assert.equal(countLine({ skills: 15, commands: 0, agents: 2 }), '15 skills · 2 agentes')
+  assert.equal(countLine({ skills: 1, commands: 1, agents: 1 }), '1 skill · 1 comando · 1 agente')
+  assert.equal(countLine({ skills: 0, commands: 0, agents: 0 }), 'sem skills')
 })

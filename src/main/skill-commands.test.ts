@@ -136,6 +136,15 @@ test('an invalid library setting becomes a note, and the copy on disk is used', 
   assert.ok(f.started[0].prompt.includes('impeccable@impeccable'))
 })
 
+test('after the library update the panel hears about it, even when the update failed', (t) => {
+  const f = setup(t, { pull: 1 })
+  const paths = skillsPaths(join(f.p.path!, '..', 'ud'))
+  let synced = 0
+  setSkillEnv(() => ({ paths, library: 'o/lib', git: () => ({ code: 1, out: '' }), onSync: () => synced++ }))
+  runSkillCommand(f.e, f.p, { name: 'skill-init', args: '' }, [])
+  assert.equal(synced, 1)
+})
+
 test('help lists the three skill commands', () => {
   const help = helpText(APP_COMMANDS)
   for (const n of ['skill-init', 'skill-refresh', 'skill-install']) assert.ok(help.includes(`/${n}\``), n)

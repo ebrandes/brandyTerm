@@ -1,5 +1,13 @@
+import { plural } from './side-summary.ts'
+
 /** Which of the user's plugins the sidebar "Skills" section shows: search, enabled first, a row limit. */
 export const PLUGIN_LIMIT = 8
+
+/** `15 skills · 2 agentes`; nothing at all → `sem skills`. */
+export function countLine(p: { skills: number; commands: number; agents: number }): string {
+  const parts = [p.skills && plural(p.skills, 'skill', 'skills'), p.commands && plural(p.commands, 'comando', 'comandos'), p.agents && plural(p.agents, 'agente', 'agentes')]
+  return parts.filter(Boolean).join(' · ') || 'sem skills'
+}
 
 interface Listed {
   id: string

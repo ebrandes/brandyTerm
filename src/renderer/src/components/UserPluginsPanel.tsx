@@ -1,23 +1,12 @@
 import { useState } from 'react'
 import type { UserPlugin, UserPluginsState } from '../types'
 import { api } from '../api'
-import { plural } from '../side-summary'
-import { viewPlugins } from '../plugin-list'
+import { countLine as summary, viewPlugins } from '../plugin-list'
 import { SideSection } from './SideSection'
+import { Toggle } from './Toggle'
 import './userplugins.css'
 
-function summary(p: Pick<UserPlugin, 'skills' | 'commands' | 'agents'>): string {
-  const parts = [p.skills && plural(p.skills, 'skill', 'skills'), p.commands && plural(p.commands, 'comando', 'comandos'), p.agents && plural(p.agents, 'agente', 'agentes')]
-  return parts.filter(Boolean).join(' · ') || 'sem skills'
-}
-
-function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: (on: boolean) => void }) {
-  return (
-    <button className={`up-toggle${on ? ' on' : ''}`} role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}>
-      <span />
-    </button>
-  )
-}
+export const HOOKS_TIP = 'hooks: rodam em toda thread e podem mudar o estilo das respostas.'
 
 function Row({ p }: { p: UserPlugin }) {
   const tip = [
@@ -33,8 +22,7 @@ function Row({ p }: { p: UserPlugin }) {
       <span className="up-text">
         <span className="up-name">
           {p.name}
-          {p.scope === 'project' && <span className="up-tag">{p.project}</span>}
-          {p.hooks && <span className="up-tag warn">hooks</span>}
+          {p.hooks && <span className="up-tag warn" title={HOOKS_TIP}>hooks</span>}
         </span>
         <span className="up-sub">{summary(p)}</span>
       </span>

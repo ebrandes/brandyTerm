@@ -1,5 +1,8 @@
 import type { MachineInfo, MachineOs } from './remote/machine.ts'
 import type { ConnectorsState, ThreadLogin } from './connectors.ts'
+import type { ProjectSkillsView } from './skills.ts'
+
+export type { CatalogItem, ProjectSkillsView, SkillRow, SkillsList } from './skills.ts'
 export type AgentId = 'claude' | 'codex' | 'antigravity'
 export type ThreadState = 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'interrupted' | 'cancelled'
 export type Effort = 'low' | 'medium' | 'high'
@@ -264,29 +267,6 @@ export interface AgentInfo {
   note: string
 }
 
-/** An entry of the skills library catalog (`biblioteca/catalogo.json`). */
-export interface CatalogItem {
-  id: string
-  tipo: 'plugin' | 'skill'
-  descricao: string
-  tags: string[]
-  /** in every project unless the list puts it in `sem` */
-  sempre?: boolean
-  /** never copied, staged or scanned off-machine */
-  corporativo?: boolean
-  plataformas?: ('mac' | 'win')[]
-  /** `dono/repo` for `claude plugin marketplace add` when the store isn't known yet */
-  loja?: string
-}
-
-/** A project's skills list (`<projeto>/.brandyterm/skills.json`). */
-export interface SkillsList {
-  versao: 1
-  plugins: { id: string; ref?: string }[]
-  skills: string[]
-  sem: string[]
-}
-
 /** A plugin from the user's own Claude Code install that threads may load. */
 export interface UserPlugin {
   id: string
@@ -374,6 +354,8 @@ export interface AppState {
   plugins: PluginInfo[]
   accounts?: AccountsState
   userPlugins?: UserPluginsState
+  /** projectId -> its skills panel (local projects with a folder) */
+  projectSkills?: Record<string, ProjectSkillsView>
   settings?: AppSettings
   machine?: MachineInfo
   connectors?: ConnectorsState

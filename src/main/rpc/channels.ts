@@ -40,6 +40,10 @@ export const RULES = {
   'term:resize': 'terminal',
   'term:kill': 'terminal',
   'settings:set': 'deny',
+  // the switch can install a plugin, and the library is this machine's
+  'skills:toggle': 'deny',
+  'skills:installMissing': 'deny',
+  'skills:setLibrary': 'deny',
   // only the owner decides which projects other machines may see
   'project:set-remote-hidden': 'deny',
   'plugin:install': 'deny',

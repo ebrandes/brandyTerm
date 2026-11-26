@@ -15,7 +15,8 @@ export const SCOPED: Record<string, Where> = {
   'process:stop': 'projectId', 'process:remove': 'projectId', 'attach:save': 'projectId',
   'attach:read': 'projectId', 'artifact:bytes': 'projectId',
   'project:rename': 'projectId', 'project:archive': 'projectId', 'project:clear-context': 'projectId',
-  'project:reveal': 'projectId'
+  'project:reveal': 'projectId',
+  'skills:toggle': 'projectId', 'skills:installMissing': 'projectId'
 }
 
 /** Channels known to name no project (archive:list names several, in an array). Anything not here or in SCOPED is refused by the host. */
@@ -28,7 +29,8 @@ export const UNSCOPED = new Set([
   'remote:revoke', 'remote:set-terminal', 'remote:discovered', 'remote:pair', 'remote:rename', 'remote:open-bytes',
   'remote:discover',
   'remote:status',
-  'fs:browse', 'project:add-path'
+  'fs:browse', 'project:add-path',
+  'skills:setLibrary'
 ])
 
 /** The project id a scoped call refers to; null when the channel is unscoped or the id is not a string. */

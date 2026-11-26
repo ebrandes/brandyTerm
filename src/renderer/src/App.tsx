@@ -149,6 +149,7 @@ export function App() {
         plugins={state.plugins}
         accounts={state.accounts}
         userPlugins={state.userPlugins}
+        projectSkills={state.projectSkills?.[project.id]}
         connectors={state.connectors}
         machine={state.machine}
         settings={state.settings}

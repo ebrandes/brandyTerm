@@ -16,6 +16,8 @@ export interface SkillEnv {
   /** the skillsLibrary setting: `dono/repo` or an https URL; unset → the default library */
   library?: string
   git?: GitRun
+  /** the library was just updated (or tried to be): the skills panels refresh */
+  onSync?: () => void
 }
 
 let env: (() => SkillEnv) | null = null
@@ -60,6 +62,7 @@ export function runSkillCommand(e: Engine, p: Project, cmd: { name: string; args
   const s = env?.()
   if (!s) return note('Biblioteca de skills indisponível.')
   for (const aviso of refreshLibrary(s)) note(aviso, false)
+  s.onSync?.()
   const cat = readCatalog(s.paths.lib)
   if (cat.erro) return note(`${cat.erro}: corrija a biblioteca antes de mudar a lista.`)
   const cur = readList(p.path)

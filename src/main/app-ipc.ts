@@ -5,6 +5,8 @@ import type { Engine } from './engine.ts'
 import { discoverPlugins, installPlugin } from './plugins.ts'
 import { validAttachments } from './attachments.ts'
 import { setUserPlugin, userPluginsState } from './user-plugins.ts'
+import { registerSkillsIpc } from './skills-ipc.ts'
+import { refreshSkills } from './skills/wiring.ts'
 import { updateSettings } from './settings.ts'
 import { registry } from './rpc/registry.ts'
 import { ruleOf } from './rpc/channels.ts'
@@ -100,6 +102,9 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
   registry.add('userPlugins:set', (a: { id: string; on: boolean }) => {
     setUserPlugin(String(a.id), !!a.on)
     engine.state.userPlugins = userPluginsState()
+    // projects without a list follow thread-plugins.json
+    refreshSkills(engine)
     pushState()
   }, ruleOf('userPlugins:set'))
+  registerSkillsIpc(engine, pushState)
 }

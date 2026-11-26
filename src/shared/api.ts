@@ -69,6 +69,11 @@ export interface BrandyApi {
   openLogs(): Promise<void>
   /** turns one of the user's own Claude Code plugins (or 'personal' skills) on/off for threads */
   setUserPlugin(args: { id: string; on: boolean }): Promise<void>
+  /** the skills panel: one item on or off in this project's list (a missing plugin gets installed) */
+  toggleSkill(args: { projectId: string; id: string; on: boolean }): Promise<{ ok: boolean; erro?: string }>
+  installMissingSkills(args: { projectId: string }): Promise<{ ok: boolean; erro?: string }>
+  /** `dono/repo` or an https URL; empty: the default library */
+  setSkillsLibrary(args: { repo: string }): Promise<{ ok: boolean; erro?: string }>
   /** Claude accounts: which subscription pays, limits, automatic switch */
   accounts: {
     activate(id: string): Promise<void>

@@ -27,9 +27,7 @@ import { bindIpc } from './rpc/ipc.ts'
 import { configureDiagLog } from './diag-log.ts'
 import { startConnectors } from './connectors/index.ts'
 import { registerConnectorsIpc } from './connectors/connectors-ipc.ts'
-import { appSettings } from './settings.ts'
-import { setSkillEnv } from './skill-commands.ts'
-import { skillsPaths } from './skills/paths.ts'
+import { refreshSkills, startSkills } from './skills/wiring.ts'
 
 const isMac = process.platform === 'darwin'
 
@@ -77,6 +75,11 @@ function createWindow(): void {
   })
 
   win.once('ready-to-show', () => win?.show())
+  // a skills.json edited outside the app shows when the user comes back
+  win.on('focus', () => {
+    refreshSkills(engine)
+    pushState()
+  })
   win.on('closed', () => {
     win = null
   })
@@ -148,8 +151,8 @@ app.whenReady().then(async () => {
     engine, attachmentsRoot, rootOf: projectRoot, userData: () => app.getPath('userData'),
     hiddenRoots: () => engine.state.projects.filter((p) => p.remoteHidden && p.path).map((p) => p.path as string)
   })
-  setSkillEnv(() => ({ paths: skillsPaths(app.getPath('userData')), library: appSettings().skillsLibrary }))
-  const connectors = await startConnectors({ engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents })
+  const skills = startSkills(engine)
+  const connectors = await startConnectors({ engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents, ...skills })
   app.once('before-quit', () => void connectors.stop())
   registerConnectorsIpc(connectors.deps)
   bindIpc(registry)

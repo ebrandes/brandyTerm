@@ -47,6 +47,9 @@ const api: BrandyApi = {
   openPluginReport: (id) => ipcRenderer.invoke('plugin:open-report', id),
   openLogs: () => ipcRenderer.invoke('logs:open'),
   setUserPlugin: (a) => ipcRenderer.invoke('userPlugins:set', a),
+  toggleSkill: (a) => ipcRenderer.invoke('skills:toggle', a),
+  installMissingSkills: (a) => ipcRenderer.invoke('skills:installMissing', a),
+  setSkillsLibrary: (a) => ipcRenderer.invoke('skills:setLibrary', a),
   accounts: {
     activate: (id) => ipcRenderer.invoke('accounts:activate', id),
     setAuto: (on) => ipcRenderer.invoke('accounts:auto', on),

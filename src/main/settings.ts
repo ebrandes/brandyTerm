@@ -44,6 +44,13 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   return settings
 }
 
+/** The skills library repo (unset: the default). Only skills:setLibrary calls it, after checking the repo and moving the clone. */
+export function setSkillsLibrary(repo: string | undefined): AppSettings {
+  settings = { ...settings, skillsLibrary: repo?.trim() || undefined }
+  save()
+  return settings
+}
+
 /** a project removed from the app: its lastSeen entry goes, and it is no longer the one reopened at startup */
 export function forgetProjectSettings(projectId: string, lastSeen: Record<string, string>): AppSettings {
   const next: AppSettings = { ...settings, lastSeen }

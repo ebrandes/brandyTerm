@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Download, FolderPlus, Loader2 } from 'lucide-react'
-import type { AccountsState, AgentInfo, AppSettings, PluginInfo, Project, UserPluginsState } from '../types'
+import type { AccountsState, AgentInfo, AppSettings, PluginInfo, Project, ProjectSkillsView, UserPluginsState } from '../types'
+import { DEFAULT_LIBRARY } from '../../../shared/skills.ts'
 import type { ConnectorsState } from '../../../shared/connectors.ts'
 import type { MachineInfo } from '../../../shared/remote/machine.ts'
 import { UserPluginsPanel } from './UserPluginsPanel'
+import { ProjectSkillsPanel } from './ProjectSkillsPanel'
 import { AccountsPanel } from './AccountsPanel'
 import { ProjectRow, type ProjectAsk } from './ProjectRow'
 import { ArchivedProjects } from './ArchivedProjects'
@@ -25,6 +27,8 @@ interface Props {
   plugins: PluginInfo[]
   accounts?: AccountsState
   userPlugins?: UserPluginsState
+  /** the skills panel of the active project (a local project with a folder) */
+  projectSkills?: ProjectSkillsView
   connectors?: ConnectorsState
   /** this machine and the app settings (remote access) */
   machine?: MachineInfo
@@ -80,7 +84,7 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, connectors, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
+export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, projectSkills, connectors, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
   const grouped = showGroups(groups)
   const viewed = projects.find((p) => p.id === activeId)
@@ -132,7 +136,11 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
 
       <ConnectorsSection state={connectors} projects={projects} active={viewed} viewing={viewed?.machine?.remote ? viewed.machine : undefined} />
 
-      {userPlugins && <UserPluginsPanel state={userPlugins} />}
+      {projectSkills && viewed?.path ? (
+        <ProjectSkillsPanel view={projectSkills} projectId={viewed.id} projectName={viewed.name} library={settings?.skillsLibrary ?? DEFAULT_LIBRARY} />
+      ) : (
+        userPlugins && <UserPluginsPanel state={userPlugins} />
+      )}
 
       <RemotePanel machine={machine} settings={settings} />
     </aside>

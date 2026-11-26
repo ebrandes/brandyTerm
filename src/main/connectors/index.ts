@@ -2,14 +2,14 @@
 import type { WebContents } from 'electron'
 import type { Engine } from '../engine.ts'
 import type { RemoteHosts } from '../remote/hosts.ts'
-import { bootConnectors, type Connectors } from './boot.ts'
+import { bootConnectors, type BootOpts, type Connectors } from './boot.ts'
 import { makeRunners } from './connector-runners.ts'
 import { safeCipher } from './safe-cipher.ts'
 
 export type { ConnectorDeps } from './boot.ts'
 
 /** Never throws: if startup fails, the app opens with no connectors and the panel's channels refuse. */
-export function startConnectors(d: {
+export function startConnectors(d: Pick<BootOpts, 'skills' | 'isSkillsThread'> & {
   engine: Engine
   userData: string
   hosts?: RemoteHosts

@@ -1,10 +1,11 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { DEFAULT_LIBRARY } from '../../shared/skills.ts'
+
+export { DEFAULT_LIBRARY }
 
 export type GitRun = (args: string[], cwd: string) => { code: number; out: string }
-
-export const DEFAULT_LIBRARY = 'ebrandes/claude-kit'
 
 /** Real git: never prompts for credentials, gives up after two minutes. */
 export const realGit: GitRun = (args, cwd) => {
@@ -39,6 +40,25 @@ export function syncLibrary(url: string, dir: string, git: GitRun = realGit): { 
   mkdirSync(parent, { recursive: true })
   if (git(['clone', '--depth', '50', url, dir], parent).code === 0) return { ok: true }
   return { ok: false, aviso: 'Biblioteca indisponível: skills da biblioteca ficam como "falta instalar".' }
+}
+
+const sameRepo = (a: string, b: string) => a.trim().replace(/\/+$/, '').replace(/\.git$/, '') === b.trim().replace(/\/+$/, '').replace(/\.git$/, '')
+
+/**
+ * Points the library at `url`. A clone of another repo (or one without origin) is moved to
+ * `<dir>-antiga-<ms>` and kept, never deleted: it may hold unpushed commits. Then it syncs.
+ */
+export function switchLibrary(url: string, dir: string, git: GitRun = realGit): { ok: boolean; aviso?: string; antiga?: string } {
+  let antiga: string | undefined
+  if (existsSync(join(dir, '.git'))) {
+    const cur = git(['-C', dir, 'remote', 'get-url', 'origin'], dir)
+    if (cur.code !== 0 || !sameRepo(cur.out, url)) {
+      antiga = `${dir}-antiga-${Date.now()}`
+      renameSync(dir, antiga)
+    }
+  }
+  const r = syncLibrary(url, dir, git)
+  return antiga ? { ...r, antiga } : r
 }
 
 /** Stages `paths` and commits them; `false` when nothing changed (or the commit failed). */

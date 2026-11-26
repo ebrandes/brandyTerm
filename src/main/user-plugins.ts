@@ -168,6 +168,12 @@ export function installedMap(): Map<string, string> {
   return out
 }
 
+/** Plain ids that thread-plugins.json turns on in `projectPath`: what its threads get without a list. */
+export function fallbackOn(projectPath: string): Set<string> {
+  const on = found.filter((f) => prefs.on.includes(f.id) && (!f.projectPath || f.projectPath === projectPath))
+  return new Set(on.map((f) => f.id.split('#')[0]))
+}
+
 /**
  * Plugin dirs for a thread in `projectPath`. A project with `.brandyterm/skills.json` gets
  * what its list resolves to; one without a list (or with a broken one) keeps the old
