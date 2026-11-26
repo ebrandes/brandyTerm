@@ -9,6 +9,12 @@ export function countLine(p: { skills: number; commands: number; agents: number 
   return parts.filter(Boolean).join(' · ') || 'sem skills'
 }
 
+/** The project Skills header: a warning while something on is missing (seen even collapsed). */
+export function skillsSummary(v: { rows: { on: boolean }[]; missing: string[] }): string {
+  if (v.missing.length) return `⚠ ${v.missing.length} faltando`
+  return `${v.rows.filter((r) => r.on).length}/${v.rows.length} no projeto`
+}
+
 interface Listed {
   id: string
   name: string

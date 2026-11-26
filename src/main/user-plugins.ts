@@ -180,15 +180,17 @@ export function fallbackOn(projectPath: string): Set<string> {
  * behaviour: the plugins turned on in thread-plugins.json plus "pessoal".
  */
 export function userPluginDirs(projectPath: string | null): string[] {
+  const dirs = found.filter((f) => prefs.on.includes(f.id) && (!f.projectPath || f.projectPath === projectPath)).map((f) => f.dir)
+  const personal = prefs.personal ? personalDir() : null
+  const old = personal ? [personal, ...dirs] : dirs
   if (projectPath) {
     try {
-      const own = projectDirs(projectPath, skillsPaths(app.getPath('userData')), installedMap(), process.platform)
+      // without a readable catalog the list's base is unknown: the old set comes along
+      const own = projectDirs(projectPath, skillsPaths(app.getPath('userData')), installedMap(), process.platform, old)
       if (own) return own
     } catch (error) {
       diagLogOnChange(`skills:project:${projectPath}`, 'skills', 'error', 'falha ao montar as skills do projeto', { projectPath, error: String(error) })
     }
   }
-  const dirs = found.filter((f) => prefs.on.includes(f.id) && (!f.projectPath || f.projectPath === projectPath)).map((f) => f.dir)
-  const own = prefs.personal ? personalDir() : null
-  return own ? [own, ...dirs] : dirs
+  return old
 }

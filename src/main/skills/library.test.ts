@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { commitLibrary, libraryUrl, pushLibrary, switchLibrary, syncLibrary, type GitRun } from './library.ts'
 
 function fakeGit(codes: Record<string, number> = {}) {
@@ -81,11 +81,15 @@ test('pushLibrary reports failure', () => {
   assert.equal(pushLibrary('/lib', fakeGit({ push: 1 }).git).ok, false)
 })
 
-function originGit(origin: string | null) {
+function originGit(origin: string | null, cloneFails = false) {
   const calls: string[][] = []
   const git: GitRun = (args) => {
     calls.push(args)
     if (args.includes('get-url')) return origin === null ? { code: 2, out: 'error: No such remote' } : { code: 0, out: origin }
+    if (args[0] === 'clone') {
+      if (cloneFails) return { code: 128, out: 'fatal: repository not found' }
+      mkdirSync(join(args.at(-1)!, '.git'), { recursive: true })
+    }
     return { code: 0, out: '' }
   }
   return { git, calls }
@@ -109,8 +113,24 @@ test('switchLibrary: a clone of another repo is kept aside and the new one is cl
   assert.equal(r.ok, true)
   assert.match(r.antiga ?? '', /biblioteca-antiga-\d+$/)
   assert.ok(existsSync(join(r.antiga!, 'meu.txt')))
-  assert.equal(existsSync(dir), false)
-  assert.deepEqual(calls.at(-1), ['clone', '--depth', '50', 'https://github.com/novo/lib.git', dir])
+  // the new clone went to a side folder first, then took the library's place
+  assert.match(calls.at(-1)!.at(-1)!, /biblioteca-nova-\d+$/)
+  assert.ok(existsSync(join(dir, '.git')))
+  assert.equal(existsSync(join(dir, 'meu.txt')), false)
+  assert.deepEqual(readdirSync(root).sort(), ['biblioteca', basename(r.antiga!)].sort())
+})
+
+test('switchLibrary: when the new repo fails to clone, the old library stays where it was', (t) => {
+  const root = tmp(t)
+  const dir = join(root, 'biblioteca')
+  mkdirSync(join(dir, '.git'), { recursive: true })
+  writeFileSync(join(dir, 'meu.txt'), 'não perder')
+  const r = switchLibrary('https://github.com/errado/lib.git', dir, originGit('https://github.com/velho/lib.git', true).git)
+  assert.equal(r.ok, false)
+  assert.equal(r.antiga, undefined)
+  assert.match(r.aviso ?? '', /errado\/lib/)
+  assert.ok(existsSync(join(dir, 'meu.txt')))
+  assert.deepEqual(readdirSync(root), ['biblioteca'])
 })
 
 test('switchLibrary: a clone without origin is also kept aside; no clone just clones', (t) => {

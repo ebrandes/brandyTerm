@@ -92,6 +92,14 @@ test('a broken list shows the error, no list, and the fallback set', () => {
   assert.equal(projectView(input({ aviso: 'sem rede' })).aviso, 'sem rede')
 })
 
+test('a list without a readable catalog shows the fallback set on too, as the threads get it', () => {
+  const v = projectView(input({ itens: [], list: list({ plugins: [{ id: 'alfa@loja' }] }), fallbackOn: new Set(['fora@x']), semCatalogo: true }))
+  const r = byId(v)
+  assert.deepEqual([r['alfa@loja'].on, r['fora@x'].on, r['beta@loja'].on], [true, true, false])
+  const ok = byId(projectView(input({ list: list({ plugins: [{ id: 'alfa@loja' }] }), fallbackOn: new Set(['fora@x']) })))
+  assert.equal(ok['fora@x'].on, false)
+})
+
 function project(t: { after(fn: () => void): void }): string {
   const p = mkdtempSync(join(tmpdir(), 'view-'))
   t.after(() => rmSync(p, { recursive: true, force: true }))
@@ -114,15 +122,22 @@ function deps(o: Partial<ToggleDeps> = {}) {
   return { d, installs }
 }
 
-test('the first toggle creates the list from the fallback catalog items plus the change', async (t) => {
+test('the first toggle creates the list from everything on in the fallback plus the change', async (t) => {
   const p = project(t)
   const { d, installs } = deps()
   assert.deepEqual(await toggle(p, 'gama', true, d), { ok: true })
-  // fora@x was on in the fallback but is not a catalog item: it stays out
-  assert.deepEqual(readJson(p), { versao: 1, plugins: [{ id: 'alfa@loja' }], skills: ['gama'], sem: [] })
+  // fora@x is installed and on in the fallback, though outside the catalog: it stays on
+  assert.deepEqual(readJson(p), { versao: 1, plugins: [{ id: 'alfa@loja' }, { id: 'fora@x' }], skills: ['gama'], sem: [] })
   assert.equal(installs.length, 0)
   assert.deepEqual(await toggle(p, 'alfa@loja', false, d), { ok: true })
-  assert.deepEqual(readJson(p).plugins, [])
+  assert.deepEqual(readJson(p).plugins, [{ id: 'fora@x' }])
+})
+
+test('without a catalog, the first toggle keeps the other plugins that were on', async (t) => {
+  const p = project(t)
+  const { d } = deps({ itens: [] })
+  assert.deepEqual(await toggle(p, 'fora@x', false, d), { ok: true })
+  assert.deepEqual(readJson(p), { versao: 1, plugins: [{ id: 'alfa@loja' }], skills: [], sem: [] })
 })
 
 test('toggling a base item off writes sem, and on again clears it', async (t) => {

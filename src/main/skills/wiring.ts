@@ -18,6 +18,7 @@ import { fallbackOn, installedMap, loadUserPlugins, userPluginsState } from '../
 import { readCatalog } from './catalog.ts'
 import type { SkillsDeps } from './handler-ctx.ts'
 import { createSkillsHandler } from './handler.ts'
+import { catalogReadable } from './project-dirs.ts'
 import { installPlugin, type CliRun } from './install.ts'
 import { libraryUrl, realGit, syncLibrary } from './library.ts'
 import { libSkillsDir, skillsPaths, type SkillsPaths } from './paths.ts'
@@ -43,14 +44,21 @@ function cli(name: string, timeout?: number): CliRun {
 const claude = cli('claude')
 const gh = cli('gh', 15_000)
 
-function knownMarkets(): Set<string> {
+/** Stores this machine knows, by name → where they come from (`dono/repo`, a URL or a path). */
+function marketSources(): Map<string, string> {
   try {
     const raw = JSON.parse(readFileSync(join(homedir(), '.claude', 'plugins', 'known_marketplaces.json'), 'utf8'))
-    return new Set(raw && typeof raw === 'object' ? Object.keys(raw) : [])
+    const out = new Map<string, string>()
+    for (const [name, v] of Object.entries<{ source?: Record<string, unknown> }>(raw && typeof raw === 'object' ? raw : {})) {
+      const s = v?.source ?? {}
+      out.set(name, String(s.repo ?? s.url ?? s.path ?? '?'))
+    }
+    return out
   } catch {
-    return new Set()
+    return new Map()
   }
 }
+const knownMarkets = (): Set<string> => new Set(marketSources().keys())
 
 const NO_SCANNER: ScanResult = { ok: false, counts: {}, blocked: true, error: 'Claude Security ausente; rode npm run plugins antes de instalar' }
 const scanner = () => discoverPlugins().find((p) => p.scanner)?.dir
@@ -89,12 +97,16 @@ export function refreshSkills(e: Engine, only?: string): void {
       ? undefined
       : 'Biblioteca ainda não baixada: rode /skill-init para baixar.'
   const lib = libSkills(p)
+  const semCatalogo = !catalogReadable(p.lib)
   const installed = userPluginsState().list
   const views = { ...e.state.projectSkills }
   for (const proj of e.state.projects) {
     if (!proj.path || (only && proj.id !== only)) continue
     const r = readList(proj.path)
-    views[proj.id] = projectView({ list: r.list, erro: r.erro, itens: cat.itens, installed, libSkills: lib, fallbackOn: fallbackOn(proj.path), platform: process.platform, aviso })
+    views[proj.id] = projectView({
+      list: r.list, erro: r.erro, itens: cat.itens, installed, libSkills: lib, fallbackOn: fallbackOn(proj.path),
+      platform: process.platform, aviso, semCatalogo,
+    })
   }
   for (const id of Object.keys(views)) if (!e.state.projects.some((x) => x.id === id && x.path)) delete views[id]
   e.state.projectSkills = views
@@ -155,6 +167,7 @@ export function startSkills(e: Engine): { skills: GwHandler; isSkillsThread: (t:
     installed: installedMap,
     repoMeta,
     git: realGit,
+    knownMarket: (name) => marketSources().get(name) ?? null,
     changed,
   }
   refreshSkills(e)

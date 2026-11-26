@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { CatalogItem } from '../../shared/types.ts'
 
-const catalogPath = (libRoot: string) => join(libRoot, 'biblioteca', 'catalogo.json')
+export const catalogPath = (libRoot: string) => join(libRoot, 'biblioteca', 'catalogo.json')
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : [])
 

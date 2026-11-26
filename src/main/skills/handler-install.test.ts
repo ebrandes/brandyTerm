@@ -174,3 +174,19 @@ test('skills_import refuses a marketplace plugin whose code is outside the scann
   assert.equal(f.scans.length, 0)
   assert.equal(f.installs.length, 0)
 })
+
+test('skills_import refuses a store on a branch, or one this machine knows from another repo, before scanning', async (t) => {
+  const p1 = { plugin: 'p1', itens: [{ nome: 'p1', descricao: 'Faz p1.', tags: [] }] }
+  const f = fixture(t, { itens, repo: MARKET_REPO, knownMarkets: { 'loja-x': 'outro/dono' } })
+  const known = (await f.call('skills_resolve', { origem: 'o/r' })) as { staging: string }
+  await assert.rejects(f.call('skills_import', { staging: known.staging, ...p1 }), /loja-x já está registrada a partir de outro\/dono/)
+  const g = fixture(t, { itens, repo: MARKET_REPO })
+  const ref = (await g.call('skills_resolve', { origem: 'https://github.com/o/r/tree/dev' })) as { staging: string }
+  await assert.rejects(g.call('skills_import', { staging: ref.staging, ...p1 }), /branch padrão/)
+  assert.deepEqual([f.scans.length, f.installs.length, g.scans.length, g.installs.length], [0, 0, 0, 0])
+  // the same repo, already registered, installs as usual
+  const h = fixture(t, { itens, repo: MARKET_REPO, knownMarkets: { 'loja-x': 'O/R' } })
+  const ok = (await h.call('skills_resolve', { origem: 'o/r' })) as { staging: string }
+  await h.call('skills_import', { staging: ok.staging, ...p1 })
+  assert.equal(h.installs.length, 1)
+})

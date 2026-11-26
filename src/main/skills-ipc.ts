@@ -38,9 +38,11 @@ export function registerSkillsIpc(engine: Engine, pushState: () => void): void {
     } catch {
       return { ok: false, erro: 'Biblioteca inválida: use dono/repo ou uma URL https do repositório.' }
     }
-    engine.state.settings = setSkillsLibrary(repo)
+    // the setting changes only once the new library is in place
     const r = switchLibrary(url, paths().lib)
+    if (!r.ok) return done({ ok: false, erro: r.aviso })
+    engine.state.settings = setSkillsLibrary(repo)
     if (r.antiga) diagLog('skills', 'info', 'biblioteca trocada: a cópia antiga ficou guardada', { antiga: r.antiga })
-    return done(r.ok ? { ok: true } : { ok: false, erro: r.aviso })
+    return done({ ok: true })
   }, ruleOf('skills:setLibrary'))
 }

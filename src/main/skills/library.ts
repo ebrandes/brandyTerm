@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, renameSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DEFAULT_LIBRARY } from '../../shared/skills.ts'
 
@@ -45,20 +45,29 @@ export function syncLibrary(url: string, dir: string, git: GitRun = realGit): { 
 const sameRepo = (a: string, b: string) => a.trim().replace(/\/+$/, '').replace(/\.git$/, '') === b.trim().replace(/\/+$/, '').replace(/\.git$/, '')
 
 /**
- * Points the library at `url`. A clone of another repo (or one without origin) is moved to
- * `<dir>-antiga-<ms>` and kept, never deleted: it may hold unpushed commits. Then it syncs.
+ * Points the library at `url`. A clone of another repo (or one without origin) is replaced only
+ * after the new repo cloned into a side folder: the old one moves to `<dir>-antiga-<ms>` and is
+ * kept, never deleted (it may hold unpushed commits). A failed clone leaves everything as it was.
  */
 export function switchLibrary(url: string, dir: string, git: GitRun = realGit): { ok: boolean; aviso?: string; antiga?: string } {
-  let antiga: string | undefined
-  if (existsSync(join(dir, '.git'))) {
-    const cur = git(['-C', dir, 'remote', 'get-url', 'origin'], dir)
-    if (cur.code !== 0 || !sameRepo(cur.out, url)) {
-      antiga = `${dir}-antiga-${Date.now()}`
-      renameSync(dir, antiga)
-    }
+  if (!existsSync(join(dir, '.git'))) return syncLibrary(url, dir, git)
+  const cur = git(['-C', dir, 'remote', 'get-url', 'origin'], dir)
+  if (cur.code === 0 && sameRepo(cur.out, url)) return syncLibrary(url, dir, git)
+  const stamp = Date.now()
+  const nova = `${dir}-nova-${stamp}`
+  if (git(['clone', '--depth', '50', url, nova], dirname(dir)).code !== 0) {
+    rmSync(nova, { recursive: true, force: true })
+    return { ok: false, aviso: `Não deu para baixar ${url}: a biblioteca continua a mesma.` }
   }
-  const r = syncLibrary(url, dir, git)
-  return antiga ? { ...r, antiga } : r
+  const antiga = `${dir}-antiga-${stamp}`
+  try {
+    renameSync(dir, antiga)
+  } catch {
+    rmSync(nova, { recursive: true, force: true })
+    return { ok: false, aviso: 'Não deu para guardar a biblioteca atual (arquivo em uso?): ela continua a mesma.' }
+  }
+  renameSync(nova, dir)
+  return { ok: true, antiga }
 }
 
 /** Stages `paths` and commits them; `false` when nothing changed (or the commit failed). */

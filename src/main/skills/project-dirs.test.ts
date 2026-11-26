@@ -51,3 +51,16 @@ test('without the library clone, list skills are missing and threads still start
   writeList(project, JSON.stringify({ versao: 1, plugins: [{ id: 'imp@s' }], skills: ['graphify'], sem: [] }))
   assert.deepEqual(projectDirs(project, paths, new Map([['imp@s', join(base, 'imp')]]), process.platform), [join(base, 'imp')])
 })
+
+test('without a readable catalog the base is unknown: the old set comes along with the list', (t) => {
+  const { paths, project, base } = setup(t)
+  const installed = new Map([['imp@s', join(base, 'imp')]])
+  const old = [join(base, 'kit-core'), join(base, 'imp')]
+  writeList(project, JSON.stringify({ versao: 1, plugins: [{ id: 'imp@s' }], skills: [], sem: [] }))
+  // a good catalog: the list alone
+  assert.deepEqual(projectDirs(project, paths, installed, process.platform, old), [join(base, 'imp')])
+  writeFileSync(join(paths.lib, 'biblioteca', 'catalogo.json'), '{bad')
+  assert.deepEqual(projectDirs(project, paths, installed, process.platform, old), [join(base, 'imp'), join(base, 'kit-core')])
+  rmSync(paths.lib, { recursive: true, force: true })
+  assert.deepEqual(projectDirs(project, paths, installed, process.platform, old), [join(base, 'imp'), join(base, 'kit-core')])
+})

@@ -24,6 +24,8 @@ export interface SkillsDeps {
   /** `gh api repos/o/r`: null fields when gh fails */
   repoMeta?(owner: string, repo: string): Promise<{ estrelas: number | null; licenca: string | null }>
   git?: GitRun
+  /** the source repo of a store this machine already knows by `name`, or null */
+  knownMarket?(name: string): string | null
   /** the project's list changed: its panel refreshes */
   changed(projectId: string): void
 }

@@ -31,6 +31,8 @@ export interface FixtureOpts {
   /** no `.git` in the library folder */
   noLib?: boolean
   repoMeta?: SkillsDeps['repoMeta']
+  /** stores this machine already knows: name → source repo */
+  knownMarkets?: Record<string, string>
 }
 
 export function write(root: string, files: Record<string, string>): void {
@@ -84,6 +86,7 @@ export function fixture(t: { after(fn: () => void): void }, o: FixtureOpts = {})
     },
     installed: () => new Map((o.installed ?? []).map((id) => [id, `/plugins/${id}`])),
     repoMeta: o.repoMeta ?? (async () => ({ estrelas: 120, licenca: 'MIT' })),
+    knownMarket: (name) => o.knownMarkets?.[name] ?? null,
     git,
     changed: (id) => changed.push(id),
   }

@@ -20,6 +20,8 @@ interface Staged {
   /** the clone right under the staging root, deleted when the import ends */
   clone: string
   repo: string
+  /** the `/tree/<ref>` of the origin, when one was given */
+  ref?: string
   commit: string
   estrelas: number | null
   licenca: string | null
@@ -65,12 +67,18 @@ const source = (e: Staged) =>
 /** The marketplace plugin to install. Its code must sit inside the folder that was scanned. */
 function pluginPlan(c: Ctx, e: Staged, staging: string, ps: Pedido[], itens: CatalogItem[]): CatalogItem {
   if (staging !== e.clone) throw new Error('Loja em subpasta não é suportada: use o repositório da loja inteiro.')
+  // the install fetches the store again: only its default branch matches what gets scanned
+  if (e.ref) throw new Error(`Loja num branch ou tag (${e.ref}) não é suportada: a instalação usaria o branch padrão, que não foi escaneado. Use ${e.repo} sem /tree/.`)
   const plugin = str(c, 'plugin')
   if (!e.plugins.includes(plugin)) throw new Error(`${plugin} não está na loja ${e.repo}.`)
   if (!validSkillName(plugin)) throw new Error(`Nome de plugin inválido: ${plugin}`)
   const manifest = JSON.parse(readFileSync(join(staging, '.claude-plugin', 'marketplace.json'), 'utf8'))
   const market: unknown = manifest?.name
   if (typeof market !== 'string' || !validSkillName(market)) throw new Error('A loja não tem um nome válido no marketplace.json.')
+  const known = c.d.knownMarket?.(market)
+  if (known && known.toLowerCase() !== e.repo.toLowerCase()) {
+    throw new Error(`A loja ${market} já está registrada a partir de ${known}: o plugin viria de lá, não do que foi escaneado. Use /skill-install com ${known}.`)
+  }
   const src: unknown = (manifest.plugins as { name?: unknown; source?: unknown }[]).find((p) => p?.name === plugin)?.source
   const from = typeof src === 'string' ? real(resolve(staging, src)) : null
   const root = real(staging)
@@ -157,6 +165,7 @@ export function createInstallTools() {
       projectId: c.p.id,
       clone: join(root, `${o.owner}-${o.repo}`),
       repo: `${o.owner}/${o.repo}`,
+      ...(o.ref ? { ref: o.ref } : {}),
       commit: s.commit,
       estrelas: meta?.estrelas ?? null,
       licenca: meta?.licenca ?? null,

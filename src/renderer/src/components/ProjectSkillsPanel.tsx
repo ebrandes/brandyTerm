@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ProjectSkillsView } from '../types'
 import { api } from '../api'
-import { viewPlugins } from '../plugin-list'
+import { skillsSummary, viewPlugins } from '../plugin-list'
 import { SideSection } from './SideSection'
 import { SkillRowView } from './SkillRowView'
 import { SkillsLibraryFooter } from './SkillsLibraryFooter'
@@ -34,9 +34,8 @@ export function ProjectSkillsPanel({ view, projectId, projectName, library }: Pr
       setBusy(false)
     }
   }
-  const on = view.rows.filter((r) => r.on).length
   return (
-    <SideSection id="skills" title={`Skills · ${projectName}`} summary={`${on}/${view.rows.length} no projeto`}>
+    <SideSection id="skills" title={`Skills · ${projectName}`} summary={skillsSummary(view)}>
       {view.erro && <p className="up-hint warn">Lista inválida ({view.erro}): as threads usam o conjunto de antes até o arquivo ser corrigido.</p>}
       {!view.hasList && !view.erro && <p className="up-hint">Projeto sem lista: a primeira mudança cria .brandyterm/skills.json. Ou rode /skill-init.</p>}
       {view.aviso && <p className="up-hint warn">⚠ {view.aviso}</p>}

@@ -16,6 +16,8 @@ export interface ViewInput {
   fallbackOn: Set<string>
   platform: NodeJS.Platform
   aviso?: string
+  /** no clone, no catalog or a broken one: threads with a list also get the fallback set */
+  semCatalogo?: boolean
 }
 
 const plain = (id: string) => id.split('#')[0]
@@ -54,7 +56,7 @@ export function projectView(i: ViewInput): ProjectSkillsView {
       commands: p?.commands ?? 0,
       agents: p?.agents ?? 0,
       ...(description ? { description } : {}),
-      on: list ? listed(list, id, kind, item) : i.fallbackOn.has(id),
+      on: list ? listed(list, id, kind, item) || (!!i.semCatalogo && i.fallbackOn.has(id)) : i.fallbackOn.has(id),
       installed: kind === 'plugin' ? !!p : i.libSkills.has(id),
       sempre: !!item?.sempre,
     })
@@ -96,8 +98,9 @@ function itemOf(id: string, d: ToggleDeps, list: SkillsList | null): CatalogItem
 }
 
 /**
- * The panel switch. Without a list, the first change creates one from the catalog items on at
- * the moment. Turning a missing plugin on installs it (the list is written first).
+ * The panel switch. Without a list, the first change creates one from everything on at the
+ * moment (catalog items and installed plugins outside it). Turning a missing plugin on installs
+ * it (the list is written first).
  */
 export async function toggle(projectPath: string, id: string, on: boolean, d: ToggleDeps): Promise<{ ok: boolean; erro?: string }> {
   const cur = readList(projectPath)
@@ -107,7 +110,10 @@ export async function toggle(projectPath: string, id: string, on: boolean, d: To
   let list = cur.list
   if (!list) {
     list = emptyList()
-    for (const i of d.itens) if (d.fallbackOn.has(i.id)) list = turnOn(list, i)
+    for (const id of d.fallbackOn) {
+      const it = itemOf(id, d, null)
+      if (it) list = turnOn(list, it)
+    }
   }
   writeList(projectPath, on ? turnOn(list, item) : turnOff(list, item))
   if (!on || item.tipo !== 'plugin' || d.installed.has(id)) return { ok: true }

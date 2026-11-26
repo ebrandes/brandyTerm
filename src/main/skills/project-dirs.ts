@@ -1,5 +1,5 @@
-import { readdirSync } from 'node:fs'
-import { readCatalog } from './catalog.ts'
+import { existsSync, readdirSync } from 'node:fs'
+import { catalogPath, readCatalog } from './catalog.ts'
 import { libSkillsDir, type SkillsPaths } from './paths.ts'
 import { buildProjectPlugin } from './project-plugin.ts'
 import { readList } from './project-list.ts'
@@ -20,13 +20,20 @@ export function resolveFor(projectPath: string, paths: SkillsPaths, installed: M
   return resolveProject({ list, itens: readCatalog(paths.lib).itens, installed, libSkills: dirNames(libSkillsDir(paths)), platform })
 }
 
+/** False when the library has no clone, no catalog or a broken one: the base items are unknown. */
+export function catalogReadable(libRoot: string): boolean {
+  return existsSync(catalogPath(libRoot)) && !readCatalog(libRoot).erro
+}
+
 /**
  * Plugin dirs for a thread of a project with a skills list: its plugins plus the generated
- * project plugin. `null` means "no list (or a broken one): use the old behaviour".
+ * project plugin. `null` means "no list (or a broken one): use the old behaviour". Without a
+ * readable catalog the base can't be told apart, so `old` (the set from before the list) comes too.
  */
-export function projectDirs(projectPath: string, paths: SkillsPaths, installed: Map<string, string>, platform: NodeJS.Platform): string[] | null {
+export function projectDirs(projectPath: string, paths: SkillsPaths, installed: Map<string, string>, platform: NodeJS.Platform, old: string[] = []): string[] | null {
   const r = resolveFor(projectPath, paths, installed, platform)
   if (!r) return null
   const own = buildProjectPlugin(paths.projectSkills, projectPath, r.skills, libSkillsDir(paths), platform)
-  return own ? [...r.pluginDirs, own] : r.pluginDirs
+  const dirs = own ? [...r.pluginDirs, own] : r.pluginDirs
+  return catalogReadable(paths.lib) ? dirs : [...dirs, ...old.filter((d) => !dirs.includes(d))]
 }
