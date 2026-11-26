@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { basename } from 'node:path'
 import { existsSync, statSync } from 'node:fs'
-import type { AgentId, AppState, ApprovalDecision, Attachment, Message, Project, SlashCommand, Thread, Usage } from '../shared/types.ts'
+import type { AgentId, AppState, ApprovalDecision, Attachment, Message, Project, SlashCommand, Thread } from '../shared/types.ts'
 import { MAX_ACTIVE_THREADS } from '../shared/types.ts'
 import type { RunHandle } from './adapters/types.ts'
 import { addUsage, runOnce } from './run.ts'
@@ -27,13 +27,15 @@ import {
   type PlannedTask
 } from './coordinator.ts'
 import { demoProjects } from './demo.ts'
+import { newThread, zeroUsage } from './new-thread.ts'
+import { dispatchReplies, retireReplaced, withNotes } from './plan-dispatch.ts'
+import { canRetire, retire } from '../shared/thread-retire.ts'
 import { discoverPlugins } from './plugins.ts'
 import { loadUserPlugins, userPluginDirs, userPluginsState } from './user-plugins.ts'
 import { ProcessManager } from './processes.ts'
 import type { JsonStore } from './store.ts'
 
 const TERMINAL = new Set(['done', 'failed', 'cancelled', 'interrupted'])
-const zero = (): Usage => ({ input: 0, output: 0, cached: 0, measured: false })
 
 export class Engine extends EventEmitter {
   state: AppState = { projects: [], agents: [], plugins: [] }
@@ -108,7 +110,7 @@ export class Engine extends EventEmitter {
       demo: false,
       messages: [],
       threads: [],
-      coordinator: { usage: zero() },
+      coordinator: { usage: zeroUsage() },
       busy: false,
       synthesized: [],
       processes: []
@@ -244,13 +246,14 @@ export class Engine extends EventEmitter {
       const reply = this.msg('coordinator', plan.reply)
       p.messages.push(reply)
       remember(this, p, plan.memory)
-      for (const a of plan.answers) {
-        const w = p.threads.find((x) => x.state === 'waiting' && x.title.toLowerCase() === a.threadTitle.toLowerCase())
-        if (w) this.sendToThread(p, w.id, a.text, [])
-      }
+      const sent = dispatchReplies({ sendToThread: (q, id, t) => this.sendToThread(q, id, t, []) }, p, plan)
       const tasks = await routeTasks(p.path!, plan.tasks, route, this.installed().has('claude'))
-      const opened = tasks.map((task) => this.createThread(p, task, requestId, atts).id)
-      if (opened.length) reply.threads = opened
+      const opened = tasks.map((task) => this.createThread(p, task, requestId, atts))
+      const notes = [...sent.notes, ...retireReplaced(p, tasks, opened)]
+      if (notes.length) console.warn('[coordinator] títulos não resolvidos:', notes)
+      reply.text = withNotes(reply.text, notes)
+      const shown = [...opened.map((t) => t.id), ...sent.resumed]
+      if (shown.length) reply.threads = shown
       this.pump(p)
     })
   }
@@ -258,28 +261,7 @@ export class Engine extends EventEmitter {
   // ---- threads --------------------------------------------------------
 
   createThread(p: Project, task: PlannedTask, requestId: string, atts: Attachment[] = []): Thread {
-    const now = new Date().toISOString()
-    const t: Thread = {
-      id: randomUUID(),
-      requestId,
-      title: task.title,
-      objective: task.objective,
-      agent: task.agent,
-      model: task.model,
-      effort: task.effort,
-      why: task.why,
-      skill: task.skill,
-      todos: [],
-      steps: [],
-      state: 'queued',
-      note: 'Na fila',
-      attachments: atts.length ? atts : undefined,
-      messages: [this.msg('coordinator', task.objective, { attachments: atts.length ? atts : undefined })],
-      usage: zero(),
-      createdAt: now,
-      updatedAt: now
-    }
-    if (appSettings().allowAllThreads) t.allowAll = true
+    const t = newThread(task, requestId, atts, (a, text, extra) => this.msg(a, text, extra), !!appSettings().allowAllThreads)
     p.threads.push(t)
     return t
   }
@@ -299,6 +281,7 @@ export class Engine extends EventEmitter {
     t.state = 'running'
     t.resolved = false
     t.pending = undefined
+    t.retired = undefined
     t.note = 'Iniciando…'
     t.aliveAt = t.runAt = new Date().toISOString()
     t.todos = []
@@ -332,7 +315,7 @@ export class Engine extends EventEmitter {
       const q = settleThread(t, r.done, (author, text, extra) => this.msg(author, text, extra))
       if (q) {
         p.messages.push(
-          this.msg('agent', `A thread “${t.title}” precisa de uma decisão sua.`, { ask: { threadId: t.id, question: q.text, options: q.options } })
+          this.msg('agent', `A thread “${t.title}” precisa de uma decisão sua.`, { ask: { threadId: t.id, question: q.text, options: q.options, recommended: q.recommended } })
         )
       }
       if (t.state === 'waiting') {
@@ -393,6 +376,14 @@ export class Engine extends EventEmitter {
     if (!t || t.state !== 'done') return
     t.pending = undefined
     t.resolved = true
+    this.touch()
+  }
+
+  /** the user sets aside an interrupted or failed thread: it stops counting as pending */
+  retireThread(projectId: string, threadId: string): void {
+    const t = this.project(projectId)?.threads.find((x) => x.id === threadId)
+    if (!t || !canRetire(t)) return
+    retire(t, 'discarded')
     this.touch()
   }
 }

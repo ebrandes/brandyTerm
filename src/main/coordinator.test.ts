@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildThreadPrompt } from './coordinator.ts'
+import { buildThreadPrompt, extractQuestion } from './coordinator.ts'
 import type { Project } from '../shared/types.ts'
 
 test('thread prompt mentions connectors', () => {
@@ -10,4 +10,68 @@ test('thread prompt mentions connectors', () => {
       p.includes('Serviços externos (Railway, GitHub e outros) ficam disponíveis pelas ferramentas list_connectors, connector_tools e call_connector; use só quando a tarefa precisar.')
     )
   }
+})
+
+import { buildPlanPrompt, parsePlan } from './coordinator.ts'
+import type { Thread } from '../shared/types.ts'
+
+const installed = new Map([['claude', ['sonnet']]]) as Parameters<typeof parsePlan>[2]
+
+test('parsePlan reads resume entries and the thread a task replaces', () => {
+  const plan = parsePlan(
+    {
+      reply: 'ok',
+      tasks: [{ title: 'Nova', objective: 'o', agent: 'claude', effort: 'low', replaces: 'Antiga' }],
+      resume: [{ threadTitle: 'Logs MCP', text: 'Continue.' }, { threadTitle: 'x', text: '  ' }, { text: 'sem título' }]
+    },
+    '',
+    installed
+  )
+  assert.deepEqual(plan.resume, [{ threadTitle: 'Logs MCP', text: 'Continue.' }])
+  assert.equal(plan.tasks[0].replaces, 'Antiga')
+})
+
+test('parsePlan without resume gives an empty list', () => {
+  assert.deepEqual(parsePlan({ reply: 'ok', tasks: [] }, '', installed).resume, [])
+})
+
+const thread = (title: string, state: Thread['state'], extra: Partial<Thread> = {}) => ({ title, state, agent: 'claude', ...extra }) as Thread
+const prompt = (threads: Thread[]) =>
+  buildPlanPrompt({ name: 'P', path: null, processes: [], threads, messages: [] } as unknown as Project, ['claude'], 'continue as threads')
+
+test('the plan prompt tells the coordinator to resume interrupted threads instead of opening new ones', () => {
+  const p = prompt([thread('Logs MCP', 'interrupted')])
+  assert.match(p, /"resume"/)
+  assert.match(p, /- "Logs MCP" \(Claude, INTERROMPIDA/)
+  assert.match(p, /continuar[\s\S]*"resume"[\s\S]*não crie/i)
+})
+
+test('the plan prompt keeps the full title and lists old interrupted threads past the recent ones', () => {
+  const long = 'Logs de diagnóstico para conectores MCP, plugins, skills e a'
+  const recent = Array.from({ length: 14 }, (_, i) => thread(`Feita ${i}`, 'done'))
+  const p = prompt([thread(long, 'interrupted'), ...recent])
+  assert.ok(p.includes(`"${long}"`))
+  assert.ok(!p.includes('"Feita 0"'))
+  assert.ok(p.includes('"Feita 13"'))
+})
+
+test('the plan prompt shows a retired thread as set aside, not as resumable', () => {
+  const p = prompt([thread('Logs MCP', 'interrupted', { retired: { reason: 'superseded', by: 'n', byTitle: 'Logs MCP v2', at: 'x' } })])
+  assert.match(p, /- "Logs MCP" \(Claude, substituída por "Logs MCP v2"\)/)
+  assert.doesNotMatch(p, /"Logs MCP" \(Claude, INTERROMPIDA/)
+})
+
+test('extractQuestion puts the starred option first and flags it', () => {
+  const q = extractQuestion('feito.\nPERGUNTA: Qual caminho?\nOPCOES: só patch | *aplicar + todos | nada')
+  assert.deepEqual(q, { text: 'Qual caminho?', options: ['aplicar + todos', 'só patch', 'nada'], recommended: true })
+})
+
+test('extractQuestion without a marker keeps order and has no recommendation', () => {
+  assert.deepEqual(extractQuestion('PERGUNTA: Sim?\nOPCOES: sim | não'), { text: 'Sim?', options: ['sim', 'não'] })
+  assert.deepEqual(extractQuestion('PERGUNTA: Qual nome?'), { text: 'Qual nome?', options: undefined })
+})
+
+test('thread prompt asks to mark the recommended option with *', () => {
+  const p = buildThreadPrompt({ name: 'Demo' } as Project, 'obj', 'claude')
+  assert.ok(p.includes('"OPCOES: *a | b | c"'))
 })

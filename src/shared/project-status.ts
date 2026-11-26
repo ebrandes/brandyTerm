@@ -26,7 +26,7 @@ export interface ProjectStatus {
 export interface StatusInput {
   /** coordinator call in flight: counts as running even with no thread running */
   busy?: boolean
-  threads: Pick<Thread, 'state' | 'approval' | 'updatedAt'>[]
+  threads: Pick<Thread, 'state' | 'approval' | 'updatedAt' | 'retired'>[]
   /** main chat, oldest first */
   messages?: Pick<Message, 'author' | 'time'>[]
 }
@@ -58,6 +58,7 @@ export function projectStatus(p: StatusInput, opts: StatusOptions = {}): Project
   let done = 0
   let failed = 0
   for (const t of p.threads) {
+    if (t.retired) continue
     if (t.state === 'waiting' || t.approval) waitingCount++
     else if (t.state === 'running') runningCount++
     else if ((t.state === 'done' || t.state === 'failed') && !opts.selected && Date.parse(t.updatedAt) > seen) {

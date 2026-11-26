@@ -44,8 +44,10 @@ export function Overview(props: Props) {
   if (resolvedCount) parts.push(`${resolvedCount} ${resolvedCount === 1 ? 'resolvida' : 'resolvidas'}`)
   const threads = [...project.threads].reverse()
   // auto-resolve: finished threads with nothing pending fold away; pending ones stay in view
-  const resolved = threads.filter((t) => t.state === 'done' && t.resolved)
-  const active = threads.filter((t) => !(t.state === 'done' && t.resolved))
+  // superseded or discarded threads fold away with them
+  const folded = (t: Thread) => (t.state === 'done' && t.resolved) || !!t.retired
+  const resolved = threads.filter(folded)
+  const active = threads.filter((t) => !folded(t))
   const saved = project.coordinator.context
   // old saves carry the model's 1M window: the coordinator is held to its own ceiling
   const coordCtx = saved && saved.used > 0 ? { used: saved.used, limit: coordinatorLimit(saved.limit) } : undefined

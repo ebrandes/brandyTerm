@@ -19,7 +19,12 @@ interface Props {
 export function ResolvedGroup({ project, threads, selectedId, onSelect, onCancel }: Props) {
   const [open, setOpen] = useState(false)
   const shown = open ? threads : threads.filter((t) => t.id === selectedId)
-  const label = `${threads.length} ${threads.length === 1 ? 'resolvida' : 'resolvidas'}`
+  const aside = threads.filter((t) => t.retired).length
+  const done = threads.length - aside
+  const label = [
+    done ? `${done} ${done === 1 ? 'resolvida' : 'resolvidas'}` : '',
+    aside ? `${aside} ${aside === 1 ? 'deixada de lado' : 'deixadas de lado'}` : ''
+  ].filter(Boolean).join(' · ')
   const listId = `resolved-${project.id}`
 
   return (

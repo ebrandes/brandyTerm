@@ -1,0 +1,112 @@
+/* question card: a thread waits for a decision (AskCard.tsx) */
+.ask {
+  container-type: inline-size;
+  width: 100%;
+  max-width: min(620px, 100%);
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+.ask-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.ask-q { display: flex; gap: 9px; align-items: flex-start; font-size: 14px; font-weight: 600; line-height: 1.45; color: var(--text); }
+.ask-q span { min-width: 0; overflow-wrap: anywhere; }
+.ask-q svg { flex: none; margin-top: 2px; color: var(--accent); }
+
+.ask-opts { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.ask-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-hi);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-align: left;
+  transition: background .12s, border-color .12s;
+}
+.ask-opt:hover { background: var(--card-hi); border-color: var(--accent-line); }
+.ask-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-num {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--line-hi);
+  color: var(--faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.ask-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ask-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ask-opt.rec { border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); }
+.ask-opt.rec .ask-num { border-color: var(--accent-line); color: var(--accent); }
+.ask-opt.rec .ask-label { font-weight: 600; }
+
+.ask-form { display: flex; gap: 6px; margin-top: 12px; }
+.ask-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line-hi);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  outline: 0;
+}
+.ask-form input::placeholder { color: var(--faint); }
+.ask-form input:focus { border-color: var(--accent-line); }
+.ask-form button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ask-form button:disabled { opacity: .4; cursor: default; }
+
+.ask.answered { border-color: var(--line); background: var(--panel); opacity: .85; }
+.ask.answered .ask-q { font-weight: 500; color: var(--muted); }
+.ask-done { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+.ask-done svg { color: var(--green); }
+
+/* narrow card: the badge drops under the text and the answer field stacks */
+@container (max-width: 380px) {
+  .ask-opt { flex-wrap: wrap; row-gap: 6px; }
+  .ask-opt.rec .ask-label { flex-basis: calc(100% - 40px); }
+  .ask-badge { margin-left: 30px; }
+  .ask-form { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) { .ask-opt { transition: none; } }

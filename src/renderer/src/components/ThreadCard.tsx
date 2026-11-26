@@ -15,6 +15,7 @@ import {
 import { AGENT_NAMES, EFFORT_LABEL, type Project, type Thread } from '../types'
 import { AgentBadge } from './AgentBadge'
 import { contextLabel, contextShare, stalledMinutes, useNow } from '../health'
+import { retiredLabel } from '../../../shared/thread-retire.ts'
 import './thread-card.css'
 
 type Tone = 'run' | 'wait' | 'done' | 'fail' | 'idle'
@@ -30,6 +31,7 @@ const STATE: Record<Thread['state'], { label: string; tone: Tone }> = {
 }
 
 function status(t: Thread, stalled?: number): { label: string; tone: Tone } {
+  if (t.retired) return { label: retiredLabel(t).replace(/^./, (c) => c.toUpperCase()), tone: 'idle' }
   if (t.approval) return { label: 'Aprovar ação', tone: 'wait' }
   if (stalled !== undefined) return { label: 'Parada?', tone: 'wait' }
   if (t.state === 'done' && t.pending) return { label: 'Pendente', tone: 'wait' }
@@ -38,6 +40,7 @@ function status(t: Thread, stalled?: number): { label: string; tone: Tone } {
 
 function StateIcon({ t, stalled }: { t: Thread; stalled?: number }) {
   const state = t.state
+  if (t.retired) return <Clock3 size={13} />
   if (t.approval) return <MessageCircleQuestion size={13} />
   if (stalled !== undefined) return <TriangleAlert size={13} />
   if (state === 'running') return <Loader2 size={13} className="spin" />

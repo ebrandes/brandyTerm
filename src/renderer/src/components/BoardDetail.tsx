@@ -66,7 +66,11 @@ export function BoardDetail({ item, now, onClose, onOpen }: Props) {
         <section className="board-question">
           <h4>Pergunta para você</h4>
           <p>{t.question.text}</p>
-          {t.question.options && <p className="muted">Opções: {t.question.options.join(' · ')}</p>}
+          {t.question.options && (
+            <p className="muted">
+              Opções: {t.question.options.map((o, i) => (i === 0 && t.question?.recommended ? `${o} (recomendada)` : o)).join(' · ')}
+            </p>
+          )}
         </section>
       )}
 

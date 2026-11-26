@@ -1,5 +1,6 @@
 import type { AgentId, Effort, Project, Thread } from '../shared/types.ts'
 import { AGENT_NAMES } from '../shared/types.ts'
+import { parseOptions } from '../shared/ask-options.ts'
 import { MEMORY_REL, MEMORY_RULES, MEMORY_SCHEMA, memoryBlock, parseNotes, type MemoryNote } from './memory.ts'
 
 export interface PlannedTask {
@@ -10,6 +11,8 @@ export interface PlannedTask {
   effort: Effort
   why?: string
   skill?: string
+  /** exact title of an interrupted/failed thread this task takes over; the old one is set aside */
+  replaces?: string
 }
 
 /** How text shown in the chat should look; the chat renders it as markdown. */
@@ -29,8 +32,19 @@ export interface Plan {
   reply: string
   tasks: PlannedTask[]
   answers: Answer[]
+  /** interrupted threads to continue, with the message that resumes each */
+  resume: Answer[]
   /** notes for the project memory */
   memory: MemoryNote[]
+}
+
+const REPLY_LIST = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { threadTitle: { type: 'string' }, text: { type: 'string' } },
+    required: ['threadTitle', 'text']
+  }
 }
 
 export const PLAN_SCHEMA = {
@@ -38,14 +52,8 @@ export const PLAN_SCHEMA = {
   properties: {
     reply: { type: 'string' },
     memory: MEMORY_SCHEMA,
-    answers: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { threadTitle: { type: 'string' }, text: { type: 'string' } },
-        required: ['threadTitle', 'text']
-      }
-    },
+    answers: REPLY_LIST,
+    resume: REPLY_LIST,
     tasks: {
       type: 'array',
       maxItems: 3,
@@ -58,7 +66,8 @@ export const PLAN_SCHEMA = {
           model: { type: 'string' },
           effort: { type: 'string', enum: ['low', 'medium', 'high'] },
           why: { type: 'string' },
-          skill: { type: 'string' }
+          skill: { type: 'string' },
+          replaces: { type: 'string' }
         },
         required: ['title', 'objective', 'agent', 'effort']
       }
@@ -69,10 +78,23 @@ export const PLAN_SCHEMA = {
 
 function threadLine(t: Thread): string {
   if (t.state === 'waiting' && t.question) {
-    return `- "${t.title}" (${AGENT_NAMES[t.agent]}, AGUARDANDO O USUÁRIO) pergunta: ${t.question.text}${t.question.options ? ` [opções: ${t.question.options.join(' | ')}]` : ''}`
+    const opts = t.question.options?.map((o, i) => (i === 0 && t.question?.recommended ? `${o} (recomendada)` : o))
+    return `- "${t.title}" (${AGENT_NAMES[t.agent]}, AGUARDANDO O USUÁRIO) pergunta: ${t.question.text}${opts ? ` [opções: ${opts.join(' | ')}]` : ''}`
+  }
+  if (t.retired) {
+    const why = t.retired.reason === 'superseded' ? `substituída${t.retired.byTitle ? ` por "${t.retired.byTitle}"` : ''}` : 'descartada'
+    return `- "${t.title}" (${AGENT_NAMES[t.agent]}, ${why})`
   }
   const tail = t.summary ? ` — ${t.summary}` : t.note ? ` — ${t.note}` : ''
-  return `- "${t.title}" (${AGENT_NAMES[t.agent]}, ${t.state})${tail}`
+  const state = t.state === 'interrupted' ? 'INTERROMPIDA, pode ser retomada' : t.state
+  return `- "${t.title}" (${AGENT_NAMES[t.agent]}, ${state})${tail}`
+}
+
+/** the last 12 threads, plus older ones still open (waiting or interrupted) so they can be resumed */
+function listedThreads(threads: Thread[]): Thread[] {
+  const recent = threads.slice(-12)
+  const open = threads.slice(0, -12).filter((t) => !t.retired && (t.state === 'waiting' || t.state === 'interrupted'))
+  return [...open, ...recent]
 }
 
 /** the last chat lines, for a coordinator session that was just restarted */
@@ -88,9 +110,9 @@ export function buildPlanPrompt(project: Project, available: AgentId[], userText
   const procs = project.processes.length
     ? project.processes.map((x) => `- ${x.name}: \`${x.command}\` (${x.state}${x.ports.length ? `, portas ${x.ports.join(', ')}` : ''})`).join('\n')
     : '(nenhum)'
-  const threads = project.threads.length ? project.threads.slice(-12).map(threadLine).join('\n') : '(nenhuma)'
+  const threads = project.threads.length ? listedThreads(project.threads).map(threadLine).join('\n') : '(nenhuma)'
   return `Você é o coordenador do projeto "${project.name}" no BrandyTerm. Pasta: ${project.path}.
-Responda SOMENTE com um objeto JSON: {"reply": string, "tasks": [{"title","objective","agent","model"?,"effort","why"}], "answers": [{"threadTitle","text"}], "memory": [{"section","text"}]}. Sem texto fora do JSON.
+Responda SOMENTE com um objeto JSON: {"reply": string, "tasks": [{"title","objective","agent","model"?,"effort","why","replaces"?}], "answers": [{"threadTitle","text"}], "resume": [{"threadTitle","text"}], "memory": [{"section","text"}]}. Sem texto fora do JSON.
 
 Regras:
 - Pergunta simples, conversa ou "como está?": responda em "reply" com tasks=[]. Não crie threads para isso; use o estado das threads abaixo.
@@ -106,6 +128,8 @@ Regras:
       : ''
   }
 - Se uma thread está AGUARDANDO O USUÁRIO e a mensagem do usuário responde essa pergunta, devolva em "answers" {threadTitle (exato), text (a resposta)} e diga em "reply" que repassou. Se não ficar claro a qual thread a resposta pertence, pergunte em "reply" citando os nomes. Sem resposta a repassar: answers=[].
+- Threads INTERROMPIDAS (o app fechou ou reiniciou no meio) podem ser retomadas. Quando o usuário pedir para continuar ou retomar ("continue", "continue as threads", "retome"), devolva em "resume" {threadTitle (o título exato, entre aspas abaixo), text (instrução curta, ex.: "Continue de onde parou.")} para cada thread interrompida que ele quer de volta e não crie tasks novas para o mesmo trabalho. Se não ficar claro quais threads, pergunte em "reply" citando os nomes. Sem retomada: resume=[].
+- Só se for melhor recomeçar do zero uma thread interrompida ou com falha, crie a task com "replaces" (título exato da antiga): ela fica marcada como substituída pela nova.
 - Processos em execução (servidores de dev, portas) são do usuário; você só os cita, não os controla.
 - Prefira poucas threads bem delimitadas a muitas; não duplique trabalho entre threads.
 - As threads podem ler, rodar comandos e editar arquivos do projeto. Comandos que alteram algo e edições passam por aprovação do usuário dentro da própria thread, então delegue também o trabalho de executar e corrigir, não só investigar.
@@ -151,6 +175,14 @@ function extractJson(text: string): unknown {
 
 const EFFORTS = new Set(['low', 'medium', 'high'])
 
+/** answers and resumes: entries with a title and a non-empty text */
+function replyList(raw: unknown): Answer[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((a) => a && typeof a.threadTitle === 'string' && a.threadTitle.trim() && typeof a.text === 'string' && a.text.trim())
+    .map((a) => ({ threadTitle: a.threadTitle, text: a.text }))
+}
+
 /** Validates the model's plan against what is really installed. The model proposes, this decides. */
 export function parsePlan(
   structured: unknown,
@@ -159,7 +191,7 @@ export function parsePlan(
 ): Plan {
   const raw = (structured ?? extractJson(text)) as { reply?: unknown; tasks?: unknown } | undefined
   if (!raw || typeof raw.reply !== 'string') {
-    return { reply: text.trim() || 'Não consegui interpretar a resposta do coordenador.', tasks: [], answers: [], memory: [] }
+    return { reply: text.trim() || 'Não consegui interpretar a resposta do coordenador.', tasks: [], answers: [], resume: [], memory: [] }
   }
   const tasks: PlannedTask[] = []
   const fallback = [...installed.keys()][0]
@@ -176,18 +208,13 @@ export function parsePlan(
         model: typeof t.model === 'string' && models.includes(t.model) ? t.model : undefined,
         effort: EFFORTS.has(t.effort) ? t.effort : 'medium',
         why: typeof t.why === 'string' ? t.why.slice(0, 160) : undefined,
-        skill: agent === 'claude' && typeof t.skill === 'string' && /^[\w:.-]{2,80}$/.test(t.skill) ? t.skill : undefined
+        skill: agent === 'claude' && typeof t.skill === 'string' && /^[\w:.-]{2,80}$/.test(t.skill) ? t.skill : undefined,
+        replaces: typeof t.replaces === 'string' && t.replaces.trim() ? t.replaces : undefined
       })
     }
   }
-  const answers: Answer[] = []
   const rawAnswers = (raw as { answers?: unknown }).answers
-  if (Array.isArray(rawAnswers)) {
-    for (const a of rawAnswers) {
-      if (a && typeof a.threadTitle === 'string' && typeof a.text === 'string' && a.text.trim()) answers.push({ threadTitle: a.threadTitle, text: a.text })
-    }
-  }
-  return { reply: unescapeReply(raw.reply), tasks, answers, memory: parseNotes((raw as { memory?: unknown }).memory) }
+  return { reply: unescapeReply(raw.reply), tasks, answers: replyList(rawAnswers), resume: replyList((raw as { resume?: unknown }).resume), memory: parseNotes((raw as { memory?: unknown }).memory) }
 }
 
 export function buildThreadPrompt(project: Project, objective: string, agent: AgentId, skill?: string): string {
@@ -206,7 +233,7 @@ ANTES de agir, planeje. ${plan} Trabalhe direto e em silêncio: sem narrar cada 
 
 Ao terminar, dê uma resposta FINAL curta (no máximo 12 linhas): resultado, evidências (arquivos e comandos) e pendências. Não cole logs, stack traces nem saída de comandos; cite só a linha decisiva. Escreva em markdown: itens com "-" e rótulo em negrito ("**Resultado:**", "**Evidências:**", "**Pendências:**"), caminhos e comandos entre crases, nada de um parágrafo único longo.
 
-Se faltar uma decisão do usuário que bloqueia o trabalho, NÃO adivinhe e NÃO faça a pergunta no meio do texto: encerre a resposta com a linha "PERGUNTA: <pergunta curta>" e, se houver alternativas, outra linha "OPCOES: a | b | c", e pare. Para dúvidas pequenas, escolha o padrão mais razoável e registre a suposição.
+Se faltar uma decisão do usuário que bloqueia o trabalho, NÃO adivinhe e NÃO faça a pergunta no meio do texto: encerre a resposta com a linha "PERGUNTA: <pergunta curta>" e, se houver alternativas, outra linha "OPCOES: *a | b | c", e pare. Marque com * no início a opção que você recomenda (no máximo uma); sem recomendação, não marque nenhuma. Para dúvidas pequenas, escolha o padrão mais razoável e registre a suposição.
 
 Se ficar algo que você realmente não conseguiu concluir (o usuário negou uma ação, falta acesso ou uma decisão para depois), escreva uma linha "PENDENTE: <o que falta, curto>". Se o objetivo foi cumprido por inteiro, NÃO escreva essa linha.
 
@@ -228,13 +255,17 @@ export function extractPending(text: string): string | undefined {
   return v.slice(0, 240)
 }
 
-/** A thread signals that it needs the user with a trailing PERGUNTA: line (and optional OPCOES:). */
-export function extractQuestion(text: string): { text: string; options?: string[] } | undefined {
+/**
+ * A thread signals that it needs the user with a trailing PERGUNTA: line (and optional OPCOES:).
+ * The option marked with * is the agent's recommendation: it comes first and `recommended` is set.
+ */
+export function extractQuestion(text: string): NonNullable<Thread['question']> | undefined {
   const q = text.match(/^\s*PERGUNTA:\s*(.+)$/im)
   if (!q) return undefined
   const o = text.match(/^\s*OPCOES:\s*(.+)$/im)
-  const options = o ? o[1].split('|').map((x) => x.trim()).filter(Boolean).slice(0, 6) : undefined
-  return { text: q[1].trim(), options: options?.length ? options : undefined }
+  const parsed = o ? parseOptions(o[1]) : undefined
+  const options = parsed?.options.length ? parsed.options : undefined
+  return { text: q[1].trim(), options, ...(options && parsed?.recommended ? { recommended: true } : {}) }
 }
 
 /**

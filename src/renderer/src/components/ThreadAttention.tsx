@@ -1,9 +1,10 @@
-import { CircleCheck, CircleDot, ShieldCheck, ShieldQuestion, X } from 'lucide-react'
+import { Archive, CircleCheck, CircleDot, ShieldCheck, ShieldQuestion, X } from 'lucide-react'
 import type { ApprovalDecision, Thread } from '../types'
 import { contextLabel, contextShare } from '../health'
 import { api } from '../api'
 import { ruleLabel } from '../rule-label'
 import { LoginCard } from '../connectors/LoginCard'
+import { canRetire } from '../../../shared/thread-retire.ts'
 import type { Project } from '../types'
 import './attention.css'
 
@@ -16,17 +17,57 @@ const TOOL_NAMES: Record<string, string> = {
   WebSearch: 'pesquisar na web'
 }
 
+interface AttentionProps {
+  t: Thread
+  projectId: string
+  /** opens another thread (the one that replaced this) */
+  onOpenThread?: (id: string) => void
+}
+
 /** What a thread needs from the user right now: a connector login, a tool to approve, or a pending item to close. */
-export function ThreadAttention({ t, projectId, machine }: { t: Thread; projectId: string; machine?: Project['machine'] }) {
+export function ThreadAttention({ machine, ...props }: AttentionProps & { machine?: Project['machine'] }) {
   return (
     <>
-      {(t.logins ?? []).map((l) => <LoginCard key={l.connectorId} login={l} remote={machine?.remote === true} place="thread" machineName={machine?.name} />)}
-      <Attention t={t} projectId={projectId} />
+      {(props.t.logins ?? []).map((l) => <LoginCard key={l.connectorId} login={l} remote={machine?.remote === true} place="thread" machineName={machine?.name} />)}
+      <Attention {...props} />
     </>
   )
 }
 
-function Attention({ t, projectId }: { t: Thread; projectId: string }) {
+/** An interrupted or failed thread can be discarded; a set-aside one points to what replaced it. */
+function SetAside({ t, projectId, onOpenThread }: AttentionProps) {
+  const r = t.retired
+  if (r) {
+    const by = r.by
+    return (
+      <div className="attn pending">
+        <div className="attn-head">
+          <Archive size={14} /> {r.reason === 'superseded' ? 'Substituída' : 'Descartada'}
+          {r.byTitle && ` por “${r.byTitle}”`}
+        </div>
+        <p className="attn-hint">Não conta mais como pendente. Escreva aqui se quiser retomá-la mesmo assim.</p>
+        {by && onOpenThread && (
+          <div className="attn-actions">
+            <button onClick={() => onOpenThread(by)}>Abrir a thread nova</button>
+          </div>
+        )}
+      </div>
+    )
+  }
+  if (!canRetire(t)) return null
+  return (
+    <div className="attn pending">
+      <p className="attn-hint">Escreva aqui para retomar de onde parou, ou descarte se não precisa mais.</p>
+      <div className="attn-actions">
+        <button onClick={() => void api.retireThread({ projectId, threadId: t.id })} title="Tira esta thread das pendências, sem apagar">
+          <Archive size={13} /> Descartar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function Attention({ t, projectId, onOpenThread }: AttentionProps) {
   const a = t.approval
   if (a) {
     const answer = (decision: ApprovalDecision) => void api.approveTool({ projectId, threadId: t.id, id: a.id, decision })
@@ -74,7 +115,7 @@ function Attention({ t, projectId }: { t: Thread; projectId: string }) {
       </div>
     )
   }
-  return null
+  return <SetAside t={t} projectId={projectId} onOpenThread={onOpenThread} />
 }
 
 /** true when the thread is blocked on the user (question or tool approval) */

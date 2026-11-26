@@ -72,7 +72,7 @@ export interface Message {
   /** threads the coordinator opened with this message (shown as clickable chips) */
   threads?: string[]
   /** a thread is asking the user something; answer routes back to that thread */
-  ask?: { threadId: string; question: string; options?: string[] }
+  ask?: { threadId: string; question: string; options?: string[]; recommended?: boolean }
 }
 
 export interface Todo {
@@ -129,7 +129,12 @@ export interface Thread {
   state: ThreadState
   note?: string
   /** set while state === 'waiting': the thread needs a decision from the user */
-  question?: { text: string; options?: string[] }
+  question?: {
+    text: string
+    options?: string[]
+    /** options[0] is the option the agent recommends (it was marked with * in OPCOES:) */
+    recommended?: boolean
+  }
   /** why the coordinator picked this agent/model/effort */
   why?: string
   /** skill the coordinator told the thread to load first */
@@ -168,6 +173,8 @@ export interface Thread {
   updatedAt: string
   /** brought back from the archive: counts as recent activity for the retention rule */
   restoredAt?: string
+  /** set aside: superseded by another thread (by/byTitle) or discarded; not pending, not red */
+  retired?: { reason: 'superseded' | 'discarded'; by?: string; byTitle?: string; at: string }
 }
 
 export interface ProcessInfo {

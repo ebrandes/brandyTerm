@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Circle, CircleCheck, ListChecks, Loader2, MessageCircleQuestion, Paperclip, Sparkles, SquareTerminal, User } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Circle, CircleCheck, ListChecks, Loader2, Paperclip, Sparkles, SquareTerminal, User } from 'lucide-react'
 import { AGENT_NAMES, type AgentId, type Message, type Project, type Thread } from '../types'
 import { AgentBadge } from './AgentBadge'
 import { Rich } from './Rich'
@@ -11,10 +11,10 @@ import { ArtifactCards } from './ArtifactCards'
 import { filesForSummary } from '../artifacts'
 import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention } from './ThreadAttention'
+import { AskCard } from './AskCard'
 import { ThreadMetaChips } from './ThreadMetaChips'
 import { MachineChip } from './MachineChip'
 import { terminalAccess } from '../machine-groups'
-import { api } from '../api'
 
 interface Props {
   project: Project
@@ -44,49 +44,6 @@ function Avatar({ m, agent }: { m: Message; agent?: AgentId }) {
   if (m.author === 'user') return <div className="avatar"><User size={15} /></div>
   if (m.author === 'agent' && agent) return <div className="avatar"><AgentBadge agent={agent} size="sm" /></div>
   return <div className="avatar accent"><Sparkles size={15} /></div>
-}
-
-function AskCard({ project, ask }: { project: Project; ask: NonNullable<Message['ask']> }) {
-  const [text, setText] = useState('')
-  const t = project.threads.find((x) => x.id === ask.threadId)
-  const open = t?.state === 'waiting' && t.question?.text === ask.question
-  const answer = (value: string) => {
-    if (!value.trim()) return
-    void api.send({ projectId: project.id, text: value.trim(), threadId: ask.threadId })
-    setText('')
-  }
-  return (
-    <div className={`ask${open ? '' : ' answered'}`}>
-      <div className="ask-q">
-        <MessageCircleQuestion size={15} /> {ask.question}
-      </div>
-      {open ? (
-        <>
-          {ask.options && (
-            <div className="ask-opts">
-              {ask.options.map((o) => (
-                <button key={o} onClick={() => answer(o)}>
-                  {o}
-                </button>
-              ))}
-            </div>
-          )}
-          <form
-            className="ask-form"
-            onSubmit={(e) => {
-              e.preventDefault()
-              answer(text)
-            }}
-          >
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Sua resposta…" aria-label="Resposta para a thread" />
-            <button type="submit" disabled={!text.trim()}>Responder</button>
-          </form>
-        </>
-      ) : (
-        <div className="ask-done">Respondida · a thread continuou</div>
-      )}
-    </div>
-  )
 }
 
 function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message; agent?: AgentId; inThread: boolean; project: Project; onOpenThread: (id: string) => void }) {
@@ -321,7 +278,7 @@ export function Chat(props: Props) {
             <ArtifactCards projectId={project.id} files={thread.files} />
           </div>
         ) : null}
-        {thread && <ThreadAttention t={thread} projectId={project.id} machine={project.machine} />}
+        {thread && <ThreadAttention t={thread} projectId={project.id} machine={project.machine} onOpenThread={onOpenThread} />}
         {!thread && project.busy && (
           <div className="working pad">
             <Loader2 size={14} className="spin" /> O coordenador está pensando…
