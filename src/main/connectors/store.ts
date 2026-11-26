@@ -5,10 +5,14 @@ import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { writeAtomic, keepCorrupt } from '../atomic-write.ts'
 import type { Connector } from '../../shared/connectors.ts'
+import { connectorProblem } from '../../shared/connector-problem.ts'
+import { readConnectors } from './store-load.ts'
 
 export class ConnectorStore extends EventEmitter {
   private items: Connector[]
   private readonly file: string
+  /** set when connectors.json could not be read as a list */
+  fault?: string
 
   constructor(file: string) {
     super()
@@ -16,13 +20,20 @@ export class ConnectorStore extends EventEmitter {
     this.items = this.load()
   }
 
+  /** every entry comes back, repaired or marked broken; the file as it was is copied aside before any rewrite */
   private load(): Connector[] {
+    let text: string
     try {
-      const v = JSON.parse(fs.readFileSync(this.file, 'utf8'))
-      if (Array.isArray(v)) return v
-    } catch { /* missing or corrupt */ }
-    keepCorrupt(this.file, 'connectors')
-    return []
+      text = fs.readFileSync(this.file, 'utf8')
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [] // not created yet
+      this.fault = `connectors.json não pôde ser lido: ${e instanceof Error ? e.message : String(e)}`
+      return []
+    }
+    const r = readConnectors(text)
+    if (r.changed) keepCorrupt(this.file, 'connectors')
+    this.fault = r.fault
+    return r.items
   }
 
   private save(): void {
@@ -59,12 +70,15 @@ export class ConnectorStore extends EventEmitter {
     return { ...made }
   }
 
+  /** `undefined` in a patch removes that field */
   update(id: string, patch: Partial<Omit<Connector, 'id'>>): Connector {
     const i = this.items.findIndex(x => x.id === id)
     if (i < 0) throw new Error('Conector não encontrado')
     if (patch.name !== undefined) this.requireName(patch.name, id)
     const { id: _ignored, ...rest } = patch as Partial<Connector>
-    this.items[i] = { ...this.items[i], ...rest, id }
+    const next: Connector = { ...this.items[i], ...rest, id }
+    for (const k of Object.keys(next) as (keyof Connector)[]) if (next[k] === undefined) delete next[k]
+    this.items[i] = next
     this.save()
     return { ...this.items[i] }
   }
@@ -88,7 +102,10 @@ export class ConnectorStore extends EventEmitter {
     this.save()
   }
 
+  /** a connector with a problem in its definition stays in the panel but is not offered to threads */
   visibleFor(projectPath: string): Connector[] {
-    return this.items.filter(c => c.enabled && (!c.projects || c.projects.includes(projectPath))).map(c => ({ ...c }))
+    return this.items
+      .filter(c => c.enabled && (!c.projects || c.projects.includes(projectPath)) && !connectorProblem(c))
+      .map(c => ({ ...c }))
   }
 }

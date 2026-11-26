@@ -31,7 +31,10 @@ test('a gateway socket that cannot listen leaves the app up, with no connectors 
   // a real listen failure: the socket's directory does not exist
   const startServer: typeof startGatewayServer = (_p, h) => startGatewayServer(join(userData, 'falta', 'gw.sock'), h)
   const { out, errors } = await quietly(() => bootConnectors({ engine: e as never, userData, runners, cipher, startServer }))
-  assert.deepEqual(e.state.connectors, { list: [], logins: [] })
+  // the panel says why it is empty instead of looking like the connectors were gone
+  const { fault, ...rest } = e.state.connectors as { fault?: string }
+  assert.deepEqual(rest, { list: [], logins: [] })
+  assert.match(fault ?? '', /^Conectores não iniciados: .*(listen|ENOENT|EACCES)/)
   assert.equal(thread.logins, undefined)
   assert.equal(gatewayFor(ref), null)
   assert.equal(errors.length, 1)

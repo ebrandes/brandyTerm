@@ -1,21 +1,32 @@
 /* Sidebar "Conectores" (ConnectorsSection.tsx) and its dialogs. Base .dot, .modal live in styles.css; the section frame in side-section.css. */
 .conn-row { padding: 6px 0; border-bottom: 1px solid var(--line); }
-.conn-main { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #cfcfda; }
-.conn-name { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.conn-count { font-size: 11px; color: var(--faint); white-space: nowrap; }
-.conn-switch { margin-left: auto; display: flex; }
+/* Windows: the .titlebar drag strip swallows clicks and right-clicks of whatever scrolls under it */
+.conn-row, .conn-else, .conn-remote { -webkit-app-region: no-drag; }
+.conn-main { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); min-width: 0; }
+/* the name keeps its full width; the tool count gives way first (much higher shrink), the name only when nothing else can */
+.conn-name { min-width: 3ch; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conn-count { min-width: 0; flex: 0 1000 auto; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--faint); white-space: nowrap; }
+.conn-switch { margin-left: auto; display: flex; flex: none; }
 .conn-switch input { accent-color: var(--accent); }
-.conn-chip { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line-hi); color: var(--muted); white-space: nowrap; }
-.conn-chip.ok { color: var(--green); border-color: var(--green); }
-.conn-chip.warn { color: var(--yellow); border-color: var(--yellow); }
-.conn-chip.err { color: var(--red); border-color: var(--red); }
-.conn-error { font-size: 11px; color: #e8845a; padding: 3px 0 0 14px; line-height: 1.35; }
+/* dot for the project in view (shared/connector-dot.ts): green usable here, yellow connected but off here, gray not connected */
+.conn-dot.on { background: var(--green); }
+.conn-dot.idle { background: var(--yellow); }
+.conn-dot.off { background: var(--faint); }
+.conn-more { flex: none; color: var(--faint); opacity: .55; }
+.conn-row:hover .conn-more, .conn-more:focus-visible, .conn-row.menu-open .conn-more { opacity: 1; color: var(--text); }
+.conn-error { font-size: 11px; color: var(--amber); padding: 3px 0 0 14px; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .conn-hint { font-size: 11.5px; line-height: 1.4; color: var(--faint); margin: 4px 0; }
 .conn-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 5px; }
 .conn-actions button, .conn-else button, .conn-pairs button { font-size: 12px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--line-hi); display: inline-flex; align-items: center; gap: 4px; }
 .conn-actions button:disabled { opacity: .45; }
 .conn-actions .primary-sm { background: var(--accent); border-color: var(--accent); color: #fff; }
 .conn-actions .danger-link { color: var(--red); }
+/* sidebar row: only Entrar / Corrigir stay on the row, full width; the rest is in the row's menu */
+.conn-row > .conn-actions { min-width: 0; }
+.conn-row > .conn-actions .primary-sm { flex: 1 1 100%; justify-content: center; }
+.conn-row > .conn-actions .primary-sm:hover { filter: brightness(1.08); }
+.conn-test { font-size: 11px; color: var(--muted); padding: 3px 0 0 14px; font-variant-numeric: tabular-nums; }
+.conn-test.ok { color: var(--green); }
 .conn-allow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; font-size: 11px; color: var(--faint); }
 .conn-tool { display: inline-flex; align-items: center; gap: 3px; padding: 1px 4px 1px 7px; border-radius: 999px; background: var(--card); border: 1px solid var(--line-hi); color: var(--muted); }
 .conn-tool button { color: var(--faint); line-height: 1; padding: 0 3px; }
@@ -44,6 +55,8 @@
 .conn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .conn-preset { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 10px; border-radius: 10px; border: 1px solid var(--line-hi); background: var(--card); }
 .conn-preset:hover { border-color: var(--accent-line); }
+.conn-preset strong, .conn-preset-title { display: flex; align-items: center; gap: 8px; margin: 0; }
+.preset-icon { flex: 0 0 auto; color: var(--text); }
 .conn-preset span { font-size: 11.5px; line-height: 1.35; color: var(--muted); }
 .conn-modal .conn-actions button, .conn-modal .conn-pairs button { font-size: 13px; padding: 6px 14px; }
 .conn-import { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid var(--line); }

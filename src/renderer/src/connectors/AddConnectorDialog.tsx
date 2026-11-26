@@ -5,6 +5,7 @@ import type { ConnectorDraft, ConnectorSecrets, Preset } from '../../../shared/c
 import { api } from '../api'
 import { errorText, report } from '../notice'
 import { CustomConnectorForm } from './CustomConnectorForm'
+import { PresetIcon } from './PresetIcon'
 
 interface Props {
   /** a preset id to start on (from "Instalar aqui") */
@@ -57,19 +58,19 @@ export function AddConnectorDialog({ initial, onClose }: Props) {
           <div className="conn-grid">
             {presets.map((p) => (
               <button key={p.id} className="conn-preset" onClick={() => setPick({ kind: 'preset', preset: p })}>
-                <strong>{p.name}</strong>
+                <strong><PresetIcon id={p.id} />{p.name}</strong>
                 <span>{p.description}</span>
               </button>
             ))}
             <button className="conn-preset" onClick={() => setPick({ kind: 'custom' })}>
-              <strong>Personalizado</strong>
+              <strong><PresetIcon />Personalizado</strong>
               <span>Um comando local ou uma URL com seus cabeçalhos</span>
             </button>
           </div>
         )}
         {pick?.kind === 'preset' && (
           <div className="conn-form">
-            <h4>{pick.preset.name}</h4>
+            <h4 className="conn-preset-title"><PresetIcon id={pick.preset.id} size={20} />{pick.preset.name}</h4>
             <p className="conn-hint">{pick.preset.description}</p>
             <div className="conn-actions">
               <button onClick={() => (initial ? onClose() : setPick(null))}>{initial ? 'Cancelar' : 'Voltar'}</button>

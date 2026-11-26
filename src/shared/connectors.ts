@@ -32,15 +32,22 @@ export interface Connector {
   alwaysAllow: string[]
   /** "Confio neste comando" given (custom/imported stdio) */
   trusted?: boolean
+  /** set at load when the saved entry was unreadable: it stays listed, with this reason, until fixed or removed */
+  broken?: string
 }
 
 export type ConnectorStatus = 'desconectado' | 'conectado' | 'precisa de login' | 'erro'
+
+/** "Testar" always ends by then: past the 60 s initialize timeout, so the client's own stage error comes first */
+export const CONNECTOR_TEST_MS = 75_000
 
 export interface ConnectorView extends Omit<Connector, 'auth'> {
   authKind: ConnectorAuth['kind']
   status: ConnectorStatus
   error?: string
   toolCount?: number
+  /** what is wrong with the saved definition itself (Corrigir fixes it); also in `error` */
+  problem?: string
 }
 
 export interface PanelLogin {
@@ -60,6 +67,8 @@ export type ThreadLogin = PanelLogin
 export interface ConnectorsState {
   list: ConnectorView[]
   logins: PanelLogin[]
+  /** connectors.json could not be read (a copy was kept): said in the panel instead of an empty list */
+  fault?: string
 }
 
 export interface Preset {
@@ -104,5 +113,8 @@ export type RemoteConnectorView = Pick<ConnectorView, 'id' | 'name' | 'descripti
 /** What the panel sends to add a connector. With a preset, main takes everything but these user fields from the preset. */
 export type ConnectorDraft = Partial<Omit<Connector, 'id' | 'alwaysAllow' | 'auth'>> & { name: string; auth?: ConnectorAuth }
 
-/** The only fields the panel may change on a saved connector. */
-export type ConnectorPatch = Partial<Pick<Connector, 'name' | 'description' | 'projects' | 'enabled'>>
+/** How a custom connector runs, sent by Corrigir: the same fields as the "Personalizado" form. */
+export type ConnectorDefinition = Pick<ConnectorDraft, 'transport' | 'command' | 'args' | 'url' | 'auth' | 'trusted'>
+
+/** The only fields the panel may change on a saved connector. `definition` only for custom (non-preset) ones. */
+export type ConnectorPatch = Partial<Pick<Connector, 'name' | 'description' | 'projects' | 'enabled'>> & { definition?: ConnectorDefinition }

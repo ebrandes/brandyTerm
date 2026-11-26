@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { ConnectorDraft, ConnectorSecrets } from '../../../shared/connectors.ts'
+import type { ConnectorDraft, ConnectorSecrets, ConnectorView } from '../../../shared/connectors.ts'
 import { validateCustom } from '../../../shared/custom-form.ts'
+import { fixPastedCommand, installHint } from '../../../shared/install-command.ts'
 
 type Pairs = { key: string; value: string }[]
 
@@ -21,23 +22,26 @@ function PairRows({ label, rows, onChange }: { label: string; rows: Pairs; onCha
   )
 }
 
+const toPairs = (r: Record<string, string>): Pairs => Object.entries(r).map(([key, value]) => ({ key, value }))
 const toRecord = (p: Pairs): Record<string, string> => Object.fromEntries(p.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value]))
 
 interface Props {
   busy: boolean
+  /** Corrigir: starts from the saved connector (secret values are never sent back, so they start empty) */
+  initial?: ConnectorView
   onSave: (draft: ConnectorDraft, secrets: ConnectorSecrets) => void
   onCancel: () => void
 }
 
 /** The "Personalizado" connector: a local command (stdio) or a remote URL (http), with secret values kept apart. */
-export function CustomConnectorForm({ busy, onSave, onCancel }: Props) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [transport, setTransport] = useState<'stdio' | 'http'>('stdio')
-  const [command, setCommand] = useState('')
-  const [args, setArgs] = useState('')
-  const [url, setUrl] = useState('')
-  const [oauth, setOauth] = useState(false)
+export function CustomConnectorForm({ busy, initial, onSave, onCancel }: Props) {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [transport, setTransport] = useState<'stdio' | 'http'>(initial?.transport === 'http' ? 'http' : 'stdio')
+  const [command, setCommand] = useState(initial?.command ?? '')
+  const [args, setArgs] = useState((initial?.args ?? []).join('\n'))
+  const [url, setUrl] = useState(initial?.url ?? '')
+  const [oauth, setOauth] = useState(initial?.authKind === 'oauth')
   const [env, setEnv] = useState<Pairs>([])
   const [headers, setHeaders] = useState<Pairs>([])
   const [trusted, setTrusted] = useState(false)
@@ -45,6 +49,24 @@ export function CustomConnectorForm({ busy, onSave, onCancel }: Props) {
   const argList = args.split('\n').map((a) => a.trim()).filter(Boolean)
   const envNames = toRecord(env)
   const canSave = !problem && !busy && (transport === 'http' || trusted)
+  // `claude mcp add … <url>` pasted as the command: it installs a server, it is not one
+  const pasted = transport === 'stdio' ? fixPastedCommand(command, argList) : null
+  const install = pasted?.kind === 'install' ? pasted : null
+
+  const applyFix = () => {
+    if (!install) return
+    const f = install.fixed
+    if (!name.trim() && install.name) setName(install.name)
+    if (f.transport === 'http') {
+      setTransport('http')
+      setUrl(f.url ?? '')
+      setHeaders([...headers.filter((h) => h.key.trim()), ...toPairs(f.headers)])
+    } else {
+      setCommand(f.command ?? '')
+      setArgs((f.args ?? []).join('\n'))
+      setEnv([...env.filter((e) => e.key.trim()), ...toPairs(f.env)])
+    }
+  }
 
   const save = () => {
     const base = { name: name.trim(), description: description.trim(), transport, enabled: true }
@@ -73,6 +95,11 @@ export function CustomConnectorForm({ busy, onSave, onCancel }: Props) {
               <span>Será executado exatamente:</span>
               <code>{[command.trim(), ...argList].join(' ')}</code>
               {Object.keys(envNames).length > 0 && <span>Com as variáveis: {Object.keys(envNames).join(', ')}</span>}
+            </div>
+          )}
+          {install && (
+            <div className="conn-error" role="alert">
+              {installHint(install)} <button type="button" onClick={applyFix}>Corrigir</button>
             </div>
           )}
           <label className="conn-trust">

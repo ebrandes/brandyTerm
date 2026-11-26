@@ -1,6 +1,6 @@
 // Live MCP clients, one per connector: connected lazily on first use, shared, closed after idle.
 import { EventEmitter } from 'node:events'
-import type { Connector, ConnectorStatus } from '../../shared/connectors.ts'
+import { CONNECTOR_TEST_MS, type Connector, type ConnectorStatus } from '../../shared/connectors.ts'
 
 export interface ToolInfo { name: string; description?: string; inputSchema: unknown }
 export interface CallResult { content: unknown[]; isError?: boolean }
@@ -33,6 +33,7 @@ export class ConnectorError extends Error {
 
 export const IDLE_MS = 600_000
 const TAIL_MAX = 500
+const TEST_STAGE = { initialize: 'conectar e initialize (handshake MCP)', list: 'tools/list (listar ferramentas)' }
 
 interface Entry {
   status: ConnectorStatus
@@ -48,13 +49,15 @@ export class ConnectorHub extends EventEmitter {
   private readonly factory: ClientFactory
   private readonly authFor: (c: Connector) => AuthMaterial
   private readonly idleMs: number
+  private readonly testMs: number
   private readonly entries = new Map<string, Entry>()
 
-  constructor(deps: { factory: ClientFactory; auth: (c: Connector) => AuthMaterial; idleMs?: number }) {
+  constructor(deps: { factory: ClientFactory; auth: (c: Connector) => AuthMaterial; idleMs?: number; testMs?: number }) {
     super()
     this.factory = deps.factory
     this.authFor = deps.auth
     this.idleMs = deps.idleMs ?? IDLE_MS
+    this.testMs = deps.testMs ?? CONNECTOR_TEST_MS
   }
 
   private entry(id: string): Entry {
@@ -161,8 +164,34 @@ export class ConnectorHub extends EventEmitter {
     return this.use(c, cl => cl.call(tool, args, signal))
   }
 
+  /** "Testar": connect and list the tools, always ending within testMs with the stage that did not answer */
   async test(c: Connector): Promise<number> {
-    return (await this.tools(c)).length
+    let stage = TEST_STAGE.initialize
+    const ctl = new AbortController()
+    let timer: NodeJS.Timeout | undefined
+    const late = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        ctl.abort()
+        reject(new ConnectorError(`Falhou em ${stage}: Tempo esgotado (${Math.round(this.testMs / 1000)} s) sem resposta do conector.`, 'failed'))
+      }, this.testMs)
+    })
+    late.catch(() => {})
+    const work = this.use(c, async cl => {
+      stage = TEST_STAGE.list
+      const list = await cl.tools(ctl.signal)
+      const e = this.entry(c.id)
+      if (e.toolCount !== list.length) { e.toolCount = list.length; this.emit('change', c.id) }
+      return list.length
+    })
+    work.catch(() => {})
+    try {
+      return await Promise.race([work, late])
+    } catch (err) {
+      if (ctl.signal.aborted && err instanceof ConnectorError && err.kind === 'failed') this.set(c.id, 'erro', err.message.slice(-TAIL_MAX))
+      throw err
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   async close(id: string): Promise<void> {

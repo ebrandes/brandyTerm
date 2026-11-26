@@ -7,6 +7,7 @@ import type { SecretStore } from './secrets.ts'
 import { PRESETS, presetById } from './presets.ts'
 import { validateCustom } from '../../shared/custom-form.ts'
 import { registerImportIpc } from './import-ipc.ts'
+import { normalizeDraft } from './pasted-fix.ts'
 
 export interface ConnectorsIpcDeps {
   store: ConnectorStore
@@ -69,7 +70,9 @@ export function registerConnectorsIpc({ store, secrets, hub, login }: Connectors
   registerImportIpc({ store, secrets }, reg)
   reg.add('connectors:presets', () => PRESETS, ruleOf('connectors:presets'))
 
-  reg.add('connectors:add', (a: { preset?: string; draft: ConnectorDraft; secrets?: ConnectorSecrets }) => {
+  reg.add('connectors:add', (raw: { preset?: string; draft: ConnectorDraft; secrets?: ConnectorSecrets }) => {
+    // a pasted `claude mcp add … <url>` or "npx -y pkg" in the command field is saved as what it meant
+    const a = raw?.preset === undefined && raw?.draft ? { ...raw, ...normalizeDraft(raw.draft, raw.secrets) } : raw
     const env = clean(a.secrets?.env)
     const headers = clean(a.secrets?.headers)
     const made = store.add(build(a, { env: Object.keys(env), headers: Object.keys(headers) }))
@@ -95,8 +98,17 @@ export function registerConnectorsIpc({ store, secrets, hub, login }: Connectors
     if (p.description !== undefined) patch.description = str(p.description)
     if (p.enabled !== undefined) patch.enabled = p.enabled === true
     if ('projects' in p) patch.projects = strList(p.projects)?.length ? strList(p.projects) : undefined
-    const env = clean(a.secrets?.env)
-    const headers = clean(a.secrets?.headers)
+    let sent = a.secrets
+    if (p.definition !== undefined) {
+      // Corrigir: how it runs changes; id, projects, switch and always-allowed tools stay
+      if (c.preset) throw new Error('Um conector pronto não muda de comando ou URL')
+      const n = normalizeDraft({ ...p.definition, name: patch.name ?? c.name }, a.secrets)
+      const d = build({ draft: n.draft }, { env: [], headers: [] })
+      Object.assign(patch, { transport: d.transport, command: d.command, args: d.args, url: d.url, auth: d.auth, trusted: d.trusted, broken: undefined })
+      sent = n.secrets
+    }
+    const env = clean(sent?.env)
+    const headers = clean(sent?.headers)
     const changed = Object.keys(env).length > 0 || Object.keys(headers).length > 0
     if (changed) {
       const prev = secrets.get(c.id)
@@ -105,7 +117,7 @@ export function registerConnectorsIpc({ store, secrets, hub, login }: Connectors
       patch.headerKeys = union(c.headerKeys, Object.keys(headers))
     }
     store.update(c.id, patch)
-    if (changed || patch.enabled === false) await hub.close(c.id) // the next call starts with the new values
+    if (changed || patch.enabled === false || p.definition !== undefined) await hub.close(c.id) // the next call starts with the new values
   }, ruleOf('connectors:update'))
 
   reg.add('connectors:remove', async (a: { id: string }) => {

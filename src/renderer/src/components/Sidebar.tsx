@@ -130,7 +130,7 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
         )
       })}
 
-      <ConnectorsSection state={connectors} projects={projects} viewing={viewed?.machine?.remote ? viewed.machine : undefined} />
+      <ConnectorsSection state={connectors} projects={projects} active={viewed} viewing={viewed?.machine?.remote ? viewed.machine : undefined} />
 
       {userPlugins && <UserPluginsPanel state={userPlugins} />}
 

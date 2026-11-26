@@ -15,6 +15,7 @@ import { LoginBroker, type Runners } from './login.ts'
 import { makeOAuthProvider } from './oauth-provider.ts'
 import { SecretStore, type Cipher } from './secrets.ts'
 import { ConnectorStore } from './store.ts'
+import { repairPasted } from './pasted-fix.ts'
 import { connectorView } from './view.ts'
 
 export interface ConnectorDeps {
@@ -55,9 +56,11 @@ export async function bootConnectors(d: BootOpts): Promise<Connectors> {
   } catch (e) {
     for (const off of detach) off()
     // fs and socket errors only: no secret reaches this message
-    console.error('Conectores não iniciados:', e instanceof Error ? e.message : String(e))
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('Conectores não iniciados:', msg)
     for (const t of d.engine.state.projects.flatMap(p => p.threads)) t.logins = undefined
-    d.engine.state.connectors = { list: [], logins: [] }
+    // said in the panel: an empty list here would look like the connectors were gone
+    d.engine.state.connectors = { list: [], logins: [], fault: `Conectores não iniciados: ${msg}` }
     return { stop: async () => {}, deps: refusing() }
   }
 }
@@ -66,6 +69,7 @@ async function boot(d: BootOpts, detach: (() => void)[]): Promise<Connectors> {
   const { engine } = d
   const store = new ConnectorStore(join(d.userData, 'connectors.json'))
   const secrets = new SecretStore(join(d.userData, 'connector-secrets.json'), d.cipher)
+  repairPasted(store, secrets)
   const hub = new ConnectorHub({
     factory: realFactory,
     auth: c => {
@@ -76,8 +80,9 @@ async function boot(d: BootOpts, detach: (() => void)[]): Promise<Connectors> {
   const login = new LoginBroker({ store, secrets, hub, runners: d.runners(secrets) })
 
   const view = (c: Connector): ConnectorView => connectorView(c, hub, login)
+  const fault = (): { fault?: string } => (store.fault ? { fault: store.fault } : {})
   const sync = (): void => {
-    engine.state.connectors = { list: store.list().map(view), logins: login.panelLogins() }
+    engine.state.connectors = { list: store.list().map(view), logins: login.panelLogins(), ...fault() }
     for (const t of engine.state.projects.flatMap(p => p.threads)) {
       const logins = login.threadLogins(t.id)
       t.logins = logins.length ? logins : undefined
@@ -85,7 +90,7 @@ async function boot(d: BootOpts, detach: (() => void)[]): Promise<Connectors> {
     engine.touch()
   }
   for (const t of engine.state.projects.flatMap(p => p.threads)) t.logins = undefined
-  engine.state.connectors = { list: store.list().map(view), logins: [] }
+  engine.state.connectors = { list: store.list().map(view), logins: [], ...fault() }
   for (const e of [store, hub, login]) e.on('change', sync)
   const off = (): void => { for (const e of [store, hub, login]) e.off('change', sync) }
   detach.push(off)
