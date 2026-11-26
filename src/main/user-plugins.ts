@@ -5,6 +5,7 @@ import { app } from 'electron'
 import type { UserPlugin, UserPluginsState } from '../shared/types.ts'
 import { diagLog, diagLogOnChange } from './diag-log.ts'
 import { OWN_PLUGIN_NAMES } from './plugins.ts'
+import { countSkills } from './skills/count.ts'
 
 /**
  * The user's own Claude Code skills and plugins, offered to BrandyTerm threads.
@@ -56,7 +57,7 @@ const mdCount = (dir: string) => list(dir).filter((f) => f.endsWith('.md')).leng
 function inspect(dir: string): Pick<Found, 'skills' | 'commands' | 'agents' | 'hooks' | 'mcp' | 'description'> {
   const m = readJson(join(dir, '.claude-plugin', 'plugin.json')) ?? {}
   return {
-    skills: skillCount(join(dir, 'skills')),
+    skills: countSkills(dir),
     commands: mdCount(join(dir, 'commands')),
     agents: mdCount(join(dir, 'agents')),
     hooks: !!m.hooks || existsSync(join(dir, 'hooks', 'hooks.json')),
