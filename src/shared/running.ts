@@ -1,5 +1,5 @@
 // "Is something running?": the one rule behind the deferred apply and the threads' `app_status`.
-// Applying to the project folder restarts the app, so this lists what a restart would kill.
+// Applying to the project folder may restart the app, so this lists what a restart would kill.
 import type { Project } from './types.ts'
 
 export type RunningKind = 'coordinator' | 'thread' | 'report'

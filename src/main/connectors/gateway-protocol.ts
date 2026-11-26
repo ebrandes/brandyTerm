@@ -58,7 +58,7 @@ export const TOOLS = [
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: 'object' as const, properties, required })
 const text = (description: string) => ({ type: 'string', description })
 
-/** Listed in every thread's gateway. Neither changes a file: queue_apply only files a request the user approves. */
+/** Listed in every thread's gateway. Neither changes a file itself: queue_apply files a request the app applies later. */
 export const APP_TOOLS = [
   {
     name: 'app_status',
@@ -67,7 +67,7 @@ export const APP_TOOLS = [
   },
   {
     name: 'queue_apply',
-    description: 'Pede para aplicar o que uma worktree commitou na pasta principal do projeto (git apply, sem commit). O usuário aprova uma vez no app, que aplica sozinho quando nada estiver rodando, uma aplicação por vez. Faça commit na worktree antes.',
+    description: 'Pede para aplicar o que uma worktree commitou na pasta principal do projeto (git apply, sem commit). O app aplica sozinho quando nada estiver rodando, uma aplicação por vez; só pede aprovação ao usuário quando a mudança é no próprio BrandyTerm e exige reiniciá-lo. Faça commit na worktree antes.',
     inputSchema: obj(
       {
         worktree: text('Caminho da worktree'),

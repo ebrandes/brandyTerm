@@ -15,7 +15,9 @@ export function appGateway(queue: ApplyQueue): GwHandler {
       const a = (req.args ?? {}) as Record<string, unknown>
       const r = await queue.request(ref.projectId, ref.threadId, { worktree: str(a.worktree), title: str(a.title), base: str(a.base) || undefined })
       return [
-        `Na fila (posição ${r.position}). O usuário aprova uma vez no painel "Aplicações" do menu lateral; o app aplica sozinho quando nada estiver rodando.`,
+        `Na fila (posição ${r.position}). ${r.auto
+          ? 'Não precisa de aprovação: o app aplica sozinho quando nada estiver rodando.'
+          : 'Como a mudança reinicia o app, o usuário aprova uma vez no painel "Aplicações" do menu lateral; o app aplica sozinho quando nada estiver rodando.'}`,
         'Não pergunte nada sobre isso e não aplique à mão. Encerre com RESUMO.',
         ...(r.warning ? [`ATENÇÃO: ${r.warning}`] : [])
       ].join('\n')

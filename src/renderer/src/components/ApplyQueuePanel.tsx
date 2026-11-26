@@ -7,9 +7,9 @@ import './apply-queue.css'
 
 /** the line under a request's title; `ahead` are the approved or failed ones before it */
 function statusLine(item: ApplyItem, running: number, ahead: ApplyItem[]): string {
-  if (item.status === 'approval') return 'aguardando sua aprovação'
+  if (item.status === 'approval') return 'aguardando sua aprovação: reinicia o app'
   if (item.status === 'applying') return 'aplicando…'
-  if (item.status === 'applied') return 'aplicado'
+  if (item.status === 'applied') return item.auto ? 'aplicado automaticamente' : 'aplicado'
   if (item.status === 'failed') return item.error ?? 'falhou'
   if (ahead.some((i) => i.status === 'failed')) return 'parada: resolva a que falhou antes'
   return ahead.length ? `na fila (${ahead.length + 1}ª)` : waitingLabel(running)
@@ -23,6 +23,7 @@ function Row({ item, project, line }: { item: ApplyItem; project?: string; line:
       <div className="aq-title" title={files}>{item.title}</div>
       <div className="aq-sub" title={files}>
         {project ? `${project} · ` : ''}{item.files.length === 1 ? '1 arquivo' : `${item.files.length} arquivos`}
+        {item.auto && item.status !== 'applied' ? ' · automático' : ''}
       </div>
       <div className="aq-status" role="status" title={line}>{line}</div>
       {item.status !== 'applying' && (

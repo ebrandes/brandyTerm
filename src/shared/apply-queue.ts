@@ -16,6 +16,8 @@ export interface ApplyItem {
   head: string
   files: string[]
   status: ApplyStatus
+  /** applied without asking the user: it does not restart BrandyTerm (see apply-auto.ts) */
+  auto?: boolean
   error?: string
   createdAt: string
   appliedAt?: string
@@ -52,6 +54,9 @@ export function enqueue(items: ApplyItem[], item: ApplyItem): ApplyItem[] {
 }
 
 export const approve = (items: ApplyItem[], id: string): ApplyItem[] => change(items, id, ['approval'], { status: 'pending' })
+
+/** releases a waiting request that, by the current rule, never needed the approval */
+export const release = (items: ApplyItem[], id: string): ApplyItem[] => change(items, id, ['approval'], { status: 'pending', auto: true })
 
 export const retry = (items: ApplyItem[], id: string): ApplyItem[] => change(items, id, ['failed'], { status: 'pending', error: undefined })
 

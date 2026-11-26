@@ -166,8 +166,8 @@ app.whenReady().then(async () => {
     hiddenRoots: () => engine.state.projects.filter((p) => p.remoteHidden && p.path).map((p) => p.path as string)
   })
   const skills = startSkills(engine)
-  // worktrees waiting to be applied: only while nothing runs, because applying src/main restarts the app
-  const applyQueue = new ApplyQueue(engine, app.getPath('userData'))
+  // worktrees waiting to be applied, only while nothing runs; what restarts this app (from source) also waits for approval
+  const applyQueue = new ApplyQueue(engine, app.getPath('userData'), Date.now, app.isPackaged ? undefined : app.getAppPath())
   await applyQueue.start().catch((e) => console.error('[apply]', e))
   app.once('before-quit', () => applyQueue.stop())
   registerApplyIpc(applyQueue)

@@ -1,10 +1,12 @@
 // Deferred apply of worktrees to project folders: waits until nothing runs in any project, then
-// applies one approved request at a time. The rules are in shared/apply-queue.ts.
+// applies one request at a time. Only a change that restarts BrandyTerm itself waits for the user's
+// approval. The rules are in shared/apply-queue.ts and shared/apply-auto.ts.
+import { restartFiles } from '../shared/apply-auto.ts'
 import * as rules from '../shared/apply-queue.ts'
 import type { ApplyItem, ApplyQueueView } from '../shared/apply-queue.ts'
 import { runningItems, type RunningItem } from '../shared/running.ts'
 import type { Message, Project } from '../shared/types.ts'
-import { applyPatch, checkPatch, isApplied, makePatch, toplevel } from './apply-git.ts'
+import { applyPatch, checkPatch, isApplied, makePatch, realDir, toplevel } from './apply-git.ts'
 import { buildItem, type ApplyRequest } from './apply-request.ts'
 import { ApplyStore } from './apply-store.ts'
 
@@ -24,6 +26,7 @@ export class ApplyQueue {
   private store: ApplyStore
   private host: QueueHost
   private now: () => number
+  private appRoot?: string
   private bootAt: number
   private idleSince: number | null = null
   private lastApplyAt: number | null = null
@@ -31,9 +34,11 @@ export class ApplyQueue {
   private published = ''
   private timer?: ReturnType<typeof setInterval>
 
-  constructor(host: QueueHost, userData: string, now: () => number = Date.now) {
+  /** `appRoot` is the folder the app runs from; absent when packaged, where no apply restarts it */
+  constructor(host: QueueHost, userData: string, now: () => number = Date.now, appRoot?: string) {
     this.host = host
     this.now = now
+    this.appRoot = appRoot
     this.bootAt = now()
     this.store = new ApplyStore(userData)
     this.items = this.store.load()
@@ -47,6 +52,7 @@ export class ApplyQueue {
     this.onChange()
     await this.exclusive(async () => {
       for (const i of this.items.filter((x) => x.status === 'applying')) await this.reconcile(i)
+      for (const i of this.items.filter((x) => x.status === 'approval')) await this.reassess(i)
     })
   }
 
@@ -63,19 +69,22 @@ export class ApplyQueue {
     return rules.visibleItems(this.items)
   }
 
-  /** a thread asks: the item waits for the user's approval */
-  async request(projectId: string, threadId: string | undefined, req: ApplyRequest): Promise<{ position: number; warning?: string }> {
+  /** a thread asks: the item waits for the user's approval only if applying it restarts the app */
+  async request(projectId: string, threadId: string | undefined, req: ApplyRequest): Promise<{ position: number; auto: boolean; warning?: string }> {
     const p = this.project(projectId)
     if (!p) throw new Error('Projeto não encontrado.')
-    const item = await buildItem(p, threadId, req, this.now())
+    let item = await buildItem(p, threadId, req, this.now())
     const root = await toplevel(p.path!)
     const file = this.store.patchFile(item.id)
     await makePatch(root, item.base, item.head, file)
     const problem = await checkPatch(root, file)
+    const auto = !(await this.needsApproval(root, item.files))
+    if (auto) item = { ...item, status: 'pending', auto }
     this.set(rules.enqueue(this.items, item))
     const position = this.items.filter((i) => i.status !== 'applied' && i.status !== 'cancelled').length
     return {
       position,
+      auto,
       ...(problem ? { warning: `Agora o patch não aplica na pasta do projeto (${problem}). Se a worktree começou com um commit que copia mudanças não commitadas, passe esse commit em "base".` } : {})
     }
   }
@@ -133,6 +142,23 @@ export class ApplyQueue {
     }
   }
 
+  private async needsApproval(root: string, files: string[]): Promise<boolean> {
+    if (!this.appRoot || !restartFiles(files).length) return false
+    // if git cannot tell, the folder itself is compared: a passing error must not release the app's core
+    const appTop = await toplevel(this.appRoot).catch(() => realDir(this.appRoot!))
+    return root === appTop
+  }
+
+  /** a request saved as waiting may not need to: it was queued under an older rule */
+  private async reassess(item: ApplyItem): Promise<void> {
+    try {
+      const path = this.project(item.projectId)?.path
+      if (path && !(await this.needsApproval(await toplevel(path), item.files))) this.set(rules.release(this.items, item.id))
+    } catch (e) {
+      console.error('[apply]', e) // it keeps waiting for the user
+    }
+  }
+
   private async reconcile(item: ApplyItem): Promise<void> {
     try {
       const path = this.project(item.projectId)?.path
@@ -153,7 +179,9 @@ export class ApplyQueue {
     this.lastApplyAt = this.now()
     this.set(rules.settle(this.items, item.id, { status: 'applied', appliedAt: new Date(this.now()).toISOString() }))
     this.store.dropPatch(item.id)
-    this.say(item, `Aplicado na pasta do projeto: ${item.title}${note ? ` (${note})` : ''}.`)
+    const how = item.auto ? 'Aplicado automaticamente' : 'Aplicado'
+    const notes = [note, item.auto ? 'não exige reiniciar o app' : ''].filter(Boolean).join('; ')
+    this.say(item, `${how} na pasta do projeto: ${item.title}${notes ? ` (${notes})` : ''}.`)
   }
 
   private failed(item: ApplyItem, error: string): void {

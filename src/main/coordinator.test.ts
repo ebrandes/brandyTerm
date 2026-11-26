@@ -119,6 +119,9 @@ test('prompts send applying a worktree to the queue instead of asking whether th
   const project = { name: 'Demo', path: '', threads: [], processes: [], messages: [] } as unknown as Project
   for (const p of [buildThreadPrompt(project, 'obj', 'codex'), buildPlanPrompt(project, ['claude'], 'oi')]) {
     assert.match(p, /queue_apply/)
+    assert.match(p, /edit(e|ar) direto na pasta do projeto/)
+    assert.match(p, /src\/main, src\/preload, src\/shared, package\.json/)
+    assert.match(p, /reinicia o app/)
     assert.match(p, /[Nn]unca (pergunte ao usuário se há threads rodando|peça ao usuário para confirmar que não há threads rodando)/)
   }
 })

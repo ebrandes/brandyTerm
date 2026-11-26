@@ -63,8 +63,9 @@ export const commitOf = async (dir: string, rev: string): Promise<string> =>
 
 export const mergeBase = async (root: string, a: string, b: string): Promise<string> => (await must(root, ['merge-base', a, b])).trim()
 
+/** NUL separated: otherwise git quotes unusual names, which would hide their folder from apply-auto.ts */
 export const changedFiles = async (root: string, base: string, head: string): Promise<string[]> =>
-  (await must(root, ['diff', '--no-renames', '--name-only', base, head, '--'])).split('\n').filter(Boolean)
+  (await must(root, ['diff', '--no-renames', '--name-only', '-z', base, head, '--'])).split('\0').filter(Boolean)
 
 /** git writes the file itself, so no byte goes through a text decoding. False when there is no change. */
 export async function makePatch(root: string, base: string, head: string, file: string): Promise<boolean> {
