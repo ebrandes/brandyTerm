@@ -46,8 +46,9 @@ export interface BrandyApi {
   cancelThread(args: { projectId: string; threadId: string }): Promise<void>
   /** answer the tool approval card of a running thread */
   approveTool(args: { projectId: string; threadId: string; id: string; decision: ApprovalDecision }): Promise<void>
-  /** mark a thread with something pending as resolved */
+  /** full report of a done thread, posted in the main chat */
   reportThread(args: { projectId: string; threadId: string }): Promise<void>
+  /** mark a thread with something pending as resolved */
   resolveThread(args: { projectId: string; threadId: string }): Promise<void>
   /** sets aside an interrupted or failed thread ("descartada"): no longer pending */
   retireThread(args: { projectId: string; threadId: string }): Promise<void>
