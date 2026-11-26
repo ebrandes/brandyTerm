@@ -261,6 +261,29 @@ export interface AgentInfo {
 }
 
 /** A plugin from the user's own Claude Code install that threads may load. */
+/** An entry of the skills library catalog (`biblioteca/catalogo.json`). */
+export interface CatalogItem {
+  id: string
+  tipo: 'plugin' | 'skill'
+  descricao: string
+  tags: string[]
+  /** in every project unless the list puts it in `sem` */
+  sempre?: boolean
+  /** never copied, staged or scanned off-machine */
+  corporativo?: boolean
+  plataformas?: ('mac' | 'win')[]
+  /** `dono/repo` for `claude plugin marketplace add` when the store isn't known yet */
+  loja?: string
+}
+
+/** A project's skills list (`<projeto>/.brandyterm/skills.json`). */
+export interface SkillsList {
+  versao: 1
+  plugins: { id: string; ref?: string }[]
+  skills: string[]
+  sem: string[]
+}
+
 export interface UserPlugin {
   id: string
   name: string
