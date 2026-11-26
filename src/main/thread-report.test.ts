@@ -216,3 +216,30 @@ test('a session changed during the run (e.g. /clear) is not overwritten by its r
   assert.equal(t.sessionId, undefined)
   assert.equal(p.messages.length, 1)
 })
+
+test('cancel of a short report calls its onFail once; the late result is still ignored', async () => {
+  const f = fakeHost()
+  const r = new ThreadReporter(f.host)
+  const t = thread()
+  const p = project(t)
+  let failed = 0
+  r.report(p, t, 'curto', () => failed++)
+  r.cancel(t.id)
+  assert.equal(failed, 1)
+  r.cancel(t.id)
+  f.runs[0].resolve({ ok: true, text: REPORT })
+  await flush()
+  assert.equal(failed, 1)
+  assert.equal(p.messages.length, 0)
+  assert.deepEqual(f.remembered, [])
+})
+
+test('cancel of a full report does not call onFail', () => {
+  const f = fakeHost()
+  const r = new ThreadReporter(f.host)
+  const t = thread()
+  let failed = 0
+  r.report(project(t), t, 'completo', () => failed++)
+  r.cancel(t.id)
+  assert.equal(failed, 0)
+})

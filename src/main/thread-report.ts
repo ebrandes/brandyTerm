@@ -39,6 +39,8 @@ interface Running {
   thread: Thread
   /** set for an ask run: a cancelled question goes back to the queue */
   question?: string
+  /** set for a short report: a cancelled one falls back to the caller's plain notice */
+  onCancel?: () => void
 }
 
 type Done = (res: SilentResult) => void
@@ -62,7 +64,8 @@ export class ThreadReporter {
   /** false (and nothing runs) when the thread has no session or is busy */
   report(p: Project, t: Thread, kind: ReportKind, onFail?: () => void): boolean {
     if (!t.sessionId || this.occupied(t)) return false
-    this.start(p, t, reportPrompt(kind), undefined, (res) => this.reported(p, t, kind, res, onFail))
+    const onCancel = kind === 'curto' ? onFail : undefined
+    this.start(p, t, reportPrompt(kind), { onCancel }, (res) => this.reported(p, t, kind, res, onFail))
     t.reporting = true
     this.host.touch()
     return true
@@ -79,7 +82,10 @@ export class ThreadReporter {
     return ''
   }
 
-  /** stops the silent run of a thread (the user is about to talk to it); its result is ignored */
+  /**
+   * stops the silent run of a thread (the user is about to talk to it); its result is ignored.
+   * A short report falls back to its onFail, so the main chat still hears about the turn.
+   */
   cancel(threadId: string): void {
     const cur = this.running.get(threadId)
     if (!cur) return
@@ -88,6 +94,7 @@ export class ThreadReporter {
     if (cur.question !== undefined) this.queue(threadId).unshift(cur.question)
     cur.thread.reporting = false
     this.host.touch()
+    cur.onCancel?.()
   }
 
   /** call after a thread's normal run settles: runs a queued question */
@@ -119,8 +126,8 @@ export class ThreadReporter {
     this.startAsk(p, t, question)
   }
 
-  private start(p: Project, t: Thread, prompt: string, question: string | undefined, done: Done): void {
-    const entry: Running = { run: this.host.run(p, t, prompt), thread: t, question }
+  private start(p: Project, t: Thread, prompt: string, extra: Pick<Running, 'question' | 'onCancel'>, done: Done): void {
+    const entry: Running = { run: this.host.run(p, t, prompt), thread: t, ...extra }
     const startedWith = t.sessionId
     this.running.set(t.id, entry)
     void entry.run.result
@@ -155,7 +162,7 @@ export class ThreadReporter {
   }
 
   private startAsk(p: Project, t: Thread, question: string): void {
-    this.start(p, t, askPrompt(question), question, (res) => {
+    this.start(p, t, askPrompt(question), { question }, (res) => {
       if (!res.ok) {
         p.messages.push(this.failure(`Não consegui perguntar à thread “${t.title}”`, res))
         return this.host.touch()
