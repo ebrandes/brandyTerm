@@ -83,6 +83,11 @@ const api: BrandyApi = {
     importList: () => ipcRenderer.invoke('connectors:import-list'),
     import: (a) => ipcRenderer.invoke('connectors:import', a)
   },
+  update: {
+    get: () => ipcRenderer.invoke('update:get'),
+    onChange: (cb) => listen('update:status', cb),
+    openRelease: () => ipcRenderer.invoke('update:open-release')
+  },
   notify: {
     setView: (view) => ipcRenderer.invoke('notify:view', view),
     takeTarget: () => ipcRenderer.invoke('notify:take-target'),

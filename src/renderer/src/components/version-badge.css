@@ -1,0 +1,13 @@
+/* the logo's row: it keeps the logo's height, and the version column overflows it evenly */
+.brand-row { position: relative; display: flex; align-items: center; gap: 6px; height: 22px; flex: none; margin: -4px -4px 18px 8px; }
+.brand-row .brand { margin: 0; align-self: center; min-width: 0; flex: 0 1 auto; object-fit: contain; object-position: left; }
+/* the .titlebar drag strip sits above the top of the sidebar: without no-drag it swallows the click (Windows too) */
+.version-box { margin-left: auto; flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; -webkit-app-region: no-drag; }
+.version-text { font-size: 11px; line-height: 14px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.update-chip { font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 5px; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.update-chip:hover { color: var(--text); }
+.update-pop { position: absolute; top: calc(100% + 12px); right: 4px; z-index: 20; width: 200px; display: grid; gap: 6px; padding: 10px; font-size: 12px; color: var(--muted); background: var(--card-hi); border: 1px solid var(--line-hi); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.update-cmd { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.update-cmd code { color: var(--text); user-select: text; }
+.update-cmd button { font-size: 11px; padding: 2px 8px; border-radius: 5px; color: var(--muted); border: 1px solid var(--line-hi); }
+.update-cmd button:hover { color: var(--text); }

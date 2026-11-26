@@ -101,6 +101,9 @@ export const RULES = {
   'remote:open-bytes': 'deny',
   'remote:status': 'deny',
   // notifications are about this machine's window
+  // the version and update notice of this machine's app
+  'update:get': 'deny',
+  'update:open-release': 'deny',
   'notify:view': 'deny',
   'notify:take-target': 'deny'
 } as const satisfies Record<string, RemoteRule>

@@ -24,6 +24,7 @@ import { startRemote, type Remote } from './remote/index.ts'
 import { startClient } from './remote/client-ipc.ts'
 import type { RemoteHosts } from './remote/hosts.ts'
 import { registerAppIpc } from './app-ipc.ts'
+import { registerUpdateIpc } from './update-ipc.ts'
 import { registry } from './rpc/registry.ts'
 import { bindIpc } from './rpc/ipc.ts'
 import { configureDiagLog } from './diag-log.ts'
@@ -153,6 +154,7 @@ app.whenReady().then(async () => {
   registerAppIpc({ engine, getWin: () => win, pushState })
   registerAttachmentIpc()
   registerLogsIpc()
+  registerUpdateIpc(() => win)
   const projectRoot = (id: string) => {
     const p = engine.state.projects.find((x) => x.id === id)
     return p && !p.demo ? p.path : null

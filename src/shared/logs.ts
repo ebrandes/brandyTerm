@@ -3,7 +3,7 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 /** the log areas the app can show; the connectors panel opens 'mcp' */
-export type LogArea = 'mcp' | 'plugins' | 'skills' | 'remote' | 'notify' | 'usage'
+export type LogArea = 'mcp' | 'plugins' | 'skills' | 'remote' | 'notify' | 'usage' | 'update'
 
 export interface LogEntry {
   ts: string

@@ -32,6 +32,7 @@ export const UNSCOPED = new Set([
   'remote:status',
   'fs:browse', 'project:add-path',
   'skills:setLibrary',
+  'update:get', 'update:open-release',
   'notify:view', 'notify:take-target'
 ])
 

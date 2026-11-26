@@ -16,6 +16,7 @@ import { PluginCoverage } from './PluginCoverage'
 import { RemotePanel } from './RemotePanel'
 import { UsageReportButton } from './UsageReport'
 import { SideSection } from './SideSection'
+import { VersionBadge } from './VersionBadge'
 import { MachineGroupHead } from './MachineGroupHead'
 import { showGroups, type MachineGroup } from '../machine-groups'
 import { readyLabel } from '../side-summary'
@@ -99,7 +100,10 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
   const viewed = projects.find((p) => p.id === activeId)
   return (
     <aside className="sidebar" id="sidebar">
-      <img className="brand" src={logo} alt="BrandyTerm" draggable={false} />
+      <div className="brand-row">
+        <img className="brand" src={logo} alt="BrandyTerm" draggable={false} />
+        <VersionBadge />
+      </div>
       <div className="side-head">
         <h2 className="side-title">Projetos</h2>
         <button className="icon-btn" onClick={() => onOpen()} aria-label="Abrir pasta" title="Abrir pasta como projeto">

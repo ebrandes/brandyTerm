@@ -3,7 +3,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { LogArea, LogEntry, LogLevel, LogsRead } from '../shared/logs.ts'
 
-const AREAS: Record<LogArea, true> = { mcp: true, plugins: true, skills: true, remote: true, notify: true, usage: true }
+const AREAS: Record<LogArea, true> = { mcp: true, plugins: true, skills: true, remote: true, notify: true, usage: true, update: true }
 const LEVELS: LogLevel[] = ['debug', 'info', 'warn', 'error']
 
 export function logArea(value: unknown): LogArea {
