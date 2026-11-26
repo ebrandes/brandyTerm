@@ -8,6 +8,9 @@ test('reportPrompt pede as linhas certas', () => {
   assert.ok(!c.includes('PENDENTE:'))
   assert.ok(reportPrompt('completo').includes('PENDENTE:'))
   assert.ok(c.includes('Não altere arquivos'))
+  for (const s of [c, reportPrompt('completo'), askPrompt('x')]) {
+    assert.ok(s.includes('Não altere arquivos nem rode comandos nesta resposta.'))
+  }
 })
 test('parseReport lê as linhas, multilinha até a próxima etiqueta', () => {
   const r = parseReport('FEITO: a\nb\nDECIDIDO: c\nARQUIVOS: x.ts, y.ts\nPENDENTE: nada')

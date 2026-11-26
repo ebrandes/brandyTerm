@@ -11,7 +11,8 @@ export interface Report {
 }
 
 const EMPTY_RE = /^(nada|nenhum|nenhuma|-)[.!;,]*$/i
-const NO_CHANGES = 'Não altere arquivos nem rode comandos.'
+// scoped to this answer: a killed silent turn may leave it in the session before the user's next message
+const NO_CHANGES = 'Não altere arquivos nem rode comandos nesta resposta.'
 const LABEL_RE = /^\s*(?:[-*]\s+)?\**\s*(FEITO|DECIDIDO|ARQUIVOS|PENDENTE)\**\s*:\**/i
 
 export function reportPrompt(kind: ReportKind): string {
