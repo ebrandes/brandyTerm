@@ -205,10 +205,22 @@ The user wants to:
 
 ### 8. Configuration parity (phase 5)
 
+Since the skills library (`docs/superpowers/specs/2026-11-25-skills-biblioteca-design.md`),
+a project with a `.brandyterm/skills.json` list carries its own skills setup: the list
+travels with the project's git, the loose skills and the catalog travel with the library
+repo (`ebrandes/claude-kit`), and each machine installs what the list names and is missing
+(the panel's "Instalar"). Parity no longer handles personal skills or
+`thread-plugins.json` for those projects. It keeps handling user-level hooks, MCP
+servers, portable app settings, and plugins installed outside any project list. Projects
+without a list keep the old setup (personal skills and `thread-plugins.json`), and parity
+still covers them until they get a list through `/skill-init`.
+
 - Each host builds an inventory:
   - Claude Code plugins: marketplaces, installed plugins with versions, enabled state.
-  - Personal skills (`~/.claude/skills/*`), with content hash.
-  - BrandyTerm: thread plugin toggles (`thread-plugins.json`) and portable app
+  - Personal skills (`~/.claude/skills/*`), with content hash (only for projects
+    without a skills list).
+  - BrandyTerm: thread plugin toggles (`thread-plugins.json`, only for projects without
+    a skills list) and portable app
     settings (keep awake, idle compaction, "permitir tudo"; not `lastProjectId`,
     `lastSeen`, accounts).
   - User-level Claude Code hooks and MCP servers from `~/.claude/settings.json` and
