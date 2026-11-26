@@ -2,10 +2,11 @@
 // one JSON object per "\n"-terminated line over a local socket.
 // `cancel` is not a request: it names, by `id`, an earlier request on the same socket that the agent gave up on.
 // Main aborts that request (its login wait, its approval card, a running call) and sends no answer for either.
+// `skills` carries one of SKILL_TOOLS (in `tool`) to the skills handler, for /skill-* threads only.
 export interface GwRequest {
   id: number
   token: string
-  op: 'list' | 'tools' | 'call' | 'cancel'
+  op: 'list' | 'tools' | 'call' | 'cancel' | 'skills'
   name?: string
   tool?: string
   args?: unknown
@@ -50,6 +51,54 @@ export const TOOLS = [
       },
       required: ['name', 'tool'],
     },
+  },
+]
+
+const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: 'object' as const, properties, required })
+const text = (description: string) => ({ type: 'string', description })
+
+/** Listed only in a /skill-* thread's gateway (BRANDY_GATEWAY_SKILLS=1). Every change asks the user first. */
+export const SKILL_TOOLS = [
+  {
+    name: 'skills_catalog',
+    description: 'Lista os itens do catálogo da biblioteca de skills e a lista atual do projeto.',
+    inputSchema: obj({}),
+  },
+  {
+    name: 'skills_add',
+    description: 'Liga um item do catálogo neste projeto. Mostra um cartão ao usuário; se for um plugin que falta, instala.',
+    inputSchema: obj({ id: text('Id do item no catálogo'), motivo: text('Por que serve a este projeto, em uma linha') }, ['id', 'motivo']),
+  },
+  {
+    name: 'skills_remove',
+    description: 'Tira um item da lista deste projeto (um item da base vai para "sem"). Mostra um cartão ao usuário.',
+    inputSchema: obj({ id: text('Id do item'), motivo: text('Por que não serve mais, em uma linha') }, ['id', 'motivo']),
+  },
+  {
+    name: 'skills_resolve',
+    description: 'Lê a origem do /skill-install (URL do GitHub, dono/repo, dono/repo/pasta ou id do catálogo) e baixa o repositório para análise.',
+    inputSchema: obj({ origem: text('Origem como o usuário escreveu') }, ['origem']),
+  },
+  {
+    name: 'skills_import',
+    description: 'Importa para a biblioteca o que skills_resolve baixou: roda a checagem de segurança, mostra um cartão por item, liga no projeto e faz o commit no clone da biblioteca.',
+    inputSchema: obj(
+      {
+        staging: text('Pasta devolvida por skills_resolve'),
+        itens: {
+          type: 'array',
+          description: 'Um por skill (ou o plugin escolhido), com descrição em pt-BR escrita a partir do SKILL.md',
+          items: obj({ nome: text('Nome da skill ou do plugin'), descricao: text('Uma linha em pt-BR'), tags: { type: 'array', items: { type: 'string' } } }, ['nome', 'descricao']),
+        },
+        plugin: text('Numa loja de plugins: o plugin escolhido'),
+      },
+      ['staging', 'itens'],
+    ),
+  },
+  {
+    name: 'skills_push',
+    description: 'Envia os commits da biblioteca para o GitHub (git push). Mostra um cartão ao usuário.',
+    inputSchema: obj({}),
   },
 ]
 

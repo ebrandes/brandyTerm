@@ -25,10 +25,11 @@ export function gatewayScript(): string {
   return join(typeof __dirname === 'string' ? __dirname : resolve('out/main'), 'gateway.js')
 }
 
-export function gatewaySpec(socket: string, token: string): GatewaySpec {
+/** `extraEnv` adds flags for this thread's gateway (BRANDY_GATEWAY_SKILLS for /skill-* threads). */
+export function gatewaySpec(socket: string, token: string, extraEnv?: Record<string, string>): GatewaySpec {
   return {
     command: process.execPath,
     args: [gatewayScript()],
-    env: { ELECTRON_RUN_AS_NODE: '1', BRANDY_GATEWAY_SOCKET: socket, BRANDY_GATEWAY_TOKEN: token },
+    env: { ELECTRON_RUN_AS_NODE: '1', BRANDY_GATEWAY_SOCKET: socket, BRANDY_GATEWAY_TOKEN: token, ...extraEnv },
   }
 }

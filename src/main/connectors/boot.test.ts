@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import { join } from 'node:path'
 import { BOOT_FAILED, bootConnectors } from './boot.ts'
-import { startGatewayServer } from './gateway-server.ts'
+import { startGatewayServer, type GwHandler } from './gateway-server.ts'
+import type { GwRequest } from './gateway-protocol.ts'
 import { gatewayFor } from '../adapters/gateway-launch.ts'
 import { registerConnectorsIpc } from './connectors-ipc.ts'
 import { Registry } from '../rpc/registry.ts'
@@ -57,4 +58,31 @@ test('started normally: state set, gateway installed, stop closes it', async () 
   assert.ok(gatewayFor(ref))
   assert.deepEqual(out.deps.store.list(), [])
   await out.stop()
+})
+
+test('a skills request reaches d.skills and never the connector calls; without d.skills it is refused', async (t) => {
+  const { e } = fakeEngine()
+  let handle: GwHandler | undefined
+  const startServer: typeof startGatewayServer = (p, h) => { handle = h; return startGatewayServer(p, h) }
+  const seen: GwRequest[] = []
+  const skills: GwHandler = async (_r, req) => { seen.push(req); return 'skills ok' }
+  const sig = new AbortController().signal
+  const { out } = await quietly(() => bootConnectors({ engine: e as never, userData: fs.mkdtempSync(join(os.tmpdir(), 'boot-')), runners, cipher, startServer, skills }))
+  t.after(() => out.stop())
+  assert.equal(await handle!(ref, { id: 1, token: 'x', op: 'skills', tool: 'skills_catalog' }, sig), 'skills ok')
+  assert.deepEqual(await handle!(ref, { id: 2, token: 'x', op: 'list' }, sig), [])
+  assert.deepEqual(seen.map(r => r.op), ['skills'])
+
+  const bare = await quietly(() => bootConnectors({ engine: e as never, userData: fs.mkdtempSync(join(os.tmpdir(), 'boot-')), runners, cipher, startServer }))
+  t.after(() => bare.out.stop())
+  await assert.rejects(handle!(ref, { id: 3, token: 'x', op: 'skills', tool: 'skills_catalog' }, sig), /skills/)
+})
+
+test('only skills threads get the skills tools flag in their gateway env', async (t) => {
+  const { e } = fakeEngine()
+  const userData = fs.mkdtempSync(join(os.tmpdir(), 'boot-'))
+  const { out } = await quietly(() => bootConnectors({ engine: e as never, userData, runners, cipher, isSkillsThread: r => r.threadId === 't2' }))
+  t.after(() => out.stop())
+  assert.equal(gatewayFor({ projectId: 'p1', threadId: 't2' })?.env.BRANDY_GATEWAY_SKILLS, '1')
+  assert.equal('BRANDY_GATEWAY_SKILLS' in gatewayFor(ref)!.env, false)
 })

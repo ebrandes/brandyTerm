@@ -3,12 +3,12 @@
 import { join } from 'node:path'
 import type { Engine } from '../engine.ts'
 import type { RemoteHosts } from '../remote/hosts.ts'
-import type { Connector, ConnectorView } from '../../shared/connectors.ts'
+import type { Connector, ConnectorView, ThreadRef } from '../../shared/connectors.ts'
 import { gatewaySpec, setGatewayProvider } from '../adapters/gateway-launch.ts'
 import { realFactory } from './client.ts'
 import { createCalls } from './calls.ts'
 import { elsewhere } from './elsewhere.ts'
-import { startGatewayServer, socketPath } from './gateway-server.ts'
+import { startGatewayServer, socketPath, type GwHandler } from './gateway-server.ts'
 import { sweepStaleSockets } from './socket-sweep.ts'
 import { ConnectorHub } from './hub.ts'
 import { LoginBroker, type Runners } from './login.ts'
@@ -37,6 +37,10 @@ export interface BootOpts {
   runners: (secrets: SecretStore) => Runners
   cipher: Cipher
   startServer?: typeof startGatewayServer
+  /** the skills_* tools (op 'skills'); absent, they are refused */
+  skills?: GwHandler
+  /** a /skill-* thread: its gateway lists the skills tools */
+  isSkillsThread?: (t: ThreadRef) => boolean
 }
 
 export const BOOT_FAILED = 'Os conectores não puderam ser iniciados. Reinicie o BrandyTerm.'
@@ -113,8 +117,12 @@ async function boot(d: BootOpts, detach: (() => void)[]): Promise<Connectors> {
     },
   })
   sweepStaleSockets(d.userData, process.pid)
-  const server = await (d.startServer ?? startGatewayServer)(socketPath(d.userData, process.pid), calls)
-  setGatewayProvider(t => gatewaySpec(server.path, server.issue(t)))
+  const handle: GwHandler = (r, req, signal) => {
+    if (req.op !== 'skills') return calls(r, req, signal)
+    return d.skills ? d.skills(r, req, signal) : Promise.reject(new Error('Ferramentas de skills indisponíveis.'))
+  }
+  const server = await (d.startServer ?? startGatewayServer)(socketPath(d.userData, process.pid), handle)
+  setGatewayProvider(t => gatewaySpec(server.path, server.issue(t), d.isSkillsThread?.(t) ? { BRANDY_GATEWAY_SKILLS: '1' } : undefined))
 
   return {
     deps: { store, secrets, hub, login },

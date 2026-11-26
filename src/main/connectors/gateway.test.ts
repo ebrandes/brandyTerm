@@ -22,13 +22,13 @@ function sockPath(): string {
   return posix ? join(dir, `s${n++}.sock`) : `\\\\.\\pipe\\bgwc-test-${process.pid}-${n++}`
 }
 
-async function withGateway<T>(handler: GwHandler, run: (c: Client) => Promise<T>, socket?: string): Promise<T> {
+async function withGateway<T>(handler: GwHandler, run: (c: Client) => Promise<T>, socket?: string, env: Record<string, string> = {}): Promise<T> {
   const srv = await startGatewayServer(sockPath(), handler)
   const token = srv.issue({ projectId: 'p', threadId: 't' })
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [script],
-    env: { NODE_NO_WARNINGS: '1', ELECTRON_RUN_AS_NODE: '1', BRANDY_GATEWAY_SOCKET: socket ?? srv.path, BRANDY_GATEWAY_TOKEN: token },
+    env: { NODE_NO_WARNINGS: '1', ELECTRON_RUN_AS_NODE: '1', BRANDY_GATEWAY_SOCKET: socket ?? srv.path, BRANDY_GATEWAY_TOKEN: token, ...env },
   })
   const client = new Client({ name: 'test', version: '1' })
   await client.connect(transport)
@@ -48,6 +48,26 @@ test('lists exactly three tools', async () => {
     const { tools } = await c.listTools()
     assert.deepEqual(tools.map(t => t.name), ['list_connectors', 'connector_tools', 'call_connector'])
   })
+})
+
+test('the skills tools are listed only with the skills flag, and reach main as op skills', async () => {
+  const seen: unknown[] = []
+  const h: GwHandler = async (_c, req) => { seen.push({ op: req.op, tool: req.tool, args: req.args }); return 'ok' }
+  await withGateway(h, async c => {
+    const { tools } = await c.listTools()
+    assert.deepEqual(tools.map(t => t.name), [
+      'list_connectors', 'connector_tools', 'call_connector',
+      'skills_catalog', 'skills_add', 'skills_remove', 'skills_resolve', 'skills_import', 'skills_push',
+    ])
+    assert.equal(text(await c.callTool({ name: 'skills_add', arguments: { id: 'x', motivo: 'y' } })), 'ok')
+  }, undefined, { BRANDY_GATEWAY_SKILLS: '1' })
+  assert.deepEqual(seen, [{ op: 'skills', tool: 'skills_add', args: { id: 'x', motivo: 'y' } }])
+  await withGateway(h, async c => {
+    const { tools } = await c.listTools()
+    assert.equal(tools.some(t => t.name.startsWith('skills_')), false)
+    assert.equal((await c.callTool({ name: 'skills_add', arguments: {} })).isError, true)
+  })
+  assert.equal(seen.length, 1)
 })
 
 test('list_connectors returns the handler result as JSON text', async () => {

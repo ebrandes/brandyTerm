@@ -4,7 +4,7 @@ import net from 'node:net'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { CALL_CANCELLED, LineReader, MAX_REPLY, NOT_RESPONDING, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
+import { CALL_CANCELLED, LineReader, MAX_REPLY, NOT_RESPONDING, SKILL_TOOLS, TOOLS, type GwRequest, type GwResponse } from './gateway-protocol.ts'
 
 type Pending = { resolve(r: GwResponse): void; reject(e: Error): void }
 
@@ -89,18 +89,23 @@ function reply(text: string, isError = false) {
   return { content: [{ type: 'text' as const, text: clip(text) }], ...(isError ? { isError: true } : {}) }
 }
 
+/** a /skill-* thread: main gave this gateway the skills tools too */
+const skills = process.env.BRANDY_GATEWAY_SKILLS === '1'
+const SKILL_NAMES = new Set(SKILL_TOOLS.map(t => t.name))
+
 function toRequest(tool: string, a: Record<string, unknown>): Omit<GwRequest, 'id' | 'token'> | null {
   const str = (v: unknown) => (typeof v === 'string' ? v : undefined)
   if (tool === 'list_connectors') return { op: 'list' }
   if (tool === 'connector_tools') return { op: 'tools', name: str(a.name) }
   if (tool === 'call_connector') return { op: 'call', name: str(a.name), tool: str(a.tool), args: a.args }
+  if (skills && SKILL_NAMES.has(tool)) return { op: 'skills', tool, args: a }
   return null
 }
 
 async function main(): Promise<void> {
   const link = new Link(process.env.BRANDY_GATEWAY_SOCKET ?? '', process.env.BRANDY_GATEWAY_TOKEN ?? '')
   const server = new Server({ name: 'brandy-gateway', version: '1.0.0' }, { capabilities: { tools: {} } })
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }))
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: skills ? [...TOOLS, ...SKILL_TOOLS] : TOOLS }))
   server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
     const req = toRequest(params.name, (params.arguments ?? {}) as Record<string, unknown>)
     if (!req) return reply(`Ferramenta desconhecida: ${params.name}`, true)

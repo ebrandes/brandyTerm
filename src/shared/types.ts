@@ -139,6 +139,8 @@ export interface Thread {
   why?: string
   /** skill the coordinator told the thread to load first */
   skill?: string
+  /** a /skill-* thread: only these get the skills_* gateway tools */
+  skillsTask?: 'init' | 'refresh' | 'install'
   /** execution plan of the current run (TodoWrite / plan tool) */
   todos: Todo[]
   /** short log of actions of the current run */
