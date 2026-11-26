@@ -1,3 +1,4 @@
+import { modelLabel } from '../../../shared/thread-phase'
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { AGENT_NAMES, EFFORT_LABEL, type Effort, type Thread } from '../types'
@@ -39,7 +40,7 @@ export function ThreadMetaChips({ thread, projectId, connectorNames }: { thread:
     <div id={regionId} className={`chips meta-chips${open ? ' open' : ''}`}>
       <span className="chip">
         <AgentBadge agent={thread.agent} size="sm" /> {AGENT_NAMES[thread.agent]}
-        {thread.model ? ` ${thread.model}` : ''}
+        {modelLabel(thread) ? ` ${modelLabel(thread)}` : ''}
       </span>
       {open ? (
         <>

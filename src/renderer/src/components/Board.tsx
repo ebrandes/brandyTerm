@@ -1,3 +1,4 @@
+import { modelLabel } from '../../../shared/thread-phase'
 import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
 import { AGENT_NAMES, EFFORT_LABEL, type Project, type Thread } from '../types'
@@ -42,7 +43,7 @@ function Card({ item, showProject, selected, now, onSelect }: { item: BoardItem;
       <span className="board-meta">
         <AgentBadge agent={t.agent} size="sm" />
         {AGENT_NAMES[t.agent]}
-        {t.model ? ` ${t.model}` : ''} · {EFFORT_LABEL[t.effort]}
+        {modelLabel(t) ? ` ${modelLabel(t)}` : ''} · {EFFORT_LABEL[t.effort]}
         {todos.length > 0 && <em>{done}/{todos.length}</em>}
       </span>
       {todos.length > 0 && t.state === 'running' && (

@@ -1,3 +1,4 @@
+import { modelLabel } from '../../../shared/thread-phase'
 import { useLayoutEffect, useRef, useState, type SyntheticEvent } from 'react'
 import {
   ChevronDown,
@@ -142,7 +143,7 @@ export function ThreadCard({ t, project, selected, onSelect, onCancel }: Props) 
         <span className="tcard-agent">
           <AgentBadge agent={t.agent} size="sm" />
           {AGENT_NAMES[t.agent]}
-          {t.model && <span className="tcard-model">{t.model}</span>}
+          {modelLabel(t) && <span className="tcard-model">{modelLabel(t)}</span>}
         </span>
         <span>
           <Gauge size={12} />

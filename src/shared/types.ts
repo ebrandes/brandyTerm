@@ -6,6 +6,8 @@ export type { CatalogItem, ProjectSkillsView, SkillRow, SkillsList } from './ski
 export type AgentId = 'claude' | 'codex' | 'antigravity'
 export type ThreadState = 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'interrupted' | 'cancelled'
 export type Effort = 'low' | 'medium' | 'high'
+/** /rota's level for a task: what model does it, and whether it is planned first */
+export type Tier = 'leve' | 'padrao' | 'pesado'
 
 export const AGENT_NAMES: Record<AgentId, string> = {
   claude: 'Claude',
@@ -71,6 +73,8 @@ export interface Message {
   text: string
   summaries?: Summary[]
   isError?: boolean
+  /** the plan a thread's planning phase handed to its execution */
+  plan?: boolean
   attachments?: Attachment[]
   /** threads the coordinator opened with this message (shown as clickable chips) */
   threads?: string[]
@@ -121,7 +125,22 @@ export type ArtifactContent =
   | { kind: MediaKind; size: number }
   | { kind: ArtifactKind; text: string; lang?: string }
 
+/** The planning phase of a `pesado` thread: another model reads the code first, read-only. */
+export interface ThreadPlan {
+  model: string
+  effort: Effort
+  sessionId?: string
+  text?: string
+  usage?: Usage
+  /** the phase is over (plan written, answered without changes, or skipped after a failure) */
+  done?: boolean
+}
+
 export interface Thread {
+  tier?: Tier
+  /** `pesado+`: a `pesado` thread that failed was replaced by this one */
+  boost?: boolean
+  plan?: ThreadPlan
   id: string
   requestId: string
   title: string

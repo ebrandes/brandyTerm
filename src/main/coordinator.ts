@@ -1,4 +1,4 @@
-import type { AgentId, Effort, Project, Thread } from '../shared/types.ts'
+import type { AgentId, Effort, Project, Thread, Tier } from '../shared/types.ts'
 import { AGENT_NAMES } from '../shared/types.ts'
 import { parseOptions } from '../shared/ask-options.ts'
 import { MEMORY_REL, MEMORY_RULES, MEMORY_SCHEMA, memoryBlock, parseNotes, type MemoryNote } from './memory.ts'
@@ -9,6 +9,12 @@ export interface PlannedTask {
   agent: AgentId
   model?: string
   effort: Effort
+  /** the coordinator's level for /rota; absent when it gave none */
+  tier?: Tier
+  /** set by /rota: `pesado+` */
+  boost?: boolean
+  /** set by /rota: the planning phase's model and effort */
+  plan?: { model: string; effort: Effort }
   why?: string
   skill?: string
   /** exact title of an interrupted/failed thread this task takes over; the old one is set aside */
@@ -68,6 +74,7 @@ export const PLAN_SCHEMA = {
           agent: { type: 'string', enum: ['claude', 'codex', 'antigravity'] },
           model: { type: 'string' },
           effort: { type: 'string', enum: ['low', 'medium', 'high'] },
+          tier: { type: 'string', enum: ['leve', 'padrao', 'pesado'] },
           why: { type: 'string' },
           skill: { type: 'string' },
           replaces: { type: 'string' }
@@ -115,7 +122,7 @@ export function buildPlanPrompt(project: Project, available: AgentId[], userText
     : '(nenhum)'
   const threads = project.threads.length ? listedThreads(project.threads).map(threadLine).join('\n') : '(nenhuma)'
   return `Você é o coordenador do projeto "${project.name}" no BrandyTerm. Pasta: ${project.path}.
-Responda SOMENTE com um objeto JSON: {"reply": string, "tasks": [{"title","objective","agent","model"?,"effort","why","replaces"?}], "answers": [{"threadTitle","text"}], "ask": [{"threadTitle","text"}], "resume": [{"threadTitle","text"}], "memory": [{"section","text"}]}. Sem texto fora do JSON.
+Responda SOMENTE com um objeto JSON: {"reply": string, "tasks": [{"title","objective","agent","tier","model"?,"effort","why","replaces"?}], "answers": [{"threadTitle","text"}], "ask": [{"threadTitle","text"}], "resume": [{"threadTitle","text"}], "memory": [{"section","text"}]}. Sem texto fora do JSON.
 
 Regras:
 - Pergunta simples, conversa ou "como está?": responda em "reply" com tasks=[]. Não crie threads para isso; use o estado das threads abaixo.
@@ -123,9 +130,14 @@ Regras:
 - Cada objective é autocontido, com critério de conclusão, porque a thread não vê esta conversa.
 - Escolha o agente pelo assunto. Agentes disponíveis: ${available.map((a) => AGENT_NAMES[a]).join(', ')} (use o id em minúsculas: ${available.join(', ')}).
   claude: investigação de código, raciocínio sobre regras, revisão. codex: rodar/descobrir testes, comandos, verificação prática.
-  model só para claude: haiku (tarefa simples), sonnet (padrão), opus (raciocínio difícil). Omita para codex.
-  effort: low | medium | high, proporcional à dificuldade.
-  why: uma frase curta dizendo por que esse agente/modelo/esforço (ex.: "codex: precisa executar comandos de teste").${
+  tier: o nível da tarefa, que decide o modelo e se ela é planejada antes.
+    leve: consulta, busca, mudança mecânica de uma linha, renomear, formatar.
+    padrao: mudança delimitada com caminho claro, em poucos arquivos.
+    pesado: precisa entender antes de mexer (vários módulos, decisão de desenho, bug sem causa conhecida, risco de quebrar o que funciona). Outro modelo lê o código e planeja antes da execução.
+    Na dúvida, o nível de baixo: se falhar, a próxima tentativa sobe sozinha. Se o pedido é refazer algo que uma thread entregou errado, use um nível acima do dela.
+    Em task pesado, o objective descreve o problema, a evidência e o critério de conclusão, sem ditar passos nem arquivos "prováveis": você não lê o código, quem decide o como é o plano.
+  model (só claude: haiku, sonnet, opus; omita para codex) e effort: low | medium | high valem quando a rota automática está desligada.
+  why: uma frase curta dizendo por que esse agente e esse nível (ex.: "codex: precisa executar comandos de teste").${
     skills.length
       ? `\n  skill (opcional, só claude): o nome exato de UMA skill que a thread deve carregar antes de começar, quando ela claramente se encaixa (ex.: depurar um bug: superpowers:systematic-debugging; planejar: superpowers:writing-plans; revisar: superpowers:requesting-code-review). Omita na dúvida. Skills: ${skills.join(', ')}.`
       : ''
@@ -178,6 +190,7 @@ function extractJson(text: string): unknown {
 }
 
 const EFFORTS = new Set(['low', 'medium', 'high'])
+const TIER_NAMES = new Set(['leve', 'padrao', 'pesado'])
 
 /** answers and resumes: entries with a title and a non-empty text */
 function replyList(raw: unknown): Answer[] {
@@ -211,6 +224,7 @@ export function parsePlan(
         agent,
         model: typeof t.model === 'string' && models.includes(t.model) ? t.model : undefined,
         effort: EFFORTS.has(t.effort) ? t.effort : 'medium',
+        tier: TIER_NAMES.has(t.tier) ? t.tier : undefined,
         why: typeof t.why === 'string' ? t.why.slice(0, 160) : undefined,
         skill: agent === 'claude' && typeof t.skill === 'string' && /^[\w:.-]{2,80}$/.test(t.skill) ? t.skill : undefined,
         replaces: typeof t.replaces === 'string' && t.replaces.trim() ? t.replaces : undefined

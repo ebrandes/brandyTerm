@@ -1,3 +1,4 @@
+import { modelLabel } from '../../../shared/thread-phase'
 import { CircleCheck, CircleDot, Circle, MessageSquare, Square, X } from 'lucide-react'
 import { AGENT_NAMES, EFFORT_LABEL, type Todo } from '../types'
 import type { BoardItem } from './Board'
@@ -46,7 +47,7 @@ export function BoardDetail({ item, now, onClose, onOpen }: Props) {
         <dt>Agente</dt>
         <dd>
           {AGENT_NAMES[t.agent]}
-          {t.model ? ` ${t.model}` : ''} · {EFFORT_LABEL[t.effort]}
+          {modelLabel(t) ? ` ${modelLabel(t)}` : ''} · {EFFORT_LABEL[t.effort]}
         </dd>
         {t.why && (
           <>

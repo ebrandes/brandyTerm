@@ -11,7 +11,7 @@ export interface ThreadSender {
 
 const waiting = (t: Thread) => t.state === 'waiting'
 const resumable = (t: Thread) => t.state === 'interrupted' && !t.retired
-const replaceable = (t: Thread) => (t.state === 'interrupted' || t.state === 'failed') && !t.retired
+export const replaceable = (t: Thread) => (t.state === 'interrupted' || t.state === 'failed') && !t.retired
 
 const names = (ts: Thread[]) => ts.map((t) => `“${t.title}”`).join(', ')
 

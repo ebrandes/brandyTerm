@@ -6,23 +6,22 @@ import type { AgentId, AppState, ApprovalDecision, Attachment, Message, Project,
 import { MAX_ACTIVE_THREADS } from '../shared/types.ts'
 import type { RunHandle } from './adapters/types.ts'
 import { addUsage, runOnce } from './run.ts'
-import { settleThread } from './settle.ts'
+import { firstPrompt } from './phases.ts'
+import { runThread } from './thread-run.ts'
 import { maybeSynthesize, reportDirect } from './synthesis.ts'
 import { ThreadApprovals } from './approvals.ts'
-import { AUTOCOMPACT, coordinatorAutocompact, coordinatorContext, remember, rotateSession } from './coordinator-memory.ts'
-import { parseOverride, routeTasks } from './router.ts'
+import { coordinatorAutocompact, coordinatorContext, remember, rotateSession } from './coordinator-memory.ts'
+import { parseOverride, routeDeps, routeTasks } from './router.ts'
 import { ADAPTERS } from './adapters/index.ts'
 import { restoreProjects } from './restore.ts'
 import { archiveDirFor, archiveProjects } from './archive.ts'
 import { appSettings, loadSettings } from './settings.ts'
-import { applyThreadEvent } from './thread-events.ts'
 import { removeProjectAttachments } from './attachments.ts'
 import { discoverCommands, parseSlash } from './commands.ts'
 import { runSlash } from './slash.ts'
 import {
   PLAN_SCHEMA,
   buildPlanPrompt,
-  buildThreadPrompt,
   parsePlan,
   type PlannedTask
 } from './coordinator.ts'
@@ -41,12 +40,12 @@ const TERMINAL = new Set(['done', 'failed', 'cancelled', 'interrupted'])
 export class Engine extends EventEmitter {
   state: AppState = { projects: [], agents: [], plugins: [] }
   /** plugin dirs for claude runs in a project: BrandyTerm's own plus the user's plugins turned on for threads */
-  private pluginsFor(path: string | null): string[] {
+  pluginsFor(path: string | null): string[] {
     const own = this.state.plugins.flatMap((p) => (p.dir && p.kind !== 'tool' && !p.scanner ? [p.dir] : []))
     return [...own, ...userPluginDirs(path)]
   }
   private procs = new ProcessManager()
-  private handles = new Map<string, RunHandle>()
+  readonly handles = new Map<string, RunHandle>()
   private chains = new Map<string, Promise<void>>()
   readonly approvals = new ThreadApprovals(() => this.touch())
   readonly reporter = createReporter(this, (path) => this.pluginsFor(path))
@@ -249,7 +248,7 @@ export class Engine extends EventEmitter {
       p.messages.push(reply)
       remember(this, p, plan.memory)
       const sent = dispatchReplies({ sendToThread: (q, id, t) => this.sendToThread(q, id, t, []), askThread: (q, t, text) => this.reporter.ask(q, t, text) }, p, plan)
-      const tasks = await routeTasks(p.path!, plan.tasks, route, this.installed().has('claude'))
+      const tasks = await routeTasks(plan.tasks, route, routeDeps(p.path!, p.threads, this.installed().has('claude')))
       const opened = tasks.map((task) => this.createThread(p, task, requestId, atts))
       const notes = [...sent.notes, ...retireReplaced(p, tasks, opened)]
       if (notes.length) console.warn('[coordinator] títulos não resolvidos:', notes)
@@ -268,66 +267,27 @@ export class Engine extends EventEmitter {
     return t
   }
 
-  private pump(p: Project): void {
+  pump(p: Project): void {
     let active = p.threads.filter((t) => t.state === 'running').length
     for (const t of p.threads) {
       if (active >= MAX_ACTIVE_THREADS) break
       if (t.state !== 'queued') continue
-      this.startThread(p, t, buildThreadPrompt(p, t.objective, t.agent, t.skill), false, t.attachments)
+      this.startThread(p, t, firstPrompt(p, t), false, t.attachments)
       active++
     }
     this.touch()
   }
 
   startThread(p: Project, t: Thread, prompt: string, direct: boolean, attachments?: Attachment[]): void {
-    this.reporter.cancel(t.id)
-    t.state = 'running'
-    t.resolved = false
-    t.pending = undefined
-    t.retired = undefined
-    t.note = 'Iniciando…'
-    t.aliveAt = t.runAt = new Date().toISOString()
-    t.todos = []
-    t.steps = []
-    t.updatedAt = new Date().toISOString()
-    const { handle, result } = runOnce(
-      ADAPTERS[t.agent],
-      {
-        cwd: p.path!,
-        prompt,
-        sessionId: t.sessionId,
-        model: t.model,
-        effort: t.effort,
-        tools: 'work',
-        thread: { projectId: p.id, threadId: t.id },
-        approve: (a) => this.approvals.ask(t, a),
-        plugins: this.pluginsFor(p.path ?? null),
-        autocompact: AUTOCOMPACT,
-        attachments
-      },
-      (e) => applyThreadEvent(p, t, e) && this.touch()
-    )
-    this.handles.set(t.id, handle)
-    this.touch()
-    void result.then((r) => {
-      this.handles.delete(t.id)
-      this.approvals.drop(t)
-      if (r.sessionId) t.sessionId = r.sessionId
-      addUsage(t.usage, r.usage)
-      t.updatedAt = new Date().toISOString()
-      const q = settleThread(t, r.done, (author, text, extra) => this.msg(author, text, extra))
-      if (q) {
-        p.messages.push(
-          this.msg('agent', `A thread “${t.title}” precisa de uma decisão sua.`, { ask: { threadId: t.id, question: q.text, options: q.options, recommended: q.recommended } })
-        )
-      }
-      if (t.state === 'waiting') {
-        // the question card is already in the main chat; synthesis waits for the answer
-      } else if (direct && t.state !== 'cancelled') reportDirect(this, p, t)
-      else maybeSynthesize(this, p, t.requestId)
-      this.reporter.afterRun(p, t)
-      this.pump(p)
-    })
+    runThread(this, p, t, prompt, direct, attachments)
+  }
+
+  /** a thread stopped: report it or synthesize its request */
+  finished(p: Project, t: Thread, direct: boolean): void {
+    // waiting: the question card is already in the main chat; synthesis waits for the answer
+    if (t.state === 'waiting') return
+    if (direct && t.state !== 'cancelled') reportDirect(this, p, t)
+    else maybeSynthesize(this, p, t.requestId)
   }
 
   /** `raw` sends the text as typed (slash commands must start the prompt) */
@@ -342,7 +302,7 @@ export class Engine extends EventEmitter {
     }
     t.question = undefined
     const fresh = !t.sessionId
-    const prompt = raw || !fresh ? text : `${buildThreadPrompt(p, t.objective, t.agent, t.skill)}\n\nMensagem do usuário:\n${text}`
+    const prompt = raw || !fresh ? text : `${firstPrompt(p, t)}\n\nMensagem do usuário:\n${text}`
     // a thread without a session (interrupted before starting) gets its original files again
     this.startThread(p, t, prompt, true, fresh && !raw ? [...(t.attachments ?? []), ...atts] : atts)
   }

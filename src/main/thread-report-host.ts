@@ -2,6 +2,7 @@ import type { Project, Thread } from '../shared/types.ts'
 import type { Engine } from './engine.ts'
 import { ADAPTERS } from './adapters/index.ts'
 import { remember } from './coordinator-memory.ts'
+import { sessionModel } from './phases.ts'
 import { addUsage, runOnce, type RunResult } from './run.ts'
 import { ThreadReporter, type SilentResult } from './thread-report.ts'
 
@@ -23,8 +24,8 @@ export function createReporter(engine: Engine, pluginsFor: (path: string | null)
         cwd: p.path!,
         prompt,
         sessionId: t.sessionId,
-        model: t.model,
-        effort: t.effort,
+        // the session's own model: the plan's while the thread is still planning
+        ...sessionModel(t),
         tools: 'readonly',
         thread: { projectId: p.id, threadId: t.id },
         plugins: pluginsFor(p.path ?? null)

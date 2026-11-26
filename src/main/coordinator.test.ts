@@ -96,3 +96,21 @@ test('thread prompt asks to mark the recommended option with *', () => {
   const p = buildThreadPrompt({ name: 'Demo' } as Project, 'obj', 'claude')
   assert.ok(p.includes('"OPCOES: *a | b | c"'))
 })
+
+test('parsePlan keeps a valid tier and drops an unknown one', () => {
+  const task = { title: 'T', objective: 'o', agent: 'claude', effort: 'low' }
+  const plan = parsePlan({ reply: 'ok', tasks: [{ ...task, tier: 'pesado' }, { ...task, tier: 'enorme' }, task] }, '', installed)
+  assert.deepEqual(plan.tasks.map((t) => t.tier), ['pesado', undefined, undefined])
+})
+
+test('PLAN_SCHEMA has the task tier', () => {
+  assert.deepEqual(PLAN_SCHEMA.properties.tasks.items.properties.tier.enum, ['leve', 'padrao', 'pesado'])
+})
+
+test('the plan prompt asks for a tier, lower when in doubt, and keeps the effort guidance', () => {
+  const p = buildPlanPrompt({ name: 'Demo', path: '/tmp/demo', threads: [], processes: [], messages: [] } as unknown as Project, ['claude'], 'oi')
+  assert.ok(p.includes('"tier"'))
+  assert.ok(p.includes('Na dúvida, o nível de baixo'))
+  assert.ok(p.includes('effort: low | medium | high'))
+  assert.ok(p.includes('sem ditar passos nem arquivos'))
+})
