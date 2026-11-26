@@ -38,3 +38,12 @@ test('codex non-work runs and runs without a thread never get the gateway', () =
     { ...base, tools: 'work' as const }
   ]) assert.equal(codexArgs(o).some((x) => x.includes('mcp_servers.brandy')), false)
 })
+
+test('hook arguments go before the final -, in new and resumed runs; without them nothing changes', () => {
+  const hooks = ['-c', 'hooks.Stop=[]']
+  for (const o of [{ ...base, tools: 'work' as const }, { ...base, tools: 'readonly' as const, sessionId: 's' }]) {
+    const plain = codexArgs(o)
+    assert.deepEqual(codexArgs(o, hooks), [...plain.slice(0, -1), ...hooks, '-'])
+    assert.equal(plain.some((x) => x.startsWith('hooks.')), false)
+  }
+})

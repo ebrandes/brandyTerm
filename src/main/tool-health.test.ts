@@ -32,6 +32,10 @@ test('no hooks file means no RTK in Codex', () => {
 test('coverage lists Codex only when it is installed', () => {
   assert.deepEqual(rtkCoverage(true, null).map((c) => c.agent), ['claude'])
   assert.deepEqual(rtkCoverage(true, 'unapproved').map((c) => c.ok), [true, false])
-  assert.deepEqual(economizerCoverage([], true).map((c) => c.ok), [true, false])
-  assert.equal(economizerCoverage(['lib/hook.py'], false)[0].ok, false)
+  assert.deepEqual(rtkCoverage(true, 'injected').map((c) => c.ok), [true, true])
+  assert.equal(rtkCoverage(false, 'injected')[1].ok, false)
+  assert.deepEqual(economizerCoverage([], { problem: null }).map((c) => c.ok), [true, true])
+  const broken = economizerCoverage([], { problem: 'Python 3.10+ não encontrado no PATH' })[1]
+  assert.deepEqual([broken.ok, broken.detail], [false, 'Python 3.10+ não encontrado no PATH'])
+  assert.equal(economizerCoverage(['lib/hook.py'], null)[0].ok, false)
 })

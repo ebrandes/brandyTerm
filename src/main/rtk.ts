@@ -1,7 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import type { PluginInfo } from '../shared/types.ts'
 import { resolveCli } from './adapters/proc.ts'
-import { codexRtkHook, rtkCoverage } from './tool-health.ts'
+import { readMachine, supportsHooks } from './codex-economy.ts'
+import { rtkCoverage } from './tool-health.ts'
 
 /**
  * RTK (github.com/rtk-ai/rtk) compresses shell output before the agent reads it.
@@ -45,6 +46,8 @@ export function rtkInfo(): PluginInfo {
     }
   }
   const note = bin ? 'comprime a saída do shell antes de o agente ler' : 'não encontrado; instale com brew install rtk'
-  const coverage = rtkCoverage(!!bin, resolveCli('codex') ? codexRtkHook() : null)
+  const m = readMachine()
+  const codex = m && (m.rtkHook !== 'approved' && supportsHooks(m) ? 'injected' : m.rtkHook)
+  const coverage = rtkCoverage(!!bin, codex)
   return { id: 'rtk', name: 'RTK', kind: 'tool', dir: bin ?? undefined, version, note, coverage }
 }

@@ -6,6 +6,8 @@ import { join } from 'node:path'
 import type { AgentCoverage } from '../shared/plugin-health.ts'
 
 export type CodexHook = 'approved' | 'unapproved' | 'missing'
+/** `injected`: BrandyTerm passes the hook on each run, whatever ~/.codex has */
+export type CodexRtk = CodexHook | 'injected'
 
 function read(file: string): string {
   try {
@@ -49,23 +51,25 @@ export function codexRtkHook(dir: string = process.env.CODEX_HOME || join(homedi
   return found.some((pos) => trusted(toml, `${file}:pre_tool_use:${pos}`)) ? 'approved' : 'unapproved'
 }
 
-const CODEX_RTK: Record<CodexHook, string> = {
+const CODEX_RTK: Record<CodexRtk, string> = {
+  injected: 'hook injetado pelo BrandyTerm em cada execução',
   approved: 'hook instalado e com registro de aprovação',
   unapproved: 'hook instalado, mas sem aprovação: abra o Codex e use /hooks',
   missing: 'sem hook do RTK: rode rtk init -g --codex'
 }
 
-export function rtkCoverage(installed: boolean, codex: CodexHook | null): AgentCoverage[] {
+export function rtkCoverage(installed: boolean, codex: CodexRtk | null): AgentCoverage[] {
   const claude: AgentCoverage = {
     agent: 'claude',
     ok: installed,
     detail: installed ? 'hook injetado nas threads, leituras e varreduras; o coordenador não tem shell' : 'RTK não instalado'
   }
   if (!codex) return [claude]
-  return [claude, { agent: 'codex', ok: installed && codex === 'approved', detail: installed ? CODEX_RTK[codex] : 'RTK não instalado' }]
+  return [claude, { agent: 'codex', ok: installed && (codex === 'approved' || codex === 'injected'), detail: installed ? CODEX_RTK[codex] : 'RTK não instalado' }]
 }
 
-export function economizerCoverage(missing: string[], codexInstalled: boolean): AgentCoverage[] {
+/** `codex`: `null` when it is not installed; `problem` is why its threads run without the plugin */
+export function economizerCoverage(missing: string[], codex: { problem: string | null } | null): AgentCoverage[] {
   const ok = !missing.length
   const claude: AgentCoverage = {
     agent: 'claude',
@@ -74,6 +78,6 @@ export function economizerCoverage(missing: string[], codexInstalled: boolean): 
       ? 'carregado nas threads; a poda de ferramentas só propõe; o coordenador não o carrega'
       : `não funciona, falta ${missing.join(', ')}: rode npm run plugins`
   }
-  if (!codexInstalled) return [claude]
-  return [claude, { agent: 'codex', ok: false, detail: 'o BrandyTerm não carrega plugins no Codex' }]
+  if (!codex) return [claude]
+  return [claude, { agent: 'codex', ok: !codex.problem, detail: codex.problem ?? 'hooks injetados pelo BrandyTerm em cada thread' }]
 }

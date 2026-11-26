@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { PluginInfo } from '../shared/types.ts'
 import { resolveCli } from './adapters/proc.ts'
+import { economizerProblem, readMachine } from './codex-economy.ts'
 import { diagLog, diagLogOnChange } from './diag-log.ts'
 import { rtkInfo } from './rtk.ts'
 import { describeCounts, scanPlugin } from './security.ts'
@@ -107,6 +108,11 @@ function cached(w: Wanted): { dir: string; version: string } | null {
   return best
 }
 
+function economizerHealth(w: Wanted, dir: string | undefined) {
+  const machine = readMachine()
+  return economizerCoverage(dir ? [] : (w.requires ?? []), machine && { problem: economizerProblem(dir, machine) })
+}
+
 /** Resolves each plugin: the copy bundled with BrandyTerm first, then Claude's plugin cache. */
 export function discoverPlugins(): PluginInfo[] {
   const plugins = PLUGINS.map((w): PluginInfo => {
@@ -116,7 +122,8 @@ export function discoverPlugins(): PluginInfo[] {
     if (best && w.scanner) note = 'revisa cada plugin antes da instalação'
     else if (best) note = own ? 'incluído no BrandyTerm, carregado em todas as threads do Claude' : 'carregado em todas as threads do Claude'
     else note = w.optional ? 'opcional; clique para instalar' : 'não encontrado; rode npm run plugins'
-    const coverage = w.id === 'tokeneconomizer' ? economizerCoverage(best ? [] : (w.requires ?? []), !!resolveCli('codex')) : undefined
+    const coverage = w.id === 'tokeneconomizer' ? economizerHealth(w, best?.dir) : undefined
+    if (best && coverage?.[1]?.ok) note += ' e do Codex'
     return { id: w.id, name: w.name, kind: w.kind, dir: best?.dir, version: best?.version, optional: !!w.optional, scanner: !!w.scanner, note, coverage }
   })
   logLoaded(plugins)

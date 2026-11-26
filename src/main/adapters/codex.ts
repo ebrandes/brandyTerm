@@ -1,3 +1,4 @@
+import { codexEconomy } from '../codex-economy.ts'
 import { filesFromCodex } from '../artifact-files.ts'
 import { execFile } from 'node:child_process'
 import type { AgentAdapter, AgentEvent, RunHandle, RunOpts } from './types.ts'
@@ -13,7 +14,7 @@ function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
   })
 }
 
-export function codexArgs(opts: RunOpts): string[] {
+export function codexArgs(opts: RunOpts, hookArgs: string[] = []): string[] {
   const args = ['exec']
   if (opts.sessionId) args.push('resume', opts.sessionId)
   // -i takes several values, so it goes before the other flags and never swallows the final "-"
@@ -37,7 +38,7 @@ export function codexArgs(opts: RunOpts): string[] {
     args.push('-c', `mcp_servers.brandy.env={ ${env} }`)
     args.push('-c', 'mcp_servers.brandy.tool_timeout_sec=960')
   }
-  args.push('-')
+  args.push(...hookArgs, '-')
   return args
 }
 
@@ -58,7 +59,8 @@ export const codexAdapter: AgentAdapter = {
       onEvent({ kind: 'done', ok: false, text: '', error: 'Codex CLI não encontrado' })
       return { done: Promise.resolve(), cancel() {} }
     }
-    const args = codexArgs(opts)
+    const economy = codexEconomy(opts)
+    const args = codexArgs(opts, economy.args)
     const atts = opts.attachments ?? []
 
     let finished = false
@@ -72,6 +74,7 @@ export const codexAdapter: AgentAdapter = {
 
     const run = spawnCli(cli, args, {
       cwd: opts.cwd,
+      env: { ...process.env, ...economy.env },
       input: opts.prompt + attachmentText(atts),
       onLine: (line) => {
         let ev: any
