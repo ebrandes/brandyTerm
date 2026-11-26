@@ -9,7 +9,8 @@
       "id": "tokeneconomizer",
       "repo": "https://github.com/microsoft/TokenEconomizer.git",
       "commit": "46b0a356dc08f01064fa683d9f7d6988dc5deade",
-      "subdir": "plugin"
+      "subdir": "plugin",
+      "requires": ["lib/tokeneconomizer/plugin/hook.py"]
     },
     {
       "id": "claude-code-setup",

@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { writeAtomic, keepCorrupt } from '../atomic-write.ts'
 import type { Connector } from '../../shared/connectors.ts'
 import { connectorProblem } from '../../shared/connector-problem.ts'
+import { activeIn } from '../../shared/connector-scope.ts'
 import { readConnectors } from './store-load.ts'
 
 export class ConnectorStore extends EventEmitter {
@@ -105,7 +106,7 @@ export class ConnectorStore extends EventEmitter {
   /** a connector with a problem in its definition stays in the panel but is not offered to threads */
   visibleFor(projectPath: string): Connector[] {
     return this.items
-      .filter(c => c.enabled && (!c.projects || c.projects.includes(projectPath)) && !connectorProblem(c))
+      .filter(c => c.enabled && activeIn(c, projectPath) && !connectorProblem(c))
       .map(c => ({ ...c }))
   }
 }

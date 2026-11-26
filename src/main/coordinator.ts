@@ -1,6 +1,5 @@
 import type { AgentId, Effort, Project, Thread, Tier } from '../shared/types.ts'
 import { AGENT_NAMES } from '../shared/types.ts'
-import { parseOptions } from '../shared/ask-options.ts'
 import { MEMORY_REL, MEMORY_RULES, MEMORY_SCHEMA, memoryBlock, parseNotes, type MemoryNote } from './memory.ts'
 
 export interface PlannedTask {
@@ -147,6 +146,7 @@ Regras:
 - Threads INTERROMPIDAS (o app fechou ou reiniciou no meio) podem ser retomadas. Quando o usuário pedir para continuar ou retomar ("continue", "continue as threads", "retome"), devolva em "resume" {threadTitle (o título exato, entre aspas abaixo), text (instrução curta, ex.: "Continue de onde parou.")} para cada thread interrompida que ele quer de volta e não crie tasks novas para o mesmo trabalho. Se não ficar claro quais threads, pergunte em "reply" citando os nomes. Sem retomada: resume=[].
 - Só se for melhor recomeçar do zero uma thread interrompida ou com falha, crie a task com "replaces" (título exato da antiga): ela fica marcada como substituída pela nova.
 - Processos em execução (servidores de dev, portas) são do usuário; você só os cita, não os controla.
+- Aplicar uma worktree na pasta principal é com a fila do app: a thread faz commit na worktree e chama queue_apply; o app aplica sozinho, depois da aprovação, quando nada estiver rodando. Nunca peça ao usuário para confirmar que não há threads rodando, nem escreva em objective que a thread espere por isso ou aplique à mão.
 - Prefira poucas threads bem delimitadas a muitas; não duplique trabalho entre threads.
 - As threads podem ler, rodar comandos e editar arquivos do projeto. Comandos que alteram algo e edições passam por aprovação do usuário dentro da própria thread, então delegue também o trabalho de executar e corrigir, não só investigar.
 - Responda no idioma do usuário.
@@ -240,7 +240,7 @@ export function buildThreadPrompt(project: Project, objective: string, agent: Ag
     agent === 'claude'
       ? 'Crie o plano com TaskCreate (3-6 tarefas curtas) e marque cada uma com TaskUpdate (in_progress ao começar, completed ao terminar).'
       : 'Mantenha um plano curto (3-6 itens) com a ferramenta de plano (update_plan) e atualize conforme avança.'
-  return `Você é uma thread do BrandyTerm trabalhando no projeto "${project.name}" (pasta atual). Você pode ler, rodar comandos e editar arquivos do projeto. Leitura e comandos de consulta rodam direto; comandos que alteram algo, edições e acesso à web pedem aprovação do usuário automaticamente: chame a ferramenta normalmente e espere. Se o usuário negar, siga sem aquilo ou pergunte. Serviços externos (Railway, GitHub e outros) ficam disponíveis pelas ferramentas list_connectors, connector_tools e call_connector; use só quando a tarefa precisar. Faça o trabalho até o fim (inclusive rodar testes e verificar) em vez de deixar como pendente.
+  return `Você é uma thread do BrandyTerm trabalhando no projeto "${project.name}" (pasta atual). Você pode ler, rodar comandos e editar arquivos do projeto. Leitura e comandos de consulta rodam direto; comandos que alteram algo, edições e acesso à web pedem aprovação do usuário automaticamente: chame a ferramenta normalmente e espere. Se o usuário negar, siga sem aquilo ou pergunte. Serviços externos (Railway, GitHub e outros) ficam disponíveis pelas ferramentas list_connectors, connector_tools e call_connector; use só quando a tarefa precisar. Para levar o que você fez numa git worktree à pasta principal do projeto, faça commit na worktree e chame queue_apply (o usuário aprova uma vez no app, que aplica quando nada estiver rodando): não aplique à mão, não peça confirmação para isso e nunca pergunte ao usuário se há threads rodando (app_status responde isso). Faça o trabalho até o fim (inclusive rodar testes e verificar) em vez de deixar como pendente.
 
 Objetivo:
 ${objective}
@@ -273,18 +273,7 @@ export function extractPending(text: string): string | undefined {
   return v.slice(0, 240)
 }
 
-/**
- * A thread signals that it needs the user with a trailing PERGUNTA: line (and optional OPCOES:).
- * The option marked with * is the agent's recommendation: it comes first and `recommended` is set.
- */
-export function extractQuestion(text: string): NonNullable<Thread['question']> | undefined {
-  const q = text.match(/^\s*PERGUNTA:\s*(.+)$/im)
-  if (!q) return undefined
-  const o = text.match(/^\s*OPCOES:\s*(.+)$/im)
-  const parsed = o ? parseOptions(o[1]) : undefined
-  const options = parsed?.options.length ? parsed.options : undefined
-  return { text: q[1].trim(), options, ...(options && parsed?.recommended ? { recommended: true } : {}) }
-}
+export { extractQuestion } from '../shared/ask-question.ts'
 
 /**
  * Some replies arrive escaped twice: the line breaks as the literal text "\\n" and code

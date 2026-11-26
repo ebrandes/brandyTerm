@@ -3,10 +3,11 @@
 // `cancel` is not a request: it names, by `id`, an earlier request on the same socket that the agent gave up on.
 // Main aborts that request (its login wait, its approval card, a running call) and sends no answer for either.
 // `skills` carries one of SKILL_TOOLS (in `tool`) to the skills handler, for /skill-* threads only.
+// `app` carries one of APP_TOOLS the same way, for every thread: they talk about BrandyTerm itself.
 export interface GwRequest {
   id: number
   token: string
-  op: 'list' | 'tools' | 'call' | 'cancel' | 'skills'
+  op: 'list' | 'tools' | 'call' | 'cancel' | 'skills' | 'app'
   name?: string
   tool?: string
   args?: unknown
@@ -56,6 +57,27 @@ export const TOOLS = [
 
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({ type: 'object' as const, properties, required })
 const text = (description: string) => ({ type: 'string', description })
+
+/** Listed in every thread's gateway. Neither changes a file: queue_apply only files a request the user approves. */
+export const APP_TOOLS = [
+  {
+    name: 'app_status',
+    description: 'Diz o que está rodando no BrandyTerm agora, em todos os projetos (threads e coordenadores), e a fila de aplicações de worktrees. Use em vez de perguntar isso ao usuário.',
+    inputSchema: obj({}),
+  },
+  {
+    name: 'queue_apply',
+    description: 'Pede para aplicar o que uma worktree commitou na pasta principal do projeto (git apply, sem commit). O usuário aprova uma vez no app, que aplica sozinho quando nada estiver rodando, uma aplicação por vez. Faça commit na worktree antes.',
+    inputSchema: obj(
+      {
+        worktree: text('Caminho da worktree'),
+        title: text('O que será aplicado, em uma linha'),
+        base: text('Opcional: commit a partir do qual aplicar (padrão: merge-base com a pasta principal). Use quando a worktree começa com um commit que copia mudanças não commitadas.'),
+      },
+      ['worktree', 'title'],
+    ),
+  },
+]
 
 /** Listed only in a /skill-* thread's gateway (BRANDY_GATEWAY_SKILLS=1). Every change asks the user first. */
 export const SKILL_TOOLS = [

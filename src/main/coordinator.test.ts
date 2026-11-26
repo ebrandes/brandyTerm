@@ -114,3 +114,11 @@ test('the plan prompt asks for a tier, lower when in doubt, and keeps the effort
   assert.ok(p.includes('effort: low | medium | high'))
   assert.ok(p.includes('sem ditar passos nem arquivos'))
 })
+
+test('prompts send applying a worktree to the queue instead of asking whether threads are running', () => {
+  const project = { name: 'Demo', path: '', threads: [], processes: [], messages: [] } as unknown as Project
+  for (const p of [buildThreadPrompt(project, 'obj', 'codex'), buildPlanPrompt(project, ['claude'], 'oi')]) {
+    assert.match(p, /queue_apply/)
+    assert.match(p, /[Nn]unca (pergunte ao usuário se há threads rodando|peça ao usuário para confirmar que não há threads rodando)/)
+  }
+})

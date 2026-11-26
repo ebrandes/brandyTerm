@@ -71,7 +71,7 @@ test('report keeps the thread visible state untouched', async () => {
     messages: [{ id: 'a', author: 'agent', time: 'x', text: 'oi' }]
   })
   const p = project(t)
-  const pick = () => structuredClone({ ...t, summary: undefined, reportedAt: undefined, reporting: undefined })
+  const pick = () => structuredClone({ ...t, summary: undefined, reportedAt: undefined, reporting: undefined, reportError: undefined })
   const before = pick()
   r.report(p, t, 'completo')
   f.runs[0].resolve({ ok: true, text: REPORT })

@@ -5,6 +5,7 @@ import type { ApprovalDecision } from '../../shared/types.ts'
 import type { ApprovalAsk } from '../adapters/types.ts'
 import type { GwRequest } from './gateway-protocol.ts'
 import type { CallResult, ToolInfo } from './hub.ts'
+import { activeIn } from '../../shared/connector-scope.ts'
 
 export const ref: ThreadRef = { projectId: 'p1', threadId: 't1' }
 export const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
@@ -56,7 +57,7 @@ export function setup(o: SetupOpts = {}) {
   const deps: CallsDeps = {
     store: {
       list: () => connectors,
-      visibleFor: path => connectors.filter(c => c.enabled && (!c.projects || c.projects.includes(path))),
+      visibleFor: path => connectors.filter(c => c.enabled && activeIn(c, path)),
       allow: (id, tool) => { log.allowed.push([id, tool]); for (const c of connectors) if (c.id === id) c.alwaysAllow.push(tool) },
     },
     hub: {

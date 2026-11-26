@@ -1,4 +1,5 @@
-// Live MCP clients, one per connector: connected lazily on first use, shared, closed after idle.
+// Live MCP clients, one per connector: connected on first use (and at app start,
+// autoconnect.ts), shared, closed after idle. The status says whether it works, not whether a client is open.
 import { EventEmitter } from 'node:events'
 import { CONNECTOR_TEST_MS, type Connector, type ConnectorStatus } from '../../shared/connectors.ts'
 
@@ -129,7 +130,7 @@ export class ConnectorHub extends EventEmitter {
     const e = this.entry(id)
     if (e.timer) clearTimeout(e.timer)
     if (e.busy > 0 || !e.client) return
-    e.timer = setTimeout(() => { void this.close(id) }, this.idleMs)
+    e.timer = setTimeout(() => { void this.drop(id) }, this.idleMs)
     e.timer.unref?.()
   }
 
@@ -138,7 +139,10 @@ export class ConnectorHub extends EventEmitter {
     e.busy++
     if (e.timer) clearTimeout(e.timer)
     try {
-      return await fn(await this.connect(c))
+      const out = await fn(await this.connect(c))
+      // an earlier test() failed on this same client, and it works again
+      if (e.client && e.status === 'erro') this.set(c.id, 'conectado')
+      return out
     } catch (err) {
       if (err instanceof ConnectorError && err.kind === 'login') {
         this.markLogin(c.id)
@@ -187,14 +191,25 @@ export class ConnectorHub extends EventEmitter {
     try {
       return await Promise.race([work, late])
     } catch (err) {
-      if (ctl.signal.aborted && err instanceof ConnectorError && err.kind === 'failed') this.set(c.id, 'erro', err.message.slice(-TAIL_MAX))
+      // a deadline, or a tool list refused by a client still open; one we closed meanwhile is not a failure
+      const login = err instanceof ConnectorError && err.kind === 'login'
+      if (!login && (ctl.signal.aborted || this.entry(c.id).client)) {
+        this.set(c.id, 'erro', (err instanceof Error ? err.message : String(err)).slice(-TAIL_MAX))
+      }
       throw err
     } finally {
       clearTimeout(timer)
     }
   }
 
+  /** Closed on purpose (switched off, changed, removed, quit): no longer connected. */
   async close(id: string): Promise<void> {
+    await this.drop(id)
+    if (this.entries.get(id)?.status === 'conectado') this.set(id, 'desconectado')
+  }
+
+  /** Lets the client go and keeps the status: after idle, the next use connects again. */
+  private async drop(id: string): Promise<void> {
     const e = this.entries.get(id)
     if (!e) return
     if (e.timer) clearTimeout(e.timer)
@@ -202,7 +217,6 @@ export class ConnectorHub extends EventEmitter {
     if (!client) return
     e.client = undefined
     try { await client.close() } catch { /* already gone */ }
-    if (e.status === 'conectado') this.set(id, 'desconectado')
   }
 
   /** Signals every live stdio child to exit, synchronously: for app quit, where nothing can be awaited. */

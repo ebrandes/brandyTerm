@@ -1,0 +1,18 @@
+/* Sidebar "Consumo do mês" (UsageReport.tsx). Base .modal and .modal-back live in styles.css. */
+.usage-open { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 6px 4px; font-size: 13px; color: var(--muted); }
+.usage-open:hover { color: var(--text); }
+.usage-back { position: fixed; z-index: 40; -webkit-app-region: no-drag; }
+.modal.usage-modal { width: min(1040px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.usage-head { display: flex; align-items: center; gap: 12px; }
+.usage-head h3 { flex: 1; margin: 0; }
+.usage-head select { background: var(--panel); color: var(--text); border: 1px solid var(--line-hi); border-radius: 7px; padding: 4px 8px; }
+.usage-body { overflow: auto; margin-top: 6px; user-select: text; }
+.usage-body h4 { font-size: 13.5px; margin: 18px 0 8px; }
+.usage-scroll { overflow-x: auto; margin-bottom: 10px; }
+.usage-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.usage-table th { text-align: left; font-weight: 500; color: var(--faint); }
+.usage-table th, .usage-table td { padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line-hi); vertical-align: top; }
+.modal .usage-note { font-size: 12px; color: var(--faint); margin-bottom: 8px; }
+.modal .usage-verdict { margin-bottom: 8px; }
+.modal .usage-verdict.ganho { color: var(--green); }
+.modal .usage-verdict.sem-ganho { color: var(--amber); }

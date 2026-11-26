@@ -43,10 +43,10 @@ const listHandler: GwHandler = async (_c, req) => {
   return `${req.op}:${req.name}:${req.tool}:${JSON.stringify(req.args)}`
 }
 
-test('lists exactly three tools', async () => {
+test('lists the connector and app tools', async () => {
   await withGateway(listHandler, async c => {
     const { tools } = await c.listTools()
-    assert.deepEqual(tools.map(t => t.name), ['list_connectors', 'connector_tools', 'call_connector'])
+    assert.deepEqual(tools.map(t => t.name), ['list_connectors', 'connector_tools', 'call_connector', 'app_status', 'queue_apply'])
   })
 })
 
@@ -56,7 +56,7 @@ test('the skills tools are listed only with the skills flag, and reach main as o
   await withGateway(h, async c => {
     const { tools } = await c.listTools()
     assert.deepEqual(tools.map(t => t.name), [
-      'list_connectors', 'connector_tools', 'call_connector',
+      'list_connectors', 'connector_tools', 'call_connector', 'app_status', 'queue_apply',
       'skills_catalog', 'skills_add', 'skills_remove', 'skills_resolve', 'skills_import', 'skills_push',
     ])
     assert.equal(text(await c.callTool({ name: 'skills_add', arguments: { id: 'x', motivo: 'y' } })), 'ok')

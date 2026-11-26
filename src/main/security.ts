@@ -91,7 +91,7 @@ async function scanPrepared(dir: string, label: string, scanner: string): Promis
   git(['init', '-q'], dir)
   git(['add', '-A'], dir)
   git(['-c', 'user.email=scan@brandyterm', '-c', 'user.name=BrandyTerm', 'commit', '-qm', 'alvo'], dir)
-  const { handle, result } = runOnce(claudeAdapter, { cwd: dir, prompt: PROMPT, model: 'opus', tools: 'scan', plugins: [scanner] })
+  const { handle, result } = runOnce(claudeAdapter, { cwd: dir, prompt: PROMPT, model: 'opus', tools: 'scan', plugins: [scanner], tag: { kind: 'scan' } })
   const timer = setTimeout(() => handle.cancel(), SCAN_TIMEOUT_MS)
   const r = await result.finally(() => clearTimeout(timer))
   if (!r.done?.ok) return failedScan(label, r.done?.error ?? 'o scan não terminou')

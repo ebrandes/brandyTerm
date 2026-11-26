@@ -59,3 +59,11 @@ test('no project in view: green unless off or limited', () => {
   assert.equal(connectorDot(c({ projects: ['/p/app'] })).tone, 'idle')
   assert.equal(connectorDot(c({ enabled: false })).tone, 'idle')
 })
+
+test('global with an exception: yellow only there, green in any other project, new ones included', () => {
+  const global = c({ exceptProjects: ['/p/app'] })
+  assert.deepEqual(connectorDot(global, app), { tone: 'idle', label: 'Context7: conectado, mas não habilitado em app (exceção)' })
+  assert.equal(connectorDot(global, site).tone, 'on')
+  assert.equal(connectorDot(global, { name: 'novo', path: '/p/novo' }).tone, 'on')
+  assert.equal(connectorDot(global).tone, 'on')
+})

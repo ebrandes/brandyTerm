@@ -3,10 +3,11 @@
 // Runs on `npm install` (postinstall). Each plugin is pinned to a commit so every
 // install gets the same code. Already-fetched plugins at the right commit are skipped.
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { copyPlugin, missingFiles } from './copy-plugin.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const dest = join(root, 'resources', 'plugins')
@@ -18,7 +19,7 @@ let failed = 0
 for (const p of manifest.plugins) {
   const target = join(dest, p.id)
   const stamp = join(target, '.brandyterm-commit')
-  if (existsSync(stamp) && readFileSync(stamp, 'utf8').trim() === p.commit) {
+  if (existsSync(stamp) && readFileSync(stamp, 'utf8').trim() === p.commit && !missingFiles(target, p.requires).length) {
     console.log(`[plugins] ${p.id} ok (${p.commit.slice(0, 7)})`)
     continue
   }
@@ -31,7 +32,10 @@ for (const p of manifest.plugins) {
     const src = join(tmp, p.subdir ?? '.')
     if (!existsSync(join(src, '.claude-plugin', 'plugin.json'))) throw new Error('plugin.json não encontrado')
     rmSync(target, { recursive: true, force: true })
-    cpSync(src, target, { recursive: true, filter: (s) => !s.split(/[\\/]/).includes('.git') })
+    const skipped = copyPlugin(tmp, src, target)
+    if (skipped.length) console.warn(`[plugins] ${p.id}: links ignorados: ${skipped.join(', ')}`)
+    const missing = missingFiles(target, p.requires)
+    if (missing.length) throw new Error(`arquivos obrigatórios ausentes: ${missing.join(', ')}`)
     writeFileSync(stamp, p.commit + '\n')
     console.log(`[plugins] ${p.id} instalado (${p.commit.slice(0, 7)})`)
   } catch (err) {

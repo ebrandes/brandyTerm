@@ -11,6 +11,8 @@ import { useLastSeen } from './useLastSeen'
 import { ResizeHandle } from './components/ResizeHandle'
 import logo from './assets/logo.png'
 import { ArtifactViewer } from './components/ArtifactViewer'
+import { closeArtifact, useArtifact } from './artifacts'
+import { useNotifications } from './useNotifications'
 import { api } from './api'
 import { Notice } from './components/Notice'
 import { useRemoteHosts } from './useRemoteHosts'
@@ -37,6 +39,9 @@ export function App() {
   const [terminals, setTerminals] = useState<Record<string, boolean>>({})
   const toggleTerminal = useCallback((id: string) => setTerminals((t) => ({ ...t, [id]: !t[id] })), [])
   const hosts = useRemoteHosts()
+  const artifact = useArtifact()
+  // a notification can lead to an archived project, which the list does not show
+  const [revealed, setRevealed] = useState<string>()
   const closeBoard = useCallback(() => setBoard(false), [])
 
   // Cmd/Ctrl+B opens the agents board, also when the side panel is hidden on narrow windows
@@ -80,17 +85,33 @@ export function App() {
   const lastId = state?.settings?.lastProjectId
   // an archived project leaves the list, so it is not the one shown (unless every project is archived)
   const listed = state?.projects.filter((p) => !p.archivedAt) ?? []
-  const project = listed.find((p) => p.id === (activeId ?? lastId)) ?? listed[0]
+  const project = (activeId === revealed ? state?.projects.find((p) => p.id === revealed) : undefined)
+    ?? listed.find((p) => p.id === (activeId ?? lastId)) ?? listed[0]
     ?? state?.projects.find((p) => p.id === (activeId ?? lastId)) ?? state?.projects[0]
   // reopen on the project used last
   useEffect(() => {
     if (project && project.id !== lastId) void api.setSettings({ lastProjectId: project.id })
   }, [project?.id, lastId])
   useLastSeen(project?.id)
+  // only an archived project needs revealing: otherwise drop it, so archiving it later still leaves it
+  const revealedIsListed = listed.some((p) => p.id === revealed)
+  useEffect(() => {
+    if (revealedIsListed) setRevealed(undefined)
+  }, [revealedIsListed])
   activeRef.current = project && !project.demo ? project.id : null
   const threadId = project ? selected[project.id] : undefined
   const thread = project?.threads.find((t) => t.id === threadId)
   const draftKey = project ? `${project.id}:${thread?.id ?? 'main'}` : ''
+  const openThread = (projectId: string, id: string | undefined) => {
+    setBoard(false)
+    setActiveId(projectId)
+    setSelected((s) => ({ ...s, [projectId]: id }))
+  }
+  useNotifications(project && !board && !artifact ? { projectId: project.id, threadId: thread?.id } : null, (target) => {
+    closeArtifact()
+    setRevealed(target.projectId)
+    openThread(target.projectId, target.threadId)
+  })
 
   const pending = files.get(draftKey)
   const send = useCallback(async () => {
@@ -151,6 +172,7 @@ export function App() {
         userPlugins={state.userPlugins}
         projectSkills={state.projectSkills?.[project.id]}
         connectors={state.connectors}
+        applyQueue={state.applyQueue}
         machine={state.machine}
         settings={state.settings}
         activeId={project.id}
@@ -185,6 +207,7 @@ export function App() {
         project={project}
         allowAllThreads={!!state.settings?.allowAllThreads}
         keepAwake={state.settings?.keepAwake !== false}
+        notifications={state.settings?.notifications !== false}
         idleCompact={state.settings?.idleCompact?.enabled !== false}
         showRemote={showRemoteToggle(state.settings?.remote?.enabled === true, groups)}
         selectedId={thread?.id}
@@ -197,11 +220,7 @@ export function App() {
           projects={state.projects}
           currentId={project.id}
           onClose={closeBoard}
-          onOpenThread={(projectId, threadId) => {
-            setBoard(false)
-            setActiveId(projectId)
-            setSelected((s) => ({ ...s, [projectId]: threadId }))
-          }}
+          onOpenThread={openThread}
         />
       )}
       <ArtifactViewer projects={state.projects} />

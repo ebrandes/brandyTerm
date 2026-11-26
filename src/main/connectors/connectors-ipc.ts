@@ -31,6 +31,17 @@ const union = (a: string[] | undefined, b: string[]): string[] | undefined => {
   return all.length ? all : undefined
 }
 
+/** the scope fields sent; a connector limited to some projects keeps no exceptions */
+function scopeOf(c: Connector, p: ConnectorPatch): Partial<Connector> {
+  const out: Partial<Connector> = {}
+  for (const k of ['projects', 'exceptProjects'] as const) {
+    if (k in p) out[k] = strList(p[k])?.length ? strList(p[k]) : undefined
+  }
+  const limited = 'projects' in out ? out.projects : c.projects
+  if (('projects' in p || 'exceptProjects' in p) && limited?.length) out.exceptProjects = undefined
+  return out
+}
+
 /** a custom connector logs in by OAuth (remote only) or not at all: a client-sent `cli` command would run unreviewed */
 function customAuth(d: ConnectorDraft): ConnectorAuth {
   return d.transport === 'http' && d.auth?.kind === 'oauth' ? { kind: 'oauth' } : { kind: 'none' }
@@ -97,7 +108,7 @@ export function registerConnectorsIpc({ store, secrets, hub, login }: Connectors
     }
     if (p.description !== undefined) patch.description = str(p.description)
     if (p.enabled !== undefined) patch.enabled = p.enabled === true
-    if ('projects' in p) patch.projects = strList(p.projects)?.length ? strList(p.projects) : undefined
+    Object.assign(patch, scopeOf(c, p))
     let sent = a.secrets
     if (p.definition !== undefined) {
       // Corrigir: how it runs changes; id, projects, switch and always-allowed tools stay

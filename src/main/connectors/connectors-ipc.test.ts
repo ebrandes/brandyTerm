@@ -169,3 +169,20 @@ test('a custom http connector with a non-https, non-localhost url is refused by 
   await assert.rejects(call('connectors:add', { draft: custom({ transport: 'http', command: undefined, url: 'http://example.com/mcp' }) }), /Use uma URL https/)
   assert.equal(store.list().length, 0)
 })
+
+test('update scope: exceptions stay with a global connector, a project list clears them', async () => {
+  const { call, store, log } = setup()
+  const { id } = (await call('connectors:add', { draft: custom({ trusted: true }) })) as { id: string }
+  const scope = () => [store.get(id)?.projects, store.get(id)?.exceptProjects]
+  await call('connectors:update', { id, patch: { projects: [], exceptProjects: ['/a'] } })
+  assert.deepEqual(scope(), [undefined, ['/a']])
+  await call('connectors:update', { id, patch: { name: 'Outro' } })
+  assert.deepEqual(scope(), [undefined, ['/a']])
+  await call('connectors:update', { id, patch: { projects: ['/b'] } })
+  assert.deepEqual(scope(), [['/b'], undefined])
+  await call('connectors:update', { id, patch: { exceptProjects: ['/c'] } })
+  assert.deepEqual(scope(), [['/b'], undefined])
+  await call('connectors:update', { id, patch: { projects: [], exceptProjects: [] } })
+  assert.deepEqual(scope(), [undefined, undefined])
+  assert.deepEqual(log.closed, [])
+})

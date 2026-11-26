@@ -9,7 +9,7 @@ import { safeCipher } from './safe-cipher.ts'
 export type { ConnectorDeps } from './boot.ts'
 
 /** Never throws: if startup fails, the app opens with no connectors and the panel's channels refuse. */
-export function startConnectors(d: Pick<BootOpts, 'skills' | 'isSkillsThread'> & {
+export function startConnectors(d: Pick<BootOpts, 'app' | 'skills' | 'isSkillsThread'> & {
   engine: Engine
   userData: string
   hosts?: RemoteHosts

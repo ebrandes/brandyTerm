@@ -36,9 +36,10 @@ export function registerAppIpc({ engine, getWin, pushState }: AppIpcDeps): void 
     p.remoteHidden = a.hidden ? true : undefined
     engine.touch()
   }, ruleOf('project:set-remote-hidden'))
-  registry.add('chat:send', (a: { projectId: string; text: string; threadId?: string; attachments?: unknown }, ctx) =>
+  registry.add('chat:send', (a: { projectId: string; text: string; threadId?: string; attachments?: unknown; answerTo?: unknown }, ctx) =>
     engine.send(String(a.projectId), String(a.text ?? ''), a.threadId ? String(a.threadId) : undefined,
-      validAttachments(a.attachments, ctx.remote ? String(a.projectId) : undefined)),
+      validAttachments(a.attachments, ctx.remote ? String(a.projectId) : undefined),
+      typeof a.answerTo === 'string' ? a.answerTo : undefined),
     ruleOf('chat:send'))
   registry.add('commands:list', (projectId: string) => engine.commands(String(projectId)), ruleOf('commands:list'))
   registry.add('process:start', (a: { projectId: string; name: string; command: string }) =>

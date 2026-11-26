@@ -1,8 +1,10 @@
+import { summarySent } from '../shared/thread-report-state.ts'
 import type { Project, Thread } from '../shared/types.ts'
 import type { Engine } from './engine.ts'
 import { ADAPTERS } from './adapters/index.ts'
 import { remember } from './coordinator-memory.ts'
 import { sessionModel } from './phases.ts'
+import { tierOf } from '../shared/thread-quality.ts'
 import { addUsage, runOnce, type RunResult } from './run.ts'
 import { ThreadReporter, type SilentResult } from './thread-report.ts'
 
@@ -28,6 +30,7 @@ export function createReporter(engine: Engine, pluginsFor: (path: string | null)
         ...sessionModel(t),
         tools: 'readonly',
         thread: { projectId: p.id, threadId: t.id },
+        tag: { kind: 'report', projectId: p.id, threadId: t.id, tier: tierOf(t) },
         plugins: pluginsFor(p.path ?? null)
       })
       return {
@@ -45,5 +48,9 @@ export function createReporter(engine: Engine, pluginsFor: (path: string | null)
 export function reportThreadById(engine: Engine, projectId: string, threadId: string): void {
   const p: Project | undefined = engine.state.projects.find((x) => x.id === projectId)
   const t: Thread | undefined = p?.threads.find((x) => x.id === threadId)
-  if (p && t) engine.reporter.report(p, t, 'completo')
+  if (!p || !t) throw new Error('Thread não encontrada.')
+  // idempotent: repeated clicks, or a click on an already sent summary, add nothing
+  if (t.reporting || summarySent(t)) return
+  if (!engine.reporter.report(p, t, 'completo'))
+    throw new Error('Não foi possível enviar: a thread está ocupada ou ainda não conversou. Tente de novo em instantes.')
 }

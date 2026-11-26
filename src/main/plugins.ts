@@ -7,6 +7,7 @@ import { resolveCli } from './adapters/proc.ts'
 import { diagLog, diagLogOnChange } from './diag-log.ts'
 import { rtkInfo } from './rtk.ts'
 import { describeCounts, scanPlugin } from './security.ts'
+import { economizerCoverage } from './tool-health.ts'
 
 interface Wanted {
   id: string
@@ -21,6 +22,8 @@ interface Wanted {
   spec?: string
   /** loaded only in the security scans, not in every thread */
   scanner?: boolean
+  /** files without which the plugin loads but does nothing (also in resources/plugins.json) */
+  requires?: string[]
 }
 
 /**
@@ -30,7 +33,7 @@ interface Wanted {
  */
 const PLUGINS: Wanted[] = [
   { id: 'superpowers', name: 'Superpowers', kind: 'plugin', dirName: 'superpowers' },
-  { id: 'tokeneconomizer', name: 'TokenEconomizer', kind: 'plugin', dirName: 'tokeneconomizer' },
+  { id: 'tokeneconomizer', name: 'TokenEconomizer', kind: 'plugin', dirName: 'tokeneconomizer', requires: ['lib/tokeneconomizer/plugin/hook.py'] },
   { id: 'claude-code-setup', name: 'Claude Code Setup', kind: 'plugin', dirName: 'claude-code-setup' },
   { id: 'claude-security', name: 'Claude Security', kind: 'plugin', dirName: 'claude-security', scanner: true },
   {
@@ -74,11 +77,13 @@ function bundledRoots(): string[] {
   return roots
 }
 
+const missingIn = (w: Wanted, dir: string): string[] => (w.requires ?? []).filter((f) => !existsSync(join(dir, f)))
+
 function bundled(w: Wanted): { dir: string; version: string } | null {
   for (const r of bundledRoots()) {
     const dir = join(r, w.id)
     const manifest = join(dir, '.claude-plugin', 'plugin.json')
-    if (!existsSync(manifest)) continue
+    if (!existsSync(manifest) || missingIn(w, dir).length) continue
     try {
       return { dir, version: String(JSON.parse(readFileSync(manifest, 'utf8')).version ?? 'incluído') }
     } catch (error) {
@@ -95,7 +100,7 @@ function cached(w: Wanted): { dir: string; version: string } | null {
   for (const market of dirs(cache)) {
     for (const version of dirs(join(cache, market, w.dirName))) {
       const dir = join(cache, market, w.dirName, version)
-      if (!existsSync(join(dir, '.claude-plugin', 'plugin.json'))) continue
+      if (!existsSync(join(dir, '.claude-plugin', 'plugin.json')) || missingIn(w, dir).length) continue
       if (!best || cmpVersion(version, best.version) > 0) best = { dir, version }
     }
   }
@@ -111,7 +116,8 @@ export function discoverPlugins(): PluginInfo[] {
     if (best && w.scanner) note = 'revisa cada plugin antes da instalação'
     else if (best) note = own ? 'incluído no BrandyTerm, carregado em todas as threads do Claude' : 'carregado em todas as threads do Claude'
     else note = w.optional ? 'opcional; clique para instalar' : 'não encontrado; rode npm run plugins'
-    return { id: w.id, name: w.name, kind: w.kind, dir: best?.dir, version: best?.version, optional: !!w.optional, scanner: !!w.scanner, note }
+    const coverage = w.id === 'tokeneconomizer' ? economizerCoverage(best ? [] : (w.requires ?? []), !!resolveCli('codex')) : undefined
+    return { id: w.id, name: w.name, kind: w.kind, dir: best?.dir, version: best?.version, optional: !!w.optional, scanner: !!w.scanner, note, coverage }
   })
   logLoaded(plugins)
   return [...plugins, rtkInfo()]

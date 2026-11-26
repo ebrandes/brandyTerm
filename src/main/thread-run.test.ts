@@ -119,3 +119,11 @@ test('the end of a run that was replaced leaves the new run alone', async () => 
   assert.equal(r.host.handles.get('t'), current)
   assert.deepEqual([r.t.state, r.finished.length], ['running', 0])
 })
+
+test('a new turn clears the sent mark, even one left by the cancelled short report', async () => {
+  const r = rig([ok('RESUMO: feito', 's')], { plan: undefined, reporting: true, reportError: 'limite' })
+  r.host.reporter.cancel = () => void (r.t.reportedAt = '2026-11-25T10:00:00.000Z')
+  r.start('de novo', true)
+  assert.deepEqual([r.t.reportedAt, r.t.reportError, r.t.reporting], [undefined, undefined, undefined])
+  await r.settle()
+})

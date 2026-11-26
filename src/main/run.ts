@@ -1,11 +1,14 @@
 import type { Usage } from '../shared/types.ts'
 import type { AgentAdapter, AgentEvent, RunHandle, RunOpts } from './adapters/types.ts'
 import { claudeAuth } from './adapters/auth.ts'
+import { recordRun } from './usage-ledger.ts'
 
 export interface RunResult {
   done?: Extract<AgentEvent, { kind: 'done' }>
   sessionId?: string
   usage: { input: number; output: number; cached: number; costUsd: number }
+  /** the model the CLI reported (Claude only) */
+  model?: string
   /** context of the last model call (Claude only) */
   context?: { used: number; limit?: number }
 }
@@ -45,6 +48,7 @@ export function runOnce(adapter: AgentAdapter, opts: RunOpts, onEvent?: (e: Agen
         r.usage.output += e.output
         r.usage.cached += e.cached
         r.usage.costUsd += e.costUsd ?? 0
+        if (e.model) r.model = e.model
       } else if (e.kind === 'done') {
         const next = e.limited && e.account && left > 0 && !cancelled ? claudeAuth().failover(e.account) : null
         if (next) {
@@ -71,5 +75,9 @@ export function runOnce(adapter: AgentAdapter, opts: RunOpts, onEvent?: (e: Agen
       current.cancel()
     }
   }
-  return { handle, result: done.then(() => r) }
+  const result = done.then(() => {
+    recordRun(adapter.id, opts, r)
+    return r
+  })
+  return { handle, result }
 }

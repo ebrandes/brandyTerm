@@ -1,0 +1,21 @@
+/* Minimize toggle of the PROCESSOS + footer area; the same button is the one-line summary when minimized */
+.procs.minimized { flex: none; max-height: none; overflow: visible; padding: 6px 0 8px; }
+.procs.minimized .procs-head { margin-bottom: 0; }
+.procs-head { gap: 4px; }
+.procs-head h3 { flex: 1; min-width: 0; }
+.dock-toggle { width: 100%; min-height: 30px; display: flex; align-items: center; gap: 8px; padding: 2px 4px; border-radius: 8px; text-align: left; text-transform: none; letter-spacing: normal; }
+.dock-toggle:hover { background: var(--card); }
+/* inside the column: an outside outline would be clipped by the section's scroll */
+.dock-toggle:focus-visible { outline-offset: -2px; }
+.dock-title { flex: none; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+/* wraps instead of scrolling sideways on a narrow column */
+.dock-summary { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; font-size: 11px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dock-ports { min-width: 0; overflow-wrap: anywhere; }
+.dock-ctx { white-space: nowrap; }
+.dock-ctx.warn, .dock-allow { color: var(--yellow); }
+.dock-allow { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.dock-chev { flex: none; margin-left: auto; color: var(--faint); transition: transform .15s; }
+.dock-toggle:hover .dock-chev { color: var(--muted); }
+.dock-chev.closed { transform: rotate(180deg); }
+.overview-footer[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .dock-chev { transition: none; } }

@@ -40,6 +40,7 @@
 }
 .ask-opt:hover { background: var(--card-hi); border-color: var(--accent-line); }
 .ask-opt:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-opt:disabled { opacity: .5; cursor: default; }
 .ask-num {
   flex: none;
   display: grid;
@@ -95,7 +96,9 @@
   font-size: 13px;
   font-weight: 600;
 }
+.ask-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ask-form button:disabled { opacity: .4; cursor: default; }
+.ask-error { margin-top: 8px; font-size: 12px; color: var(--red); }
 
 .ask.answered { border-color: var(--line); background: var(--panel); opacity: .85; }
 .ask.answered .ask-q { font-weight: 500; color: var(--muted); }

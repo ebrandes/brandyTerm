@@ -5,6 +5,7 @@ import { attachmentText, claudeUserMessage } from '../attach-content.ts'
 import { LIMIT_RE, claudeAuth } from './auth.ts'
 import { claudeStream } from './claude-events.ts'
 import { runClaudeSdk } from './claude-sdk.ts'
+import { claudeEnv } from './claude-env.ts'
 import { dirname } from 'node:path'
 import { readOnlyBashRules, rtkBin, rtkSettings } from '../rtk.ts'
 
@@ -16,7 +17,14 @@ function versionOf(cmd: string, prefix: string[]): Promise<string | undefined> {
   })
 }
 
-const SCAN_SETTINGS = JSON.stringify({ sandbox: { enabled: true, autoAllowBashIfSandboxed: true } })
+const SCAN_SANDBOX = { sandbox: { enabled: true, autoAllowBashIfSandboxed: true } }
+
+/** one `--settings` per run: the scan's sandbox and the RTK hook travel together */
+export function runSettings(tools: RunOpts['tools'], rtk: string | null): string | null {
+  const extra = tools === 'scan' ? SCAN_SANDBOX : undefined
+  if (rtk) return rtkSettings(rtk, extra)
+  return extra ? JSON.stringify(extra) : null
+}
 
 export const claudeAdapter: AgentAdapter = {
   id: 'claude',
@@ -37,7 +45,7 @@ export const claudeAdapter: AgentAdapter = {
       onEvent({ kind: 'done', ok: false, text: '', error: 'Claude CLI não encontrado' })
       return { done: Promise.resolve(), cancel() {} }
     }
-    const rtk = opts.tools === 'readonly' ? rtkBin() : null
+    const rtk = opts.tools === 'readonly' || opts.tools === 'scan' ? rtkBin() : null
     const args = [
       '-p',
       '--output-format',
@@ -54,9 +62,10 @@ export const claudeAdapter: AgentAdapter = {
     // Bash only for read-only commands (headless mode denies the rest), compressed by RTK when installed
     // Skill loads plugin skills (superpowers…) on demand; without it threads cannot use them
     if (opts.tools === 'readonly') args.push('--allowedTools', ['Skill', ...readOnlyBashRules(!!rtk)].join(','))
-    if (rtk) args.push('--settings', rtkSettings(rtk))
+    const settings = runSettings(opts.tools, rtk)
+    if (settings) args.push('--settings', settings)
     // scan: edits only inside its throwaway folder, every Bash call inside Claude Code's sandbox
-    if (opts.tools === 'scan') args.push('--permission-mode', 'acceptEdits', '--allowedTools', 'Workflow,Read,Glob,Grep', '--settings', SCAN_SETTINGS)
+    if (opts.tools === 'scan') args.push('--permission-mode', 'acceptEdits', '--allowedTools', 'Workflow,Read,Glob,Grep')
     if (opts.sessionId) args.push('--resume', opts.sessionId)
     if (opts.model) args.push('--model', opts.model)
     if (opts.effort) args.push('--effort', opts.effort)
@@ -73,8 +82,7 @@ export const claudeAdapter: AgentAdapter = {
 
     // the account is fixed for the whole run; a token account only changes this child's env
     const account = claudeAuth().pick()
-    const env: NodeJS.ProcessEnv = { ...process.env, ...account.env }
-    if (account.env.CLAUDE_CODE_OAUTH_TOKEN === undefined) delete env.CLAUDE_CODE_OAUTH_TOKEN
+    const env = claudeEnv(account.env)
     let finished = false
     const finish = (e: Extract<AgentEvent, { kind: 'done' }>) => {
       if (finished) return

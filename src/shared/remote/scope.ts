@@ -6,7 +6,7 @@ export const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 
 
 /** Where a project-scoped channel carries its project id. */
 export const SCOPED: Record<string, Where> = {
-  'commands:list': 'arg', 'project:remove': 'arg',
+  'commands:list': 'arg', 'project:remove': 'arg', 'process:detected': 'arg',
   'term:open': 'id', 'term:write': 'id', 'term:resize': 'id', 'term:kill': 'arg-or-id',
   'chat:send': 'projectId', 'fs:list': 'projectId', 'thread:cancel': 'projectId', 'thread:approve': 'projectId',
   'thread:resolve': 'projectId', 'thread:report': 'projectId', 'thread:allowAll': 'projectId', 'archive:reopen': 'projectId',
@@ -21,7 +21,7 @@ export const SCOPED: Record<string, Where> = {
 
 /** Channels known to name no project (archive:list names several, in an array). Anything not here or in SCOPED is refused by the host. */
 export const UNSCOPED = new Set([
-  'state:get', 'archive:list', 'settings:set', 'project:set-remote-hidden', 'plugin:install', 'plugin:open-report', 'logs:open',
+  'state:get', 'archive:list', 'settings:set', 'project:set-remote-hidden', 'plugin:install', 'plugin:open-report', 'logs:open', 'usage:report',
   'project:open-folder', 'attach:open', 'process:open-port', 'clipboard:read', 'clipboard:write',
   'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
   'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',
@@ -30,7 +30,8 @@ export const UNSCOPED = new Set([
   'remote:discover',
   'remote:status',
   'fs:browse', 'project:add-path',
-  'skills:setLibrary'
+  'skills:setLibrary',
+  'notify:view', 'notify:take-target'
 ])
 
 /** The project id a scoped call refers to; null when the channel is unscoped or the id is not a string. */

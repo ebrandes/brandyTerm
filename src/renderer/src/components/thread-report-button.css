@@ -1,0 +1,8 @@
+.thread-report { align-items: center; }
+.thread-report button[aria-disabled='true'] { cursor: default; color: var(--muted); }
+.thread-report button[aria-disabled='true']:hover { background: transparent; }
+.thread-report button.report-sent { color: var(--green); border-color: var(--green); }
+.thread-report button.report-error { border-color: var(--red); }
+.report-status { font-size: 12.5px; }
+.report-error { color: var(--red); }
+.thread-report .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

@@ -9,6 +9,7 @@ import type { ConnectorStore } from './store.ts'
 import { HOLD_MS } from './login.ts'
 import { resultText, toolsText } from './result-text.ts'
 import { CANCELLED, hold, startDeadline, type Deadline } from './deadline.ts'
+import { activeIn } from '../../shared/connector-scope.ts'
 
 export { RESULT_CAP } from './result-text.ts'
 const DETAIL_CAP = 8000
@@ -54,7 +55,7 @@ export function createCalls(d: CallsDeps): GwHandler {
       throw new Error(msg)
     }
     if (!c.enabled) throw new Error(`${c.name} está desativado no painel Conectores.`)
-    if (c.projects && !c.projects.includes(p.path ?? '')) throw new Error(`${c.name} não está liberado para este projeto.`)
+    if (!activeIn(c, p.path ?? '')) throw new Error(`${c.name} não está liberado para este projeto.`)
     return c
   }
 

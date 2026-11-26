@@ -7,10 +7,14 @@ import type { MachineInfo } from '../../../shared/remote/machine.ts'
 import { UserPluginsPanel } from './UserPluginsPanel'
 import { ProjectSkillsPanel } from './ProjectSkillsPanel'
 import { AccountsPanel } from './AccountsPanel'
+import { ApplyQueuePanel } from './ApplyQueuePanel'
+import type { ApplyQueueView } from '../../../shared/apply-queue.ts'
 import { ProjectRow, type ProjectAsk } from './ProjectRow'
 import { ArchivedProjects } from './ArchivedProjects'
 import { ConnectorsSection } from '../connectors/ConnectorsSection'
+import { PluginCoverage } from './PluginCoverage'
 import { RemotePanel } from './RemotePanel'
+import { UsageReportButton } from './UsageReport'
 import { SideSection } from './SideSection'
 import { MachineGroupHead } from './MachineGroupHead'
 import { showGroups, type MachineGroup } from '../machine-groups'
@@ -30,6 +34,8 @@ interface Props {
   /** the skills panel of the active project (a local project with a folder) */
   projectSkills?: ProjectSkillsView
   connectors?: ConnectorsState
+  /** worktrees waiting to be applied */
+  applyQueue?: ApplyQueueView
   /** this machine and the app settings (remote access) */
   machine?: MachineInfo
   settings?: AppSettings
@@ -47,10 +53,12 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   const canInstall = p.optional && !p.dir
   const blocked = p.review?.blocked && !p.dir
   const status = p.installing ? 'revisando…' : p.dir ? (p.version ?? 'ativo') : blocked ? 'bloqueado' : p.optional ? 'opcional' : 'ausente'
+  // installed but not acting on some agent is not the same as active
+  const partial = !!p.dir && !!p.coverage?.some((c) => !c.ok)
   return (
     <div className="plugin-row">
       <button className="agent-row plugin-main" onClick={onToggle} title={p.error ?? (p.installing ? p.note : p.dir) ?? p.note}>
-        <span className={`dot ${p.dir ? 'dot-ok' : 'dot-off'}`} />
+        <span className={`dot ${partial ? 'dot-partial' : p.dir ? 'dot-ok' : 'dot-off'}`} />
         <span>{p.name}</span>
         <span className="agent-note">{status}</span>
       </button>
@@ -66,6 +74,7 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
         </button>
       )}
       {p.error && open && <div className="plugin-error">{p.error}</div>}
+      {p.coverage && open && <PluginCoverage list={p.coverage} />}
       {p.review && open && (
         <div className={blocked ? 'plugin-error' : 'plugin-review'}>
           Claude Security: {p.review.summary}
@@ -84,7 +93,7 @@ function PluginRow({ plugin: p, open, onToggle }: { plugin: PluginInfo; open: bo
   )
 }
 
-export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, projectSkills, connectors, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
+export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugins, projectSkills, connectors, applyQueue, machine, settings, activeId, lastSeen, onSelect, onOpen, onAsk }: Props) {
   const [openPlugin, setOpenPlugin] = useState<string | null>(null)
   const grouped = showGroups(groups)
   const viewed = projects.find((p) => p.id === activeId)
@@ -109,7 +118,10 @@ export function Sidebar({ projects, groups, agents, plugins, accounts, userPlugi
         <ArchivedProjects projects={projects.filter((p) => p.archivedAt)} />
       </nav>
 
+      <ApplyQueuePanel queue={applyQueue} projects={projects} />
+
       {accounts && <AccountsPanel state={accounts} />}
+      <UsageReportButton />
 
       <hr className="side-divider" />
 

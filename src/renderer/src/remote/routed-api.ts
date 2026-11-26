@@ -70,6 +70,8 @@ export function createRoutedApi(
     startProcess: a => via('process:start', a, x => local.startProcess(x)),
     stopProcess: a => via('process:stop', a, x => local.stopProcess(x)),
     removeProcess: a => via('process:remove', a, x => local.removeProcess(x)),
+    // the scan reads this machine only: a remote project shows none
+    detectedProcesses: id => isRemote('process:detected', id) ? Promise.resolve([]) : local.detectedProcesses(id),
     term: {
       ...local.term,
       // remote terminals arrive in phase 3: without output events they would be blind

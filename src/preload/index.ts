@@ -37,12 +37,17 @@ const api: BrandyApi = {
   reportThread: (a) => ipcRenderer.invoke('thread:report', a),
   resolveThread: (a) => ipcRenderer.invoke('thread:resolve', a),
   retireThread: (a) => ipcRenderer.invoke('thread:retire', a),
+  approveApply: (id) => ipcRenderer.invoke('apply:approve', id),
+  cancelApply: (id) => ipcRenderer.invoke('apply:cancel', id),
+  retryApply: (id) => ipcRenderer.invoke('apply:retry', id),
   setAllowAll: (a) => ipcRenderer.invoke('thread:allowAll', a),
+  usageReport: (month) => ipcRenderer.invoke('usage:report', month),
   listArchived: (ids) => ipcRenderer.invoke('archive:list', ids),
   reopenArchived: (a) => ipcRenderer.invoke('archive:reopen', a),
   startProcess: (a) => ipcRenderer.invoke('process:start', a),
   stopProcess: (a) => ipcRenderer.invoke('process:stop', a),
   removeProcess: (a) => ipcRenderer.invoke('process:remove', a),
+  detectedProcesses: (id) => ipcRenderer.invoke('process:detected', id),
   openPort: (p) => ipcRenderer.invoke('process:open-port', p),
   installPlugin: (a) => ipcRenderer.invoke('plugin:install', a),
   openPluginReport: (id) => ipcRenderer.invoke('plugin:open-report', id),
@@ -73,6 +78,11 @@ const api: BrandyApi = {
     revokeAlways: (a) => ipcRenderer.invoke('connectors:revoke-always', a),
     importList: () => ipcRenderer.invoke('connectors:import-list'),
     import: (a) => ipcRenderer.invoke('connectors:import', a)
+  },
+  notify: {
+    setView: (view) => ipcRenderer.invoke('notify:view', view),
+    takeTarget: () => ipcRenderer.invoke('notify:take-target'),
+    onOpen: (cb) => listen('notify:open', cb)
   },
   remote: {
     hosts: () => ipcRenderer.invoke('remote:hosts'),

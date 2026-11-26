@@ -7,6 +7,7 @@ import { buildThreadPrompt } from './coordinator.ts'
 import { zeroUsage } from './new-thread.ts'
 import { afterPlan, execPrompt, inPlan, runSpec } from './phases.ts'
 import { addUsage, runOnce, type RunResult } from './run.ts'
+import { tierOf } from '../shared/thread-quality.ts'
 import { settleThread } from './settle.ts'
 import { applyThreadEvent } from './thread-events.ts'
 
@@ -37,6 +38,10 @@ export function runThread(host: RunHost, p: Project, t: Thread, prompt: string, 
   const planning = inPlan(t)
   // the user (or the queue) takes the session: a silent run on it stops first
   host.reporter.cancel(t.id)
+  // a new turn has a new summary to send (after the cancel, whose fallback may mark the old one)
+  t.reporting = undefined
+  t.reportedAt = undefined
+  t.reportError = undefined
   t.state = 'running'
   t.resolved = false
   t.pending = undefined
@@ -56,6 +61,7 @@ export function runThread(host: RunHost, p: Project, t: Thread, prompt: string, 
       sessionId: t.sessionId,
       ...runSpec(t),
       thread: { projectId: p.id, threadId: t.id },
+      tag: { kind: planning ? 'plan' : 'work', projectId: p.id, threadId: t.id, tier: tierOf(t) },
       approve: (a) => host.approvals.ask(t, a),
       plugins: host.pluginsFor(p.path ?? null),
       autocompact: AUTOCOMPACT,

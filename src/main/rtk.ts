@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import type { PluginInfo } from '../shared/types.ts'
 import { resolveCli } from './adapters/proc.ts'
+import { codexRtkHook, rtkCoverage } from './tool-health.ts'
 
 /**
  * RTK (github.com/rtk-ai/rtk) compresses shell output before the agent reads it.
@@ -25,8 +26,9 @@ export function readOnlyBashRules(withRtk: boolean): string[] {
 }
 
 /** `--settings` JSON that installs the RTK hook for one Claude run, independent of the user's settings. */
-export function rtkSettings(bin: string): string {
+export function rtkSettings(bin: string, extra: object = {}): string {
   return JSON.stringify({
+    ...extra,
     hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command: `"${bin}" hook claude` }] }] }
   })
 }
@@ -42,6 +44,7 @@ export function rtkInfo(): PluginInfo {
       version = 'ativo'
     }
   }
-  const note = bin ? 'comprime a saída do shell em todas as threads do Claude' : 'não encontrado; instale com brew install rtk'
-  return { id: 'rtk', name: 'RTK', kind: 'tool', dir: bin ?? undefined, version, note }
+  const note = bin ? 'comprime a saída do shell antes de o agente ler' : 'não encontrado; instale com brew install rtk'
+  const coverage = rtkCoverage(!!bin, resolveCli('codex') ? codexRtkHook() : null)
+  return { id: 'rtk', name: 'RTK', kind: 'tool', dir: bin ?? undefined, version, note, coverage }
 }

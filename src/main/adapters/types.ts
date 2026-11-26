@@ -1,5 +1,6 @@
 import type { ThreadRef } from '../../shared/connectors.ts'
 import type { AgentId, AgentInfo, ApprovalDecision, Attachment, Effort, Todo } from '../../shared/types.ts'
+import type { RunTag } from '../../shared/usage-report.ts'
 
 export interface ApprovalAsk {
   tool: string
@@ -39,6 +40,8 @@ export interface RunOpts {
   thread?: ThreadRef
   /** files sent with this prompt (images/PDFs as content, text inlined, others by path) */
   attachments?: Attachment[]
+  /** what the usage ledger records about this run */
+  tag?: RunTag
 }
 
 export type AgentEvent =
@@ -48,7 +51,7 @@ export type AgentEvent =
   | { kind: 'file'; path: string; op: 'write' | 'edit' }
   | { kind: 'text'; text: string }
   | { kind: 'todos'; items: Todo[] }
-  | { kind: 'usage'; input: number; output: number; cached: number; costUsd?: number }
+  | { kind: 'usage'; input: number; output: number; cached: number; costUsd?: number; model?: string }
   /** context in use after the last model call, and the model's window */
   | { kind: 'context'; used: number; limit?: number }
   /** any other sign that the run is still alive (tool progress, thinking) */

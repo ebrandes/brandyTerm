@@ -36,11 +36,16 @@ export const RULES = {
   'attach:open': 'local-only',
   'artifact:open': 'local-only',
   'process:open-port': 'local-only',
+  'process:detected': 'local-only',
   'term:open': 'terminal',
   'term:write': 'terminal',
   'term:resize': 'terminal',
   'term:kill': 'terminal',
   'settings:set': 'deny',
+  // approving changes this machine's project folders: only its own user does it
+  'apply:approve': 'deny',
+  'apply:cancel': 'deny',
+  'apply:retry': 'deny',
   // the switch can install a plugin, and the library is this machine's
   'skills:toggle': 'deny',
   'skills:installMissing': 'deny',
@@ -51,6 +56,8 @@ export const RULES = {
   'plugin:open-report': 'deny',
   // the diagnostic logs folder of this machine
   'logs:open': 'deny',
+  // spend of every project of this machine, hidden ones included
+  'usage:report': 'deny',
   'accounts:activate': 'deny',
   'accounts:auto': 'deny',
   'accounts:rename': 'deny',
@@ -87,7 +94,10 @@ export const RULES = {
   'remote:pair': 'deny',
   'remote:rename': 'deny',
   'remote:open-bytes': 'deny',
-  'remote:status': 'deny'
+  'remote:status': 'deny',
+  // notifications are about this machine's window
+  'notify:view': 'deny',
+  'notify:take-target': 'deny'
 } as const satisfies Record<string, RemoteRule>
 
 export type Channel = keyof typeof RULES

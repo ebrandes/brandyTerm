@@ -1,3 +1,4 @@
+import { backfillSent } from '../shared/thread-report-state.ts'
 import type { Project } from '../shared/types.ts'
 import { unescapeReply } from './coordinator.ts'
 
@@ -22,5 +23,6 @@ export function restoreProjects(projects: Project[]): void {
         t.note = 'Interrompida ao fechar o app. Envie uma mensagem para retomar.'
       }
     }
+    if (!p.demo) backfillSent(p)
   }
 }

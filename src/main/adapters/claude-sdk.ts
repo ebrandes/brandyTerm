@@ -7,6 +7,7 @@ import { LIMIT_RE, claudeAuth } from './auth.ts'
 import { claudeStream, describeTool } from './claude-events.ts'
 import { attachmentText, claudeUserMessage } from '../attach-content.ts'
 import { gatewayFor } from './gateway-launch.ts'
+import { claudeEnv } from './claude-env.ts'
 import { readOnlyBashRules, rtkBin, rtkSettings } from '../rtk.ts'
 
 /**
@@ -21,7 +22,7 @@ const TOOLS = ['Read', 'Grep', 'Glob', 'Bash', 'Edit', 'Write', 'NotebookEdit', 
 const FREE = ['Read', 'Grep', 'Glob', 'Skill', 'TaskCreate', 'TaskUpdate', 'TaskList', 'TodoWrite']
 
 /** the gateway's tools: approval happens in the hub, so they are never asked here */
-const BRANDY_TOOLS = ['list_connectors', 'connector_tools', 'call_connector'].map((n) => `mcp__brandy__${n}`)
+const BRANDY_TOOLS = ['list_connectors', 'connector_tools', 'call_connector', 'app_status', 'queue_apply'].map((n) => `mcp__brandy__${n}`)
 /** a connector call may wait for the user (approval, login): longer than the 60 s default */
 const MCP_TOOL_TIMEOUT_MS = '960000'
 
@@ -93,8 +94,7 @@ export function buildOptions(opts: RunOpts, env: Record<string, string | undefin
 
 export function runClaudeSdk(opts: RunOpts, onEvent: (e: AgentEvent) => void): RunHandle {
   const account = claudeAuth().pick()
-  const env: Record<string, string | undefined> = { ...process.env, ...account.env }
-  if (account.env.CLAUDE_CODE_OAUTH_TOKEN === undefined) delete env.CLAUDE_CODE_OAUTH_TOKEN
+  const env: Record<string, string | undefined> = claudeEnv(account.env)
   const stream = claudeStream(onEvent, account.id)
   let finished = false
   const finish = (e: Extract<AgentEvent, { kind: 'done' }>) => {

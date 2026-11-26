@@ -30,6 +30,7 @@ import { demoProjects } from './demo.ts'
 import { newThread, zeroUsage } from './new-thread.ts'
 import { dispatchReplies, retireReplaced, withNotes } from './plan-dispatch.ts'
 import { canRetire, retire } from '../shared/thread-retire.ts'
+import { isStaleAnswer } from '../shared/ask-question.ts'
 import { discoverPlugins } from './plugins.ts'
 import { loadUserPlugins, userPluginDirs, userPluginsState } from './user-plugins.ts'
 import { ProcessManager } from './processes.ts'
@@ -44,7 +45,7 @@ export class Engine extends EventEmitter {
     const own = this.state.plugins.flatMap((p) => (p.dir && p.kind !== 'tool' && !p.scanner ? [p.dir] : []))
     return [...own, ...userPluginDirs(path)]
   }
-  private procs = new ProcessManager()
+  readonly procs = new ProcessManager()
   readonly handles = new Map<string, RunHandle>()
   private chains = new Map<string, Promise<void>>()
   readonly approvals = new ThreadApprovals(() => this.touch())
@@ -164,10 +165,12 @@ export class Engine extends EventEmitter {
     return discoverCommands(this.pluginsFor(this.project(projectId)?.path ?? null), this.project(projectId)?.path ?? null)
   }
 
-  send(projectId: string, text: string, threadId?: string, attachments: Attachment[] = []): void {
+  send(projectId: string, text: string, threadId?: string, attachments: Attachment[] = [], answerTo?: string): void {
     const p = this.project(projectId)
     text = text.trim()
     if (!p || (!text && !attachments.length)) return
+    // one answer per question: a second card click (here or in the main chat) is dropped
+    if (isStaleAnswer(p.threads.find((t) => t.id === threadId), answerTo)) return
     if (p.demo) {
       p.messages.push(this.msg('user', text, { attachments }))
       this.fail(p, 'Este é um projeto de demonstração e não executa nada. Use "Abrir pasta" para trabalhar em um projeto real.')
@@ -221,7 +224,8 @@ export class Engine extends EventEmitter {
       autocompact: coordinatorAutocompact(),
       effort: agent === 'claude' ? 'medium' : 'low',
       schema: PLAN_SCHEMA,
-      attachments
+      attachments,
+      tag: { kind: 'coordinator', projectId: p.id }
     })
     const r = await result
     if (r.sessionId) p.coordinator.sessionId = r.sessionId

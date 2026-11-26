@@ -4,7 +4,7 @@ import { appendFile, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createRedactor } from './diag-redact.ts'
 
-export type DiagArea = 'mcp' | 'plugins' | 'skills' | 'remote'
+export type DiagArea = 'mcp' | 'plugins' | 'skills' | 'remote' | 'notify' | 'usage'
 export type DiagLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface DiagConfig {

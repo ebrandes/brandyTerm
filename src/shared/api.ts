@@ -1,4 +1,6 @@
+import type { DetectedProc } from './proc-attribution.ts'
 import type { FileDiff } from './diff-summary.ts'
+import type { MonthReport } from './usage-report.ts'
 import type { DiscoveredHost, MachineInfo, RemoteHostInfo, TrustRole, TrustedDevice } from './remote/machine.ts'
 import type { RemoteStatus } from './remote/status.ts'
 import type { ConnectorDraft, ConnectorPatch, ConnectorSecrets, ImportCandidate, Preset } from './connectors.ts'
@@ -8,6 +10,12 @@ import type { AppSettings, ArchivedThreadInfo, AppState, ApprovalDecision, Artif
 export interface ActionResult {
   ok: boolean
   error?: string
+}
+
+/** a thread of a project, or its coordinator chat (no threadId) */
+export interface NotifyTarget {
+  projectId: string
+  threadId?: string
 }
 
 export interface BrandyApi {
@@ -28,7 +36,8 @@ export interface BrandyApi {
   revealProject(args: { projectId: string }): Promise<ActionResult>
   /** saves app preferences (merged into the current ones) */
   setSettings(patch: Partial<AppSettings>): Promise<void>
-  send(args: { projectId: string; text: string; threadId?: string; attachments?: Attachment[] }): Promise<void>
+  /** `answerTo`: the question a card answers; ignored if the thread no longer waits on it */
+  send(args: { projectId: string; text: string; threadId?: string; attachments?: Attachment[]; answerTo?: string }): Promise<void>
   /** stores a pasted/dropped/picked file for the project; images may carry the user's marks */
   saveAttachment(args: { projectId: string; name: string; mime: string; data: Uint8Array; marked?: boolean }): Promise<Attachment>
   /** opens a stored attachment with the system's default app */
@@ -52,6 +61,10 @@ export interface BrandyApi {
   resolveThread(args: { projectId: string; threadId: string }): Promise<void>
   /** sets aside an interrupted or failed thread ("descartada"): no longer pending */
   retireThread(args: { projectId: string; threadId: string }): Promise<void>
+  /** the apply queue: approve once, drop (or dismiss a finished one), try a failed one again */
+  approveApply(id: string): Promise<void>
+  cancelApply(id: string): Promise<void>
+  retryApply(id: string): Promise<void>
   setAllowAll(args: { projectId: string; threadId: string; on: boolean }): Promise<void>
   /** archived threads of these projects, newest first (read on demand, never pushed with the state) */
   listArchived(projectIds: string[]): Promise<ArchivedThreadInfo[]>
@@ -60,6 +73,8 @@ export interface BrandyApi {
   startProcess(args: { projectId: string; name: string; command: string }): Promise<void>
   stopProcess(args: { projectId: string; processId: string }): Promise<void>
   removeProcess(args: { projectId: string; processId: string }): Promise<void>
+  /** read-only: what runs for the project without the "+" button (terminal, threads, already running) */
+  detectedProcesses(projectId: string): Promise<DetectedProc[]>
   /** opens http://localhost:PORT in the default browser */
   openPort(port: number, projectId: string): Promise<void>
   /** owner only: hides (or shows again) a project from the machines paired to this one */
@@ -69,6 +84,8 @@ export interface BrandyApi {
   openPluginReport(id: string): Promise<void>
   /** opens this machine's diagnostic logs folder (mcp, plugins, skills, remote) */
   openLogs(): Promise<void>
+  /** this machine's tokens, savings and quality of a month ("YYYY-MM"; default: the current one) */
+  usageReport(month?: string): Promise<MonthReport>
   /** turns one of the user's own Claude Code plugins (or 'personal' skills) on/off for threads */
   setUserPlugin(args: { id: string; on: boolean }): Promise<void>
   /** the skills panel: one item on or off in this project's list (a missing plugin gets installed) */
@@ -105,6 +122,15 @@ export interface BrandyApi {
     importList(): Promise<ImportCandidate[]>
     /** main re-reads the file for the values; stdio entries need trusted */
     import(args: { names: string[]; trusted: boolean }): Promise<{ imported: string[] }>
+  }
+  /** native notifications of this machine */
+  notify: {
+    /** what the window is showing (null: something covers it), so what is in sight is not notified */
+    setView(view: NotifyTarget | null): Promise<void>
+    /** where the last clicked notification leads, once; null when there is none */
+    takeTarget(): Promise<NotifyTarget | null>
+    /** a notification was clicked: take the target */
+    onOpen(cb: () => void): () => void
   }
   /** other BrandyTerm machines: the ones this machine controls (client) and the devices that control it (host) */
   remote: {

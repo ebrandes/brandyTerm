@@ -99,8 +99,8 @@ test('authorize: archive:list keeps only visible string ids', () => {
 test('authorize knows every registered channel (none falls into the unknown refusal by accident)', () => {
   const s = state()
   for (const ch of Object.keys(RULES)) {
-    // connectors:* are deny and deliberately in neither SCOPED nor UNSCOPED: the host refuses them as unknown
-    if (ch.startsWith('connectors:')) {
+    // connectors:* and apply:* are deny and deliberately in neither SCOPED nor UNSCOPED: refused as unknown
+    if (ch.startsWith('connectors:') || ch.startsWith('apply:')) {
       assert.deepEqual(authorize(ch, { id: 'x' }, s), { ok: false, error: HIDDEN }, ch)
       continue
     }

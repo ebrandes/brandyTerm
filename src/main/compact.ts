@@ -9,7 +9,7 @@ import type { Engine } from './engine.ts'
  */
 export async function compactCoordinator(e: Engine, p: Project): Promise<void> {
   const s = p.coordinator
-  const r = await runOnce(ADAPTERS.claude, { cwd: p.path!, prompt: '/compact', sessionId: s.sessionId, tools: 'none' }).result
+  const r = await runOnce(ADAPTERS.claude, { cwd: p.path!, prompt: '/compact', sessionId: s.sessionId, tools: 'none', tag: { kind: 'compact', projectId: p.id } }).result
   addUsage(s.usage, r.usage)
   if (r.sessionId) s.sessionId = r.sessionId
   const ok = r.done?.ok !== false

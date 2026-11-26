@@ -11,7 +11,7 @@ const ANSI_RE = /\u001b\[[0-9;]*[A-Za-z]/g
 
 /**
  * Runs long-lived user commands (frontend on one port, backend on another…).
- * Threads stay read-only; only the user starts these, from the UI.
+ * Only the user starts these, from the UI; what runs otherwise is found by proc-scan.ts.
  */
 export class ProcessManager {
   private children = new Map<string, ChildProcess>()
@@ -58,6 +58,11 @@ export class ProcessManager {
       onChange()
     })
     return info
+  }
+
+  /** pids of the running ones: the panel already lists these and their children */
+  pids(): number[] {
+    return [...this.children.values()].flatMap((c) => (c.pid ? [c.pid] : []))
   }
 
   stop(id: string): void {

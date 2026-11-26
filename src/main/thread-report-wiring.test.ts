@@ -70,12 +70,12 @@ test('reportDirect: failed turn posts the failure without a report', () => {
   assert.equal(p.messages[0].isError, true)
 })
 
-test('reportThreadById: full report for a found thread, no-op otherwise', () => {
+test('reportThreadById: full report for a found thread, error otherwise', () => {
   const { engine, p, t, calls } = fake(true)
   reportThreadById(engine, 'p1', 't1')
   assert.deepEqual([calls[0][0], calls[0][1], calls[0][2]], [p, t, 'completo'])
-  reportThreadById(engine, 'nope', 't1')
-  reportThreadById(engine, 'p1', 'nope')
+  assert.throws(() => reportThreadById(engine, 'nope', 't1'))
+  assert.throws(() => reportThreadById(engine, 'p1', 'nope'))
   assert.equal(calls.length, 1)
 })
 

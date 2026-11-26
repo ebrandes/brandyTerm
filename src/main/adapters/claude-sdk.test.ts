@@ -14,7 +14,7 @@ test('claude work thread gets brandy', () => {
   assert.equal(o.strictMcpConfig, true)
   // always loaded (never deferred behind tool search, there on turn 1) and allowed as long as the agent's own timeout
   assert.deepEqual(o.mcpServers?.brandy, { type: 'stdio', command: '/e', args: ['/g.js'], env, alwaysLoad: true, timeout: 960000 })
-  for (const n of ['list_connectors', 'connector_tools', 'call_connector']) assert.ok(o.allowedTools?.includes(`mcp__brandy__${n}`))
+  for (const n of ['list_connectors', 'connector_tools', 'call_connector', 'app_status', 'queue_apply']) assert.ok(o.allowedTools?.includes(`mcp__brandy__${n}`))
   assert.equal(o.env?.MCP_TOOL_TIMEOUT, '960000')
 })
 

@@ -1,5 +1,6 @@
 import { createPortal } from 'react-dom'
-import { FileText, PlugZap, Settings2, Trash2 } from 'lucide-react'
+import { CircleCheck, CircleOff, FileText, Globe, PlugZap, Settings2, Trash2 } from 'lucide-react'
+import type { ScopeChoice } from '../../../shared/connector-scope-menu.ts'
 import { ProjectContextMenu, type MenuItem } from '../components/ProjectContextMenu'
 
 interface MenuProps {
@@ -8,6 +9,8 @@ interface MenuProps {
   testing: boolean
   /** the connector's error, shown under the items */
   error?: string | null
+  scope: ScopeChoice[]
+  onScope: (patch: ScopeChoice['patch']) => void
   onConfigure: () => void
   onTest: () => void
   onLogs: () => void
@@ -16,9 +19,11 @@ interface MenuProps {
 }
 
 /** A connector's actions (right-click, "⋯", Shift+F10 or the menu key): the project menu's look and keys. */
-export function ConnectorMenu({ name, at, testing, error, onConfigure, onTest, onLogs, onRemove, onClose }: MenuProps) {
+export function ConnectorMenu({ name, at, testing, error, scope, onScope, onConfigure, onTest, onLogs, onRemove, onClose }: MenuProps) {
+  const icon = (s: ScopeChoice) => (s.id === 'everywhere' ? <Globe size={14} /> : s.on ? <CircleCheck size={14} /> : <CircleOff size={14} />)
   const items: MenuItem[] = [
-    { id: 'configure', label: 'Configurar', icon: <Settings2 size={14} />, run: onConfigure },
+    ...scope.map((s) => ({ id: `scope-${s.id}`, label: s.label, icon: icon(s), run: () => onScope(s.patch) })),
+    { id: 'configure', label: 'Configurar', icon: <Settings2 size={14} />, separated: scope.length > 0, run: onConfigure },
     {
       id: 'test', label: testing ? 'Testando…' : 'Testar', icon: <PlugZap size={14} />,
       disabled: testing ? 'Um teste já está em andamento.' : null, run: onTest

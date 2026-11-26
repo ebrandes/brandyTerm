@@ -37,6 +37,7 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   if ('lastProjectId' in patch) next.lastProjectId = typeof patch.lastProjectId === 'string' ? patch.lastProjectId : undefined
   if ('lastSeen' in patch) next.lastSeen = mergeLastSeen(settings.lastSeen, patch.lastSeen)
   if ('keepAwake' in patch) next.keepAwake = patch.keepAwake !== false
+  if ('notifications' in patch) next.notifications = patch.notifications !== false
   if ('remote' in patch && patch.remote) next.remote = mergeRemote(settings.remote, patch.remote)
   if ('idleCompact' in patch && patch.idleCompact) next.idleCompact = { ...DEFAULT_IDLE_COMPACT, ...patch.idleCompact }
   settings = next

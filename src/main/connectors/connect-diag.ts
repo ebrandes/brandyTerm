@@ -48,6 +48,10 @@ function why(e: unknown, f: FailureContext): string {
   }
   const code = (e as { code?: unknown } | null)?.code
   if (f.stage === 'spawn' && code === 'ENOENT') return `${target(f.connector)} não encontrado (ENOENT). Confira o caminho ou instale o programa.`
+  if (f.stage === 'connect') {
+    const net = (e as { cause?: { code?: unknown } } | null)?.cause?.code
+    return `sem conexão com o servidor${typeof net === 'string' ? ` (${net})` : ''}. Confira a rede e a URL.`
+  }
   if (f.ended) return `o ${f.connector.transport === 'stdio' ? 'processo terminou' : 'servidor fechou a conexão'} antes de responder.`
   return e instanceof Error ? e.message : String(e)
 }

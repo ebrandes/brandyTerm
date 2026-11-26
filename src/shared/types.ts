@@ -1,6 +1,8 @@
+import type { ApplyQueueView } from './apply-queue.ts'
 import type { MachineInfo, MachineOs } from './remote/machine.ts'
 import type { ConnectorsState, ThreadLogin } from './connectors.ts'
 import type { ProjectSkillsView } from './skills.ts'
+import type { AgentCoverage } from './plugin-health.ts'
 
 export type { CatalogItem, ProjectSkillsView, SkillRow, SkillsList } from './skills.ts'
 export type AgentId = 'claude' | 'codex' | 'antigravity'
@@ -115,15 +117,7 @@ export interface ThreadFile {
   at: string
 }
 
-export type ArtifactKind = 'md' | 'mermaid' | 'html' | 'svg' | 'code'
-export type MediaKind = 'video' | 'image'
-
-/** an artifact read for the viewer; a file outside the project or gone reads as missing */
-export type ArtifactContent =
-  | { kind: 'missing' }
-  | { kind: 'too-big'; size: number }
-  | { kind: MediaKind; size: number }
-  | { kind: ArtifactKind; text: string; lang?: string }
+export type { ArtifactContent, ArtifactKind, MediaKind } from './artifact-types.ts'
 
 /** The planning phase of a `pesado` thread: another model reads the code first, read-only. */
 export interface ThreadPlan {
@@ -190,8 +184,10 @@ export interface Thread {
   context?: ContextUse
   /** a report is being written in the thread's session ("Escrevendo resumo…") */
   reporting?: boolean
-  /** when the thread last sent a report to the coordinator */
+  /** when the thread's summary last reached the coordinator (by click or automatically) */
   reportedAt?: string
+  /** why the last report failed; cleared by a retry or a new turn */
+  reportError?: string
   sessionId?: string
   /** files of the request that opened the thread, sent with its first run */
   attachments?: Attachment[]
@@ -274,6 +270,8 @@ export interface AppSettings {
   lastSeen?: Record<string, string>
   /** keep the machine awake while a thread or the coordinator works (default on) */
   keepAwake?: boolean
+  /** native notifications of this machine (default on) */
+  notifications?: boolean
   /** compact an idle coordinator's context (default on) */
   idleCompact?: IdleCompactCfg
   /** LAN host server for other BrandyTerm machines (default off) */
@@ -335,6 +333,8 @@ export interface PluginInfo {
   /** claude-security result of the last install attempt; `blocked` waits for the user */
   review?: { summary: string; report?: string; blocked: boolean }
   note: string
+  /** token-saving tools only: does it act on each installed agent? */
+  coverage?: AgentCoverage[]
 }
 
 export interface LimitWindow {
@@ -382,6 +382,7 @@ export interface AppState {
   settings?: AppSettings
   machine?: MachineInfo
   connectors?: ConnectorsState
+  applyQueue?: ApplyQueueView
 }
 
 export const MAX_ACTIVE_THREADS = 2

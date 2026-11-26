@@ -48,10 +48,70 @@ test('idle close then reconnect', async () => {
   await hub.call(conn, 't', {})
   await sleep(120)
   assert.equal(s.closes, 1)
-  assert.equal(hub.status('c1').status, 'desconectado')
+  // the connection was verified and nobody turned it off: it comes back on the next use
+  assert.equal(hub.status('c1').status, 'conectado')
   await hub.call(conn, 't', {})
   assert.equal(s.connects, 2)
   await hub.closeAll()
+})
+
+test('closing on purpose says desconectado, also after an idle close', async () => {
+  const { factory } = fake()
+  const hub = new ConnectorHub({ factory, auth, idleMs: 30 })
+  await hub.call(conn, 't', {})
+  await hub.close('c1')
+  assert.equal(hub.status('c1').status, 'desconectado')
+  await hub.call(conn, 't', {})
+  await sleep(80)
+  let changes = 0
+  hub.on('change', () => changes++)
+  await hub.close('c1')
+  assert.equal(hub.status('c1').status, 'desconectado')
+  assert.equal(changes, 1)
+})
+
+test('a reconnect that fails after an idle close shows the error', async () => {
+  let down = false
+  const { factory } = fake()
+  const hub = new ConnectorHub({ factory: (c, a) => { if (down) throw new Error('fetch failed'); return factory(c, a) }, auth, idleMs: 30 })
+  await hub.call(conn, 't', {})
+  await sleep(80)
+  down = true
+  await assert.rejects(hub.call(conn, 't', {}))
+  assert.deepEqual(hub.status('c1'), { status: 'erro', error: 'fetch failed' })
+})
+
+test('test() leaves erro when the tool list is refused, and a later success clears it', async () => {
+  let broken = true
+  const factory: ClientFactory = async () => ({
+    tools: async () => { if (broken) throw new ConnectorError('tools/list quebrou', 'failed'); return [] },
+    call: async () => ({ content: [] }),
+    close: async () => {},
+    onClose: () => {},
+  })
+  const hub = new ConnectorHub({ factory, auth })
+  await assert.rejects(hub.test(conn), /quebrou/)
+  assert.deepEqual(hub.status('c1'), { status: 'erro', error: 'tools/list quebrou' })
+  broken = false
+  await hub.test(conn)
+  assert.equal(hub.status('c1').status, 'conectado')
+  await hub.closeAll()
+})
+
+test('closing while test() runs ends desconectado, not erro', async () => {
+  let fail: (e: Error) => void = () => {}
+  const factory: ClientFactory = async () => ({
+    tools: () => new Promise((_, reject) => { fail = reject }),
+    call: async () => ({ content: [] }),
+    close: async () => { fail(new Error('Connection closed')) },
+    onClose: () => {},
+  })
+  const hub = new ConnectorHub({ factory, auth })
+  const running = assert.rejects(hub.test(conn))
+  await sleep(10)
+  await hub.close('c1')
+  await running
+  assert.equal(hub.status('c1').status, 'desconectado')
 })
 
 test('crash marks erro with the stderr tail and reconnects', async () => {

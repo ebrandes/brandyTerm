@@ -2,6 +2,7 @@ import { useCallback, useRef, useState, type KeyboardEvent, type MouseEvent } fr
 import { MoreHorizontal } from 'lucide-react'
 import type { ConnectorView } from '../../../shared/connectors.ts'
 import { connectorDot, type DotProject } from '../../../shared/connector-dot.ts'
+import { scopeChoices } from '../../../shared/connector-scope-menu.ts'
 import type { Project } from '../types'
 import { api } from '../api'
 import { report } from '../notice'
@@ -109,6 +110,8 @@ export function ConnectorRow({ c, projects, here }: Props) {
       )}
       {menu && (
         <ConnectorMenu name={c.name} at={menu} testing={t.testing} error={error}
+          scope={scopeChoices(c, here)}
+          onScope={(patch) => run(api.connectors.update({ id: c.id, patch }))}
           onConfigure={() => { setEditing(true); setFixing(false) }}
           onTest={t.run}
           onLogs={() => run(api.openLogs())}

@@ -13,7 +13,9 @@ import { registerFsIpc } from './fs-list.ts'
 import { Accounts } from './accounts.ts'
 import { registerAccountIpc } from './account-ipc.ts'
 import { registerArchiveIpc } from './archive-ipc.ts'
+import { registerProcScanIpc } from './proc-scan-ipc.ts'
 import { archiveDirFor } from './archive.ts'
+import { registerUsageIpc } from './usage-ipc.ts'
 import { registerProjectActionsIpc } from './project-actions-ipc.ts'
 import { setClaudeAuth } from './adapters/auth.ts'
 import { loadIdentity } from './remote/identity.ts'
@@ -25,9 +27,14 @@ import { registerAppIpc } from './app-ipc.ts'
 import { registry } from './rpc/registry.ts'
 import { bindIpc } from './rpc/ipc.ts'
 import { configureDiagLog } from './diag-log.ts'
+import { configureLedger } from './usage-ledger.ts'
 import { startConnectors } from './connectors/index.ts'
 import { registerConnectorsIpc } from './connectors/connectors-ipc.ts'
 import { refreshSkills, startSkills } from './skills/wiring.ts'
+import { ApplyQueue } from './apply-queue.ts'
+import { appGateway } from './apply-gateway.ts'
+import { registerApplyIpc } from './apply-ipc.ts'
+import { startNotifications } from './notify/index.ts'
 
 const isMac = process.platform === 'darwin'
 
@@ -120,6 +127,9 @@ app.whenReady().then(async () => {
   const debugLogs = !app.isPackaged || process.env.BRANDYTERM_DEBUG === '1'
   configureDiagLog({ dir: app.getPath('logs'), debug: debugLogs })
   const stateFile = join(app.getPath('userData'), 'brandyterm-state.json')
+  const usageDir = join(app.getPath('userData'), 'usage')
+  // before the engine starts: it may resume queued threads
+  configureLedger(usageDir)
   engine = new Engine(new JsonStore(stateFile))
   engine.on('change', pushState)
   // accounts first: every Claude run (even the ones init may start) bills the active account
@@ -133,6 +143,7 @@ app.whenReady().then(async () => {
   engine.state.accounts = accounts.state
   registerAccountIpc(accounts)
   registerArchiveIpc(engine, archiveDirFor(stateFile))
+  registerUsageIpc(engine, usageDir, archiveDirFor(stateFile))
   registerProjectActionsIpc(engine, archiveDirFor(stateFile))
   stopBackground = startBackground(engine)
   remote = startRemote(engine)
@@ -145,6 +156,7 @@ app.whenReady().then(async () => {
     return p && !p.demo ? p.path : null
   }
   registerTerminalIpc(projectRoot)
+  registerProcScanIpc(engine)
   registerFsIpc(projectRoot)
   registerArtifactIpc(projectRoot)
   registerRemoteCalls({
@@ -152,11 +164,20 @@ app.whenReady().then(async () => {
     hiddenRoots: () => engine.state.projects.filter((p) => p.remoteHidden && p.path).map((p) => p.path as string)
   })
   const skills = startSkills(engine)
-  const connectors = await startConnectors({ engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents, ...skills })
+  // worktrees waiting to be applied: only while nothing runs, because applying src/main restarts the app
+  const applyQueue = new ApplyQueue(engine, app.getPath('userData'))
+  await applyQueue.start().catch((e) => console.error('[apply]', e))
+  app.once('before-quit', () => applyQueue.stop())
+  registerApplyIpc(applyQueue)
+  const connectors = await startConnectors({
+    engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents,
+    app: appGateway(applyQueue), ...skills
+  })
   app.once('before-quit', () => void connectors.stop())
   registerConnectorsIpc(connectors.deps)
-  bindIpc(registry)
   const icon = iconPath()
+  startNotifications({ engine, hosts, getWin: () => win, createWindow, icon })
+  bindIpc(registry)
   if (isMac && icon) app.dock?.setIcon(nativeImage.createFromPath(icon))
   createWindow()
   app.on('activate', () => {

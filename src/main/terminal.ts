@@ -17,6 +17,9 @@ const fixed = new Set<string>()
 /** where each pty's output goes; a reopened window takes it over */
 const senders = new Map<string, WebContents>()
 
+/** pty id (the project id, for project terminals) → pid of its shell */
+export const terminalPids = (): Map<string, number> => new Map([...ptys].map(([id, pty]) => [id, pty.pid]))
+
 function shell(): { file: string; args: string[] } {
   if (process.platform === 'win32') return { file: process.env.COMSPEC || 'powershell.exe', args: [] }
   // login shell: GUI apps on macOS start without the user's PATH

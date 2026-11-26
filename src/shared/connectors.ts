@@ -27,7 +27,10 @@ export interface Connector {
   auth: ConnectorAuth
   enabled: boolean
   preset?: string
+  /** none or empty: every project, new ones included (connector-scope.ts) */
   projects?: string[]
+  /** projects where a connector for every project is off */
+  exceptProjects?: string[]
   /** tool names */
   alwaysAllow: string[]
   /** "Confio neste comando" given (custom/imported stdio) */
@@ -117,4 +120,4 @@ export type ConnectorDraft = Partial<Omit<Connector, 'id' | 'alwaysAllow' | 'aut
 export type ConnectorDefinition = Pick<ConnectorDraft, 'transport' | 'command' | 'args' | 'url' | 'auth' | 'trusted'>
 
 /** The only fields the panel may change on a saved connector. `definition` only for custom (non-preset) ones. */
-export type ConnectorPatch = Partial<Pick<Connector, 'name' | 'description' | 'projects' | 'enabled'>> & { definition?: ConnectorDefinition }
+export type ConnectorPatch = Partial<Pick<Connector, 'name' | 'description' | 'projects' | 'exceptProjects' | 'enabled'>> & { definition?: ConnectorDefinition }

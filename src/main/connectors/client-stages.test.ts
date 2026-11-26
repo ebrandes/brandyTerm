@@ -63,3 +63,11 @@ test('the message keeps the head when stderr is long and fits the card', () => {
   assert.match(m, /^Falhou em tools\/list \(listar ferramentas\): sem resposta em 60 s/)
   assert.ok(m.length <= 500)
 })
+
+test('a connection that never opened says so with the network code, not that the server hung up', () => {
+  const http: Connector = { ...silent, transport: 'http', url: 'https://x.test/mcp' }
+  const e = new TypeError('fetch failed', { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } })
+  // the SDK closes the client on a failed connect, so `ended` is set here too
+  const m = failureMessage(e, { connector: http, stage: 'connect', timeoutMs: 60_000, stderr: '', ended: true }, s => s)
+  assert.equal(m, 'Falhou em conectar à URL: sem conexão com o servidor (UND_ERR_CONNECT_TIMEOUT). Confira a rede e a URL.')
+})

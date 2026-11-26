@@ -1,4 +1,5 @@
 import type { Message, Project, Summary, Thread } from '../shared/types.ts'
+import { markSent } from '../shared/thread-report-state.ts'
 import type { Plan } from './coordinator.ts'
 import type { MemoryNote } from './memory.ts'
 import {
@@ -61,12 +62,19 @@ export class ThreadReporter {
     return this.running.has(threadId)
   }
 
+  /** a report (not a question) is being written in the thread's session */
+  writing(threadId: string): boolean {
+    const cur = this.running.get(threadId)
+    return !!cur && cur.question === undefined
+  }
+
   /** false (and nothing runs) when the thread has no session or is busy */
   report(p: Project, t: Thread, kind: ReportKind, onFail?: () => void): boolean {
     if (!t.sessionId || this.occupied(t)) return false
     const onCancel = kind === 'curto' ? onFail : undefined
     this.start(p, t, reportPrompt(kind), { onCancel }, (res) => this.reported(p, t, kind, res, onFail))
     t.reporting = true
+    t.reportError = undefined
     this.host.touch()
     return true
   }
@@ -146,13 +154,16 @@ export class ThreadReporter {
   private reported(p: Project, t: Thread, kind: ReportKind, res: SilentResult, onFail?: () => void): void {
     t.reporting = false
     if (!res.ok) {
-      if (kind === 'curto') onFail?.()
-      else p.messages.push(this.failure(`Não consegui o resumo da thread “${t.title}”`, res))
+      if (kind === 'curto' && onFail) onFail()
+      else {
+        t.reportError = res.error || 'sem resposta'
+        p.messages.push(this.failure(`Não consegui o resumo da thread “${t.title}”`, res))
+      }
       return this.host.touch()
     }
     const r = parseReport(res.text)
     if (r.feito) t.summary = r.feito
-    t.reportedAt = new Date().toISOString()
+    markSent(t, new Date().toISOString())
     // the report itself goes in the markdown text; the card only links to the thread
     const summaries: Summary[] = [{ agent: t.agent, title: t.title, text: reportShort(r), threadId: t.id }]
     const label = kind === 'curto' ? 'Resumo' : 'Relatório'

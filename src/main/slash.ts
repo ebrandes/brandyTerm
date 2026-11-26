@@ -49,7 +49,7 @@ export function runSlash(e: Engine, p: Project, cmd: { name: string; args: strin
   if (t) {
     // thread compaction: its own session, not the coordinator's
     void (async () => {
-      const r = await runOnce(ADAPTERS.claude, { cwd: p.path!, prompt: '/compact', sessionId: s.sessionId, tools: 'none' }).result
+      const r = await runOnce(ADAPTERS.claude, { cwd: p.path!, prompt: '/compact', sessionId: s.sessionId, tools: 'none', tag: { kind: 'compact', projectId: p.id, threadId: t.id } }).result
       addUsage(s.usage, r.usage)
       if (r.sessionId) s.sessionId = r.sessionId
       note(r.done?.ok === false ? `Falha ao compactar: ${r.done.error ?? 'sem resposta'}` : 'Contexto compactado.', r.done?.ok === false)

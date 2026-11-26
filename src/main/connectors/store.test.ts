@@ -85,3 +85,34 @@ test('store keeps a corrupt copy', () => {
   assert.ok(copy)
   assert.equal(fs.readFileSync(join(file, '..', copy), 'utf8'), '{not json')
 })
+
+test('visibleFor offers a global connector everywhere but in its exceptions', () => {
+  const s = new ConnectorStore(tmp())
+  const c = s.add(draft('Docs', { exceptProjects: ['/a'] }))
+  const empty = s.add(draft('Empty', { projects: [] }))
+  assert.deepEqual(s.visibleFor('/a').map(x => x.id), [empty.id])
+  assert.deepEqual(s.visibleFor('/brand-new').map(x => x.id), [c.id, empty.id])
+})
+
+test('switch and scope survive a restart', () => {
+  const file = tmp()
+  const s = new ConnectorStore(file)
+  const global = s.add(draft('Docs'))
+  const limited = s.add(draft('Scoped', { projects: ['/a'] }))
+  const off = s.add(draft('Off'))
+  s.update(global.id, { exceptProjects: ['/b'] })
+  s.update(off.id, { enabled: false })
+  const again = new ConnectorStore(file)
+  assert.deepEqual(again.list().map(c => [c.enabled, c.projects, c.exceptProjects]), [
+    [true, undefined, ['/b']], [true, ['/a'], undefined], [false, undefined, undefined]
+  ])
+  assert.deepEqual(again.visibleFor('/a').map(c => c.id), [global.id, limited.id])
+  assert.deepEqual(again.visibleFor('/b').map(c => c.id), [])
+  assert.equal(again.fault, undefined)
+})
+
+test('a damaged exception list is repaired, keeping the entry', () => {
+  const file = tmp()
+  fs.writeFileSync(file, JSON.stringify([{ ...draft('Docs'), id: '1', alwaysAllow: [], exceptProjects: ['/a', 7] }]))
+  assert.deepEqual(new ConnectorStore(file).list()[0].exceptProjects, ['/a'])
+})

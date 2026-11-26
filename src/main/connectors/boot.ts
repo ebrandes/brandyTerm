@@ -1,6 +1,7 @@
 // Starts the connectors in main: stores, hub, login broker, call dispatcher and the gateway socket.
 // No Electron here: index.ts passes the login runners and the keychain cipher. A startup failure never stops the app.
 import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import type { Engine } from '../engine.ts'
 import type { RemoteHosts } from '../remote/hosts.ts'
 import type { Connector, ConnectorView, ThreadRef } from '../../shared/connectors.ts'
@@ -10,7 +11,10 @@ import { createCalls } from './calls.ts'
 import { elsewhere } from './elsewhere.ts'
 import { startGatewayServer, socketPath, type GwHandler } from './gateway-server.ts'
 import { sweepStaleSockets } from './socket-sweep.ts'
+import { writeTokenFile } from './gateway-token.ts'
 import { ConnectorHub } from './hub.ts'
+import { reconnectEnabled } from './autoconnect.ts'
+import { mcpLog } from './connect-diag.ts'
 import { LoginBroker, type Runners } from './login.ts'
 import { makeOAuthProvider } from './oauth-provider.ts'
 import { SecretStore, type Cipher } from './secrets.ts'
@@ -37,10 +41,14 @@ export interface BootOpts {
   runners: (secrets: SecretStore) => Runners
   cipher: Cipher
   startServer?: typeof startGatewayServer
+  /** app_status and queue_apply (op 'app') */
+  app?: GwHandler
   /** the skills_* tools (op 'skills'); absent, they are refused */
   skills?: GwHandler
   /** a /skill-* thread: its gateway lists the skills tools */
   isSkillsThread?: (t: ThreadRef) => boolean
+  /** reconnect the enabled connectors in the background (default) */
+  autoConnect?: boolean
 }
 
 export const BOOT_FAILED = 'Os conectores não puderam ser iniciados. Reinicie o BrandyTerm.'
@@ -52,7 +60,7 @@ function refusing(): ConnectorDeps {
   return { store: part(), secrets: part(), hub: part(), login: part() }
 }
 
-/** No process or connection starts here: a connector connects on its first tools or call. */
+/** Resolves without waiting for any connector: the enabled ones reconnect in the background. */
 export async function bootConnectors(d: BootOpts): Promise<Connectors> {
   const detach: (() => void)[] = []
   try {
@@ -118,19 +126,26 @@ async function boot(d: BootOpts, detach: (() => void)[]): Promise<Connectors> {
   })
   sweepStaleSockets(d.userData, process.pid)
   const handle: GwHandler = (r, req, signal) => {
+    if (req.op === 'app') return d.app ? d.app(r, req, signal) : Promise.reject(new Error('Fila de aplicação indisponível.'))
     if (req.op !== 'skills') return calls(r, req, signal)
     return d.skills ? d.skills(r, req, signal) : Promise.reject(new Error('Ferramentas de skills indisponíveis.'))
   }
   const server = await (d.startServer ?? startGatewayServer)(socketPath(d.userData, process.pid), handle)
-  setGatewayProvider(t => gatewaySpec(server.path, server.issue(t), d.isSkillsThread?.(t) ? { BRANDY_GATEWAY_SKILLS: '1' } : undefined))
+  const tokenDir = join(d.userData, `gw-tokens-${process.pid}`)
+  setGatewayProvider(t => gatewaySpec(server.path, writeTokenFile(tokenDir, server.issue(t)), d.isSkillsThread?.(t) ? { BRANDY_GATEWAY_SKILLS: '1' } : undefined))
+  // not awaited: the window opens right away, and each dot turns as its connector answers
+  const quitting = new AbortController()
+  if (d.autoConnect !== false) void reconnectEnabled({ store, hub, login, log: mcpLog, signal: quitting.signal })
 
   return {
     deps: { store, secrets, hub, login },
     async stop() {
       off()
+      quitting.abort()
       // synchronous part first: Electron may exit right after this returns
       hub.killAll()
       const closing = server.close()
+      rmSync(tokenDir, { recursive: true, force: true })
       await closing
       await hub.closeAll()
     },

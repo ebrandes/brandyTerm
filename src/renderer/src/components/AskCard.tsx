@@ -2,6 +2,7 @@ import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { CircleCheck, MessageCircleQuestion, Send } from 'lucide-react'
 import type { Message, Project } from '../types'
 import { api } from '../api'
+import { canAnswer } from '../../../shared/ask-question.ts'
 import './ask-card.css'
 
 type Ask = NonNullable<Message['ask']>
@@ -11,18 +12,33 @@ type Ask = NonNullable<Message['ask']>
  * one as recommended it is options[0] (the parser already moved it) and gets the badge.
  * Keyboard: ↑/↓/Home/End move between options, 1–9 pick one, Enter sends the typed answer.
  */
-export function AskCard({ project, ask }: { project: Project; ask: Ask }) {
+export function AskCard({ project, ask, stale }: { project: Project; ask: Ask; stale?: boolean }) {
   const [text, setText] = useState('')
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState(false)
+  const sending = useRef(false)
   const listRef = useRef<HTMLDivElement>(null)
   const qid = useId()
   const t = project.threads.find((x) => x.id === ask.threadId)
-  const open = t?.state === 'waiting' && t.question?.text === ask.question
+  const open = !stale && canAnswer(t, ask.question)
   const options = ask.options ?? []
 
-  const answer = (value: string) => {
-    if (!value.trim()) return
-    void api.send({ projectId: project.id, text: value.trim(), threadId: ask.threadId })
-    setText('')
+  // one send at a time; main drops a second answer to the same question (answerTo)
+  const answer = async (value: string) => {
+    if (!value.trim() || sending.current) return
+    sending.current = true
+    setSent(true)
+    setError(false)
+    try {
+      await api.send({ projectId: project.id, text: value.trim(), threadId: ask.threadId, answerTo: ask.question })
+      setText('')
+    } catch {
+      setError(true)
+    } finally {
+      // released even on success: if the thread still waits, the card must stay usable
+      sending.current = false
+      setSent(false)
+    }
   }
 
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -31,7 +47,7 @@ export function AskCard({ project, ask }: { project: Project; ask: Ask }) {
     const n = Number(e.key)
     if (n >= 1 && n <= buttons.length) {
       e.preventDefault()
-      answer(options[n - 1])
+      void answer(options[n - 1])
       return
     }
     const at = buttons.indexOf(document.activeElement as HTMLButtonElement)
@@ -75,7 +91,8 @@ export function AskCard({ project, ask }: { project: Project; ask: Ask }) {
                 <button
                   type="button"
                   className={`ask-opt${rec ? ' rec' : ''}`}
-                  onClick={() => answer(o)}
+                  onClick={() => void answer(o)}
+                  disabled={sent}
                   aria-keyshortcuts={i < 9 ? String(i + 1) : undefined}
                 >
                   <span className="ask-num" aria-hidden>{i + 1}</span>
@@ -91,7 +108,7 @@ export function AskCard({ project, ask }: { project: Project; ask: Ask }) {
         className="ask-form"
         onSubmit={(e) => {
           e.preventDefault()
-          answer(text)
+          void answer(text)
         }}
       >
         <input
@@ -99,11 +116,13 @@ export function AskCard({ project, ask }: { project: Project; ask: Ask }) {
           onChange={(e) => setText(e.target.value)}
           placeholder={options.length ? 'Ou escreva outra resposta…' : 'Sua resposta…'}
           aria-label="Resposta para a thread"
+          readOnly={sent}
         />
-        <button type="submit" disabled={!text.trim()}>
+        <button type="submit" disabled={sent || !text.trim()}>
           <Send size={13} aria-hidden /> Responder
         </button>
       </form>
+      {error && <p className="ask-error" role="alert">Não consegui enviar a resposta. Tente de novo.</p>}
     </section>
   )
 }

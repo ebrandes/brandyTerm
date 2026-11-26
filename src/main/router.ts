@@ -98,7 +98,8 @@ export async function classify(cwd: string, objective: string): Promise<Tier | n
     prompt: `${RUBRIC}\n\n<request>${clip(objective)}</request>\nTier:`,
     model: 'haiku',
     effort: 'low',
-    tools: 'none'
+    tools: 'none',
+    tag: { kind: 'router' }
   })
   const timer = setTimeout(() => handle.cancel(), TIMEOUT_MS)
   try {

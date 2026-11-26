@@ -62,7 +62,7 @@ async function consolidate(engine: Engine, p: Project): Promise<void> {
   try {
     const text = readMemory(root)
     // no session: the rewrite must not land in the coordinator's conversation
-    const { result } = runOnce(ADAPTERS[agent], { cwd: root, prompt: consolidatePrompt(text), tools: 'none', effort: 'low', schema: CONSOLIDATE_SCHEMA })
+    const { result } = runOnce(ADAPTERS[agent], { cwd: root, prompt: consolidatePrompt(text), tools: 'none', effort: 'low', schema: CONSOLIDATE_SCHEMA, tag: { kind: 'memory', projectId: p.id } })
     const r = await result
     addUsage(p.coordinator.usage, r.usage)
     const out = (r.done?.structured as { memory?: unknown } | undefined)?.memory

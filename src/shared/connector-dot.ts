@@ -1,6 +1,7 @@
 // The color of a connector's dot in the sidebar, for the project in view. Pure; the panel's only rule for it.
-// Same availability rule as main (store.ts visibleFor): switched on and either not limited or limited to this project.
+// Same availability rule as main: switched on and active in the project (connector-scope.ts).
 import type { ConnectorStatus } from './connectors.ts'
+import { activeIn, isGlobal, type ConnectorScope } from './connector-scope.ts'
 
 export type ConnectorTone = 'on' | 'idle' | 'off'
 
@@ -11,12 +12,10 @@ export interface ConnectorDot {
   label: string
 }
 
-interface Input {
+interface Input extends ConnectorScope {
   name: string
   status: ConnectorStatus
   enabled: boolean
-  /** project paths it is limited to; none or empty: every project */
-  projects?: string[]
   error?: string
 }
 
@@ -36,11 +35,11 @@ const NOT_CONNECTED: Record<Exclude<ConnectorStatus, 'conectado'>, string> = {
 /** Why a connected connector is not used in `project`, or null when it is. */
 function offHere(c: Input, project: DotProject | undefined): string | null {
   if (!c.enabled) return 'desligado'
-  if (!project) return c.projects?.length ? 'limitado a outros projetos' : null
+  if (!project) return isGlobal(c) ? null : 'limitado a outros projetos'
   if (project.elsewhere) return `não usado em ${project.name}: roda em ${project.elsewhere}`
-  const limits = c.projects ?? []
-  if (limits.length === 0) return null
-  return project.path && limits.includes(project.path) ? null : `não habilitado em ${project.name}`
+  // a project without a folder is on no list: inside any global connector, outside any limit
+  if (activeIn(c, project.path ?? '')) return null
+  return `não habilitado em ${project.name}${isGlobal(c) ? ' (exceção)' : ''}`
 }
 
 export function connectorDot(c: Input, project?: DotProject): ConnectorDot {

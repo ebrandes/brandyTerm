@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ContextUse, Thread } from './types'
+import type { ContextUse, Thread } from './types.ts'
 
 /** a running thread silent for this long shows as "parada" on its card */
 export const STALL_MS = 4 * 60_000

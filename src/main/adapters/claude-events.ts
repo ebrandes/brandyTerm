@@ -11,6 +11,11 @@ export function describeTool(name: string, input: Record<string, unknown> | unde
 
 type Done = Extract<AgentEvent, { kind: 'done' }>
 
+/** The model that carried the run: the costliest in `modelUsage` (small helper calls also show there). */
+function mainModel(usage: Record<string, any> | undefined): string | undefined {
+  return Object.entries(usage ?? {}).sort(([, a], [, b]) => (Number(b?.costUSD) || 0) - (Number(a?.costUSD) || 0))[0]?.[0]
+}
+
 /**
  * Turns Claude Code stream messages (the CLI's stream-json lines and the Agent SDK's
  * SDKMessage objects share the shape) into BrandyTerm AgentEvents. `handle` returns the
@@ -97,7 +102,8 @@ export function claudeStream(onEvent: (e: AgentEvent) => void, accountId: string
           input: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
           output: u.output_tokens ?? 0,
           cached: u.cache_read_input_tokens ?? 0,
-          costUsd: ev.total_cost_usd
+          costUsd: ev.total_cost_usd,
+          model: mainModel(ev.modelUsage)
         })
         const ok = ev.subtype === 'success' && !ev.is_error
         const errors = Array.isArray(ev.errors) && ev.errors.length ? ev.errors.join('; ') : undefined

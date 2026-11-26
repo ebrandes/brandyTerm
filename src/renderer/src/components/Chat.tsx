@@ -13,6 +13,8 @@ import { filesOf, type PendingFile } from '../attach'
 import { ThreadAttention } from './ThreadAttention'
 import { ThreadReportButton } from './ThreadReportButton'
 import { AskCard } from './AskCard'
+import { ThreadAsk } from './ThreadAsk'
+import { stripQuestion } from '../../../shared/ask-question.ts'
 import { ThreadMetaChips } from './ThreadMetaChips'
 import { MachineChip } from './MachineChip'
 import { terminalAccess } from '../machine-groups'
@@ -47,7 +49,11 @@ function Avatar({ m, agent }: { m: Message; agent?: AgentId }) {
   return <div className="avatar accent"><Sparkles size={15} /></div>
 }
 
-function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message; agent?: AgentId; inThread: boolean; project: Project; onOpenThread: (id: string) => void }) {
+function MessageView({ m, agent, thread, project, onOpenThread }: { m: Message; agent?: AgentId; thread?: Thread; project: Project; onOpenThread: (id: string) => void }) {
+  const inThread = !!thread
+  // in its own thread, the question lines of a reply become the card below the text
+  const asking = m.author === 'agent' && !m.plan ? thread : undefined
+  const text = asking ? stripQuestion(m.text) : m.text
   // artifact cards need a real project folder
   const artifacts = !project.demo && !!project.path
   // each summary shows only the files of the run it reports
@@ -79,9 +85,9 @@ function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message
           <span className="msg-time">{time(m.time)}</span>
         </div>
         {m.attachments?.length ? <MessageFiles items={m.attachments} projectId={project.id} /> : null}
-        {m.text && (
+        {text && (
           <div className={`bubble${m.isError ? ' msg-error' : ''}`}>
-            <Rich text={m.text} projectId={project.demo || !project.path ? undefined : project.id} />
+            <Rich text={text} projectId={project.demo || !project.path ? undefined : project.id} />
           </div>
         )}
         {linked.length > 0 && (
@@ -92,6 +98,7 @@ function MessageView({ m, agent, inThread, project, onOpenThread }: { m: Message
           </div>
         )}
         {m.ask && <AskCard project={project} ask={m.ask} />}
+        {asking && <ThreadAsk project={project} thread={asking} message={m} />}
         {m.summaries && (
           <div className="summaries">
             <div className="summaries-head">
@@ -270,7 +277,7 @@ export function Chat(props: Props) {
         )}
         {messages.map((m, i) => (
           <div key={m.id} className="row">
-            <MessageView m={m} agent={thread?.agent} inThread={!!thread} project={project} onOpenThread={onOpenThread} />
+            <MessageView m={m} agent={thread?.agent} thread={thread} project={project} onOpenThread={onOpenThread} />
             {thread && i === panelAt && <RunPanel t={thread} />}
           </div>
         ))}
@@ -280,7 +287,7 @@ export function Chat(props: Props) {
           </div>
         ) : null}
         {thread && <ThreadAttention t={thread} projectId={project.id} machine={project.machine} onOpenThread={onOpenThread} />}
-        {thread && !project.demo && <ThreadReportButton t={thread} projectId={project.id} />}
+        {thread && !project.demo && <ThreadReportButton key={`${thread.id}:${thread.runAt}`} t={thread} projectId={project.id} />}
         {!thread && project.busy && (
           <div className="working pad">
             <Loader2 size={14} className="spin" /> O coordenador está pensando…

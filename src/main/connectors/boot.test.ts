@@ -86,3 +86,32 @@ test('only skills threads get the skills tools flag in their gateway env', async
   assert.equal(gatewayFor({ projectId: 'p1', threadId: 't2' })?.env.BRANDY_GATEWAY_SKILLS, '1')
   assert.equal('BRANDY_GATEWAY_SKILLS' in gatewayFor(ref)!.env, false)
 })
+
+test('saved connectors reconnect at boot on their own; a failure shows as erro and stays listed', async (t) => {
+  const userData = fs.mkdtempSync(join(os.tmpdir(), 'boot-'))
+  const base = { description: '', auth: { kind: 'none' }, enabled: true, alwaysAllow: [] }
+  fs.writeFileSync(join(userData, 'connectors.json'), JSON.stringify([
+    { ...base, id: 'bad', name: 'Quebrado', transport: 'stdio', command: join(userData, 'nao-existe'), trusted: true },
+    { ...base, id: 'off', name: 'Desligado', transport: 'stdio', command: 'x', trusted: true, enabled: false },
+  ]))
+  const { e } = fakeEngine()
+  const { out } = await quietly(() => bootConnectors({ engine: e as never, userData, runners, cipher }))
+  t.after(() => out.stop())
+  for (let i = 0; i < 200 && out.deps.hub.status('bad').status !== 'erro'; i++) await new Promise(r => setTimeout(r, 25))
+  assert.match(out.deps.hub.status('bad').error ?? '', /ENOENT/)
+  assert.equal(out.deps.hub.status('off').status, 'desconectado')
+  const list = (e.state.connectors as { list: { id: string; status: string; error?: string }[] }).list
+  assert.deepEqual(list.map(c => [c.id, c.status]), [['bad', 'erro'], ['off', 'desconectado']])
+})
+
+test('autoConnect off leaves saved connectors alone', async (t) => {
+  const userData = fs.mkdtempSync(join(os.tmpdir(), 'boot-'))
+  fs.writeFileSync(join(userData, 'connectors.json'), JSON.stringify([
+    { id: 'bad', name: 'Quebrado', description: '', transport: 'stdio', command: 'x', auth: { kind: 'none' }, enabled: true, alwaysAllow: [], trusted: true },
+  ]))
+  const { e } = fakeEngine()
+  const { out } = await quietly(() => bootConnectors({ engine: e as never, userData, runners, cipher, autoConnect: false }))
+  t.after(() => out.stop())
+  await new Promise(r => setTimeout(r, 100))
+  assert.equal(out.deps.hub.status('bad').status, 'desconectado')
+})

@@ -37,7 +37,7 @@ function readOne(v: unknown, n: number, ids: Set<string>): { c: Connector; chang
   const enabled = v.enabled === true
   if (enabled !== v.enabled) fixes.push('enabled')
   const c = { ...v, id, name, description, auth, enabled, alwaysAllow } as unknown as Connector
-  for (const k of ['args', 'projects', 'envKeys', 'headerKeys'] as const) {
+  for (const k of ['args', 'projects', 'exceptProjects', 'envKeys', 'headerKeys'] as const) {
     if (v[k] === undefined) continue
     const list = strs(v[k])
     if (list && list.length === (v[k] as unknown[]).length) continue
