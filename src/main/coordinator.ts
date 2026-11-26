@@ -1,3 +1,4 @@
+import { ASK_RULE } from './ask-rule.ts'
 import type { AgentId, Effort, Project, Thread, Tier } from '../shared/types.ts'
 import { AGENT_NAMES } from '../shared/types.ts'
 import { MEMORY_REL, MEMORY_RULES, MEMORY_SCHEMA, memoryBlock, parseNotes, type MemoryNote } from './memory.ts'
@@ -87,8 +88,12 @@ export const PLAN_SCHEMA = {
 
 function threadLine(t: Thread): string {
   if (t.state === 'waiting' && t.question) {
-    const opts = t.question.options?.map((o, i) => (i === 0 && t.question?.recommended ? `${o} (recomendada)` : o))
-    return `- "${t.title}" (${AGENT_NAMES[t.agent]}, AGUARDANDO O USUÁRIO) pergunta: ${t.question.text}${opts ? ` [opções: ${opts.join(' | ')}]` : ''}`
+    const { more = [], ...first } = t.question
+    const asked = [first, ...more].map((q) => {
+      const opts = q.options?.map((o, i) => (i === 0 && q.recommended ? `${o} (recomendada)` : o))
+      return `pergunta: ${q.text}${opts ? ` [opções: ${opts.join(' | ')}]` : ''}`
+    })
+    return `- "${t.title}" (${AGENT_NAMES[t.agent]}, AGUARDANDO O USUÁRIO) ${asked.join(' · ')}`
   }
   if (t.retired) {
     const why = t.retired.reason === 'superseded' ? `substituída${t.retired.byTitle ? ` por "${t.retired.byTitle}"` : ''}` : 'descartada'
@@ -251,7 +256,7 @@ ANTES de agir, planeje. ${plan} Trabalhe direto e em silêncio: sem narrar cada 
 
 Ao terminar, dê uma resposta FINAL curta (no máximo 12 linhas): resultado, evidências (arquivos e comandos) e pendências. Não cole logs, stack traces nem saída de comandos; cite só a linha decisiva. Escreva em markdown: itens com "-" e rótulo em negrito ("**Resultado:**", "**Evidências:**", "**Pendências:**"), caminhos e comandos entre crases, nada de um parágrafo único longo.
 
-Se faltar uma decisão do usuário que bloqueia o trabalho, NÃO adivinhe e NÃO faça a pergunta no meio do texto: encerre a resposta com a linha "PERGUNTA: <pergunta curta>" e, se houver alternativas, outra linha "OPCOES: *a | b | c", e pare. Marque com * no início a opção que você recomenda (no máximo uma); sem recomendação, não marque nenhuma. Para dúvidas pequenas, escolha o padrão mais razoável e registre a suposição.
+Se faltar uma decisão do usuário que bloqueia o trabalho, NÃO adivinhe e NÃO faça a pergunta no meio do texto: encerre a resposta assim: ${ASK_RULE} Para dúvidas pequenas, escolha o padrão mais razoável e registre a suposição.
 
 Se ficar algo que você realmente não conseguiu concluir (o usuário negou uma ação, falta acesso ou uma decisão para depois), escreva uma linha "PENDENTE: <o que falta, curto>". Se o objetivo foi cumprido por inteiro, NÃO escreva essa linha.
 

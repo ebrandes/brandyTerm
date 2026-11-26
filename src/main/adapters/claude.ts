@@ -71,6 +71,7 @@ export const claudeAdapter: AgentAdapter = {
     if (opts.effort) args.push('--effort', opts.effort)
     if (opts.schema) args.push('--json-schema', JSON.stringify(opts.schema))
     if (opts.autocompact) args.push('--autocompact', String(opts.autocompact))
+    if (opts.appendSystem) args.push('--append-system-prompt', opts.appendSystem)
     for (const dir of opts.plugins ?? []) args.push('--plugin-dir', dir)
     const atts = opts.attachments ?? []
     const prompt = opts.prompt + attachmentText(atts)

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { canAnswer, extractQuestion, isCurrentAsk, isStaleAnswer, stripQuestion } from './ask-question.ts'
+import { canAnswer, cardQuestion, extractQuestion, isCurrentAsk, isStaleAnswer, stripQuestion } from './ask-question.ts'
 import type { Message, Thread } from './types.ts'
 
 const REPLY = 'Feito.\n\n- item\n\nPERGUNTA: Aplicar agora?\nOPCOES: depois | *quando parar | não'
@@ -65,4 +65,27 @@ test('only the latest agent reply holds the open question', () => {
 test('a later plan message does not replace the reply that asked', () => {
   const messages = [msg('1', 'agent'), msg('2', 'agent', { plan: true })]
   assert.equal(isCurrentAsk(messages, messages[0]), true)
+})
+
+test('several PERGUNTA: lines become one question with the others in `more`', () => {
+  const reply = 'Feito.\n\nPERGUNTA: Cor?\nOPCOES: azul | verde\n\nPERGUNTA: Nome?\nRESUMO: fim'
+  assert.deepEqual(extractQuestion(reply), { text: 'Cor?', options: ['azul', 'verde'], more: [{ text: 'Nome?', options: undefined }] })
+  assert.equal(stripQuestion(reply), 'Feito.\n\n\nRESUMO: fim')
+})
+
+test('the first question answers all the cards of that turn', () => {
+  const q = extractQuestion('PERGUNTA: Cor?\nPERGUNTA: Nome?')!
+  const t = { state: 'waiting', question: q } as Thread
+  assert.equal(isStaleAnswer(t, 'Cor?'), false)
+  t.question = undefined
+  t.state = 'running'
+  assert.equal(isStaleAnswer(t, 'Cor?'), true)
+})
+
+test('a waiting thread shows its own question on the latest reply when the text holds none', () => {
+  const messages = [msg('1', 'agent', { text: 'antes' }), msg('2', 'agent', { text: 'Pronto.' })]
+  const t = { ...waiting('Decisão em aberto'), messages } as Thread
+  assert.deepEqual(cardQuestion(t, messages[1]), { text: 'Decisão em aberto' })
+  assert.equal(cardQuestion(t, messages[0]), undefined)
+  assert.equal(cardQuestion({ ...t, state: 'done' }, messages[1]), undefined)
 })

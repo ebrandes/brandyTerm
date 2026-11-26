@@ -72,6 +72,11 @@ export function BoardDetail({ item, now, onClose, onOpen }: Props) {
               Opções: {t.question.options.map((o, i) => (i === 0 && t.question?.recommended ? `${o} (recomendada)` : o)).join(' · ')}
             </p>
           )}
+          {t.question.more && (
+            <p className="muted">
+              +{t.question.more.length} {t.question.more.length === 1 ? 'pergunta' : 'perguntas'} para responder na thread
+            </p>
+          )}
         </section>
       )}
 

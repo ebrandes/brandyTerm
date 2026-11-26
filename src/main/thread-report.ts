@@ -2,6 +2,7 @@ import type { Message, Project, Summary, Thread } from '../shared/types.ts'
 import { markSent } from '../shared/thread-report-state.ts'
 import type { Plan } from './coordinator.ts'
 import type { MemoryNote } from './memory.ts'
+import { askMessage, awaitUser, openDecision } from './settle.ts'
 import {
   askPrompt,
   followUpPrompt,
@@ -10,6 +11,7 @@ import {
   reportNotes,
   reportPrompt,
   reportShort,
+  summaryDecisions,
   type ReportKind
 } from './thread-report-text.ts'
 
@@ -162,6 +164,9 @@ export class ThreadReporter {
       return this.host.touch()
     }
     const r = parseReport(res.text)
+    // safety net: a summary with a decision of the user still open is a question, not a closed thread
+    const open = kind === 'curto' && t.state === 'done' ? openDecision(summaryDecisions(r)) : undefined
+    if (open) return this.stillWaiting(p, t, open)
     if (r.feito) t.summary = r.feito
     markSent(t, new Date().toISOString())
     // the report itself goes in the markdown text; the card only links to the thread
@@ -169,6 +174,12 @@ export class ThreadReporter {
     const label = kind === 'curto' ? 'Resumo' : 'Relatório'
     p.messages.push(this.host.msg('agent', `${label} da thread “${t.title}”\n\n${reportBody(r, kind)}`, { summaries }))
     this.host.remember(p, reportNotes(t.title, r, kind))
+    this.host.touch()
+  }
+
+  private stillWaiting(p: Project, t: Thread, q: NonNullable<Thread['question']>): void {
+    awaitUser(t, q)
+    p.messages.push(askMessage(t, q, (author, text, extra) => this.host.msg(author, text, extra)))
     this.host.touch()
   }
 

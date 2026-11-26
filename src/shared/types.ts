@@ -1,3 +1,4 @@
+import type { AskQuestion, AskRef } from './ask-types.ts'
 import type { ApplyQueueView } from './apply-queue.ts'
 import type { MachineInfo, MachineOs } from './remote/machine.ts'
 import type { ConnectorsState, ThreadLogin } from './connectors.ts'
@@ -81,7 +82,7 @@ export interface Message {
   /** threads the coordinator opened with this message (shown as clickable chips) */
   threads?: string[]
   /** a thread is asking the user something; answer routes back to that thread */
-  ask?: { threadId: string; question: string; options?: string[]; recommended?: boolean }
+  ask?: AskRef
 }
 
 export interface Todo {
@@ -145,12 +146,7 @@ export interface Thread {
   state: ThreadState
   note?: string
   /** set while state === 'waiting': the thread needs a decision from the user */
-  question?: {
-    text: string
-    options?: string[]
-    /** options[0] is the option the agent recommends (it was marked with * in OPCOES:) */
-    recommended?: boolean
-  }
+  question?: AskQuestion & { more?: AskQuestion[] }
   /** why the coordinator picked this agent/model/effort */
   why?: string
   /** skill the coordinator told the thread to load first */

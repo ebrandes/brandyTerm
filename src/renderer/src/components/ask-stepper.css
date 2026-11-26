@@ -1,0 +1,27 @@
+/* one question at a time (AskStepper.tsx); the rest of the card is styled in ask-card.css */
+.ask-count {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--faint);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.ask .ask-opt[aria-pressed='true'] { border-color: var(--accent); background: var(--card-hi); }
+.ask .ask-opt[aria-pressed='true'] .ask-num { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+.ask-nav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 10px; }
+.ask-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ask-nav .ask-back { border: 1px solid var(--line-hi); background: var(--card); color: var(--text); }
+.ask-nav .ask-go { margin-left: auto; background: var(--accent); color: #fff; }
+.ask-nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-nav button:disabled { opacity: .4; cursor: default; }

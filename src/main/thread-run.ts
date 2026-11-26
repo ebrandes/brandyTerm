@@ -8,7 +8,8 @@ import { zeroUsage } from './new-thread.ts'
 import { afterPlan, execPrompt, inPlan, runSpec } from './phases.ts'
 import { addUsage, runOnce, type RunResult } from './run.ts'
 import { tierOf } from '../shared/thread-quality.ts'
-import { settleThread } from './settle.ts'
+import { askMessage, settleThread } from './settle.ts'
+import { ASK_SYSTEM } from './ask-rule.ts'
 import { applyThreadEvent } from './thread-events.ts'
 
 /** What a thread run needs from the engine. */
@@ -65,6 +66,7 @@ export function runThread(host: RunHost, p: Project, t: Thread, prompt: string, 
       approve: (a) => host.approvals.ask(t, a),
       plugins: host.pluginsFor(p.path ?? null),
       autocompact: AUTOCOMPACT,
+      appendSystem: t.agent === 'claude' ? ASK_SYSTEM : undefined,
       attachments
     },
     (e) => applyThreadEvent(p, t, e) && host.touch()
@@ -93,11 +95,7 @@ export function runThread(host: RunHost, p: Project, t: Thread, prompt: string, 
       }
     }
     const q = settleThread(t, r.done, (author, text, extra) => host.msg(author, text, extra))
-    if (q) {
-      p.messages.push(
-        host.msg('agent', `A thread “${t.title}” precisa de uma decisão sua.`, { ask: { threadId: t.id, question: q.text, options: q.options, recommended: q.recommended } })
-      )
-    }
+    if (q) p.messages.push(askMessage(t, q, (author, text, extra) => host.msg(author, text, extra)))
     host.finished(p, t, direct)
     host.reporter.afterRun(p, t)
     host.pump(p)

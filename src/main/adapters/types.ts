@@ -40,6 +40,8 @@ export interface RunOpts {
   thread?: ThreadRef
   /** files sent with this prompt (images/PDFs as content, text inlined, others by path) */
   attachments?: Attachment[]
+  /** claude: instruction added to the system prompt, for prompts sent as typed (slash commands) */
+  appendSystem?: string
   /** what the usage ledger records about this run */
   tag?: RunTag
 }

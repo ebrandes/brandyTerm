@@ -97,7 +97,7 @@ function MessageView({ m, agent, thread, project, onOpenThread }: { m: Message; 
             ))}
           </div>
         )}
-        {m.ask && <AskCard project={project} ask={m.ask} />}
+        {m.ask && <AskCard project={project} ask={m.ask} onOpenThread={thread ? undefined : onOpenThread} />}
         {asking && <ThreadAsk project={project} thread={asking} message={m} />}
         {m.summaries && (
           <div className="summaries">

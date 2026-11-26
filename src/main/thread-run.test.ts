@@ -4,6 +4,7 @@ import { runThread, type RunHost } from './thread-run.ts'
 import type { Message, Project, Thread } from '../shared/types.ts'
 import type { RunOpts } from './adapters/types.ts'
 import type { RunResult } from './run.ts'
+import { FREE_TEXT_REPLY } from '../shared/ask-sample.ts'
 
 const usage = { input: 10, output: 5, cached: 0, costUsd: 0 }
 const ok = (text: string, sessionId: string): RunResult => ({ done: { kind: 'done', ok: true, text }, sessionId, usage })
@@ -126,4 +127,15 @@ test('a new turn clears the sent mark, even one left by the cancelled short repo
   r.start('de novo', true)
   assert.deepEqual([r.t.reportedAt, r.t.reportError, r.t.reporting], [undefined, undefined, undefined])
   await r.settle()
+})
+
+test('a final reply with free-text questions waits for the user instead of resolving', async () => {
+  const r = rig([ok(FREE_TEXT_REPLY, 's1')], { plan: undefined, model: 'opus', effort: 'high' })
+  r.start('/critique apps/site', true)
+  await r.settle()
+  assert.equal(r.t.state, 'waiting')
+  assert.ok(!r.t.resolved)
+  const ask = r.p.messages.at(-1)!.ask!
+  assert.deepEqual([ask.threadId, ask.question, ask.more?.length], ['t', 'Por onde começar?', 3])
+  assert.equal(r.runs[0].appendSystem?.includes('PERGUNTA:'), true)
 })

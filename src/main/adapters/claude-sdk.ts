@@ -62,6 +62,15 @@ function detailOf(tool: string, input: Record<string, unknown>): string | undefi
   return d && d.length > 2000 ? d.slice(0, 2000) + '\n…' : d
 }
 
+/** CLI flags the SDK has no option for; the default system prompt stays as it is */
+function extraArgs({ autocompact, appendSystem }: RunOpts): { extraArgs?: Record<string, string> } {
+  const args: Record<string, string> = {
+    ...(autocompact ? { autocompact: String(autocompact) } : {}),
+    ...(appendSystem ? { 'append-system-prompt': appendSystem } : {})
+  }
+  return Object.keys(args).length ? { extraArgs: args } : {}
+}
+
 export function buildOptions(opts: RunOpts, env: Record<string, string | undefined>, canUseTool: CanUseTool): Options {
   const work = opts.tools === 'work'
   const gw = work ? gatewayFor(opts.thread) : null
@@ -88,7 +97,7 @@ export function buildOptions(opts: RunOpts, env: Record<string, string | undefin
     additionalDirectories: [...new Set(atts.map((a) => dirname(a.path)))],
     ...(opts.schema ? { outputFormat: { type: 'json_schema' as const, schema: opts.schema as Record<string, unknown> } } : {}),
     ...(rtk ? { settings: rtkSettings(rtk) } : {}),
-    ...(opts.autocompact ? { extraArgs: { autocompact: String(opts.autocompact) } } : {})
+    ...extraArgs(opts)
   }
 }
 

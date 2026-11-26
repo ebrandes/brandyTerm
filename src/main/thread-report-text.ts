@@ -105,6 +105,11 @@ export function reportBody(r: Report, kind: ReportKind): string {
   return items.length ? items.join('\n') : cap(r.texto, RAW_MAX[kind])
 }
 
+/** Where a report says what is still open: its decision fields, or the whole text without labels. */
+export function summaryDecisions(r: Report): string {
+  return r.decidido || r.pendente ? `${r.decidido ?? ''}\n${r.pendente ?? ''}` : r.texto
+}
+
 /** The short line of the summary card that links to the thread. */
 export function reportShort(r: Report): string {
   return r.feito ?? cap(r.texto, SHORT_MAX)

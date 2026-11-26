@@ -1,3 +1,4 @@
+import { ASK_RULE } from './ask-rule.ts'
 import type { Effort, Project, Thread } from '../shared/types.ts'
 import { buildThreadPrompt, extractQuestion } from './coordinator.ts'
 import { MEMORY_REL } from './memory.ts'
@@ -82,7 +83,7 @@ Termine de UMA destas três formas:
 - **Como verificar:** comandos de teste e o resultado esperado (são propostas, você não rodou).
 Aponte lugares em vez de reproduzir código; cole só o trecho que decide algo. No máximo cerca de 120 linhas.
 
-2. Se faltar uma decisão do usuário que muda o plano, NÃO adivinhe: encerre com a linha "PERGUNTA: <pergunta curta>" e, se houver alternativas, outra linha "OPCOES: *a | b | c" (com * na que você recomenda), e pare. Para dúvidas pequenas, escolha o padrão mais razoável e registre a suposição no plano.
+2. Se faltar uma decisão do usuário que muda o plano, NÃO adivinhe: encerre a resposta assim: ${ASK_RULE} Para dúvidas pequenas, escolha o padrão mais razoável e registre a suposição no plano.
 
 3. Se não há nada a mudar (o objetivo era investigar, revisar ou responder algo sobre o código), a sua resposta é a final: no máximo 12 linhas com resultado e evidências (arquivos e linhas), terminando com a linha "RESUMO: <uma frase>". Nesse caso não haverá execução.
 
