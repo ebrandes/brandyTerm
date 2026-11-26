@@ -33,3 +33,15 @@ test('askPrompt e followUpPrompt carregam pergunta e resposta', () => {
   const f = followUpPrompt('T', 'por que X?', 'porque Y')
   for (const s of ['“T”', 'por que X?', 'porque Y', '"reply"']) assert.ok(f.includes(s))
 })
+test('parseReport aceita etiquetas em negrito, com marcador e em minúsculas', () => {
+  assert.equal(parseReport('**FEITO:** a').feito, 'a')
+  assert.equal(parseReport('- **DECIDIDO**: b').decidido, 'b')
+  assert.equal(parseReport('feito: c').feito, 'c')
+  assert.equal(parseReport('  * ARQUIVOS: x.ts').arquivos, 'x.ts')
+})
+test('parseReport trata "Nada." e "nenhum." como vazio', () => {
+  const r = parseReport('FEITO: f\nPENDENTE: Nada.\nDECIDIDO: nenhum.')
+  assert.equal(r.pendente, undefined)
+  assert.equal(r.decidido, undefined)
+  assert.equal(r.feito, 'f')
+})

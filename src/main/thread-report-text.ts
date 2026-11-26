@@ -10,9 +10,9 @@ export interface Report {
   texto: string
 }
 
+const EMPTY_RE = /^(nada|nenhum|nenhuma|-)[.!;,]*$/i
 const NO_CHANGES = 'Não altere arquivos nem rode comandos.'
-const LABEL_RE = /^(FEITO|DECIDIDO|ARQUIVOS|PENDENTE):/i
-const EMPTY = new Set(['nada', 'nenhum', 'nenhuma', '-'])
+const LABEL_RE = /^\s*(?:[-*]\s+)?\**\s*(FEITO|DECIDIDO|ARQUIVOS|PENDENTE)\**\s*:\**/i
 
 export function reportPrompt(kind: ReportKind): string {
   if (kind === 'curto') {
@@ -54,7 +54,7 @@ export function followUpPrompt(title: string, question: string, answer: string):
 
 function clean(value: string): string | undefined {
   const v = value.replace(/\s+/g, ' ').trim()
-  return !v || EMPTY.has(v.toLowerCase()) ? undefined : v
+  return !v || EMPTY_RE.test(v) ? undefined : v
 }
 
 export function parseReport(text: string): Report {
