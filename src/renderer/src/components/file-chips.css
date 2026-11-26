@@ -1,8 +1,10 @@
 /* Compact file row under a thread summary (ArtifactCards) and its '+N…' list (FileChipsMenu). */
 .summary > div { flex: 1 1 auto; min-width: 0; }
 
-.fchips { position: relative; margin-top: 8px; }
-.fchips-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; overflow: hidden; }
+.fchips { position: relative; margin-top: 8px; min-width: 0; max-width: 100%; }
+/* contain: inline-size makes the row's own content worth 0 px to the card's width. Without it the visible chips
+   widened the card, the wider card made room for the same chips, and the row never gave chips back to '+N…'. */
+.fchips-row { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0; overflow: hidden; contain: inline-size; }
 
 .fchip { display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 200px; height: 24px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; }
 .fchip svg { flex: none; color: var(--faint); }

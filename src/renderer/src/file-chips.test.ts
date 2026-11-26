@@ -38,3 +38,12 @@ test('fitCount leaves room for the +N button when it does not', () => {
   assert.equal(fitCount([300, 50], 100, 40, 4), 1)
   assert.equal(fitCount([50, 50], 0, 40, 4), 1)
 })
+
+test('fitCount: one pixel short of the full row hands chips to the +N button', () => {
+  // all three need 158 px; at 157 the row needs the button (40) and keeps two: 40 + 54 + 54 = 148
+  assert.equal(fitCount([50, 50, 50], 158, 40, 4), 3)
+  assert.equal(fitCount([50, 50, 50], 157, 40, 4), 2)
+  // shrinking the row only ever shows fewer chips
+  const counts = [400, 300, 200, 120, 60].map((w) => fitCount([90, 120, 140, 80], w, 40, 4))
+  assert.deepEqual(counts, [...counts].sort((a, b) => b - a))
+})
