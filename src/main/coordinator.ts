@@ -32,6 +32,8 @@ export interface Plan {
   reply: string
   tasks: PlannedTask[]
   answers: Answer[]
+  /** questions for threads (title + question); the thread's reply comes back to the coordinator */
+  ask: Answer[]
   /** interrupted threads to continue, with the message that resumes each */
   resume: Answer[]
   /** notes for the project memory */
@@ -53,6 +55,7 @@ export const PLAN_SCHEMA = {
     reply: { type: 'string' },
     memory: MEMORY_SCHEMA,
     answers: REPLY_LIST,
+    ask: REPLY_LIST,
     resume: REPLY_LIST,
     tasks: {
       type: 'array',
@@ -112,7 +115,7 @@ export function buildPlanPrompt(project: Project, available: AgentId[], userText
     : '(nenhum)'
   const threads = project.threads.length ? listedThreads(project.threads).map(threadLine).join('\n') : '(nenhuma)'
   return `Você é o coordenador do projeto "${project.name}" no BrandyTerm. Pasta: ${project.path}.
-Responda SOMENTE com um objeto JSON: {"reply": string, "tasks": [{"title","objective","agent","model"?,"effort","why","replaces"?}], "answers": [{"threadTitle","text"}], "resume": [{"threadTitle","text"}], "memory": [{"section","text"}]}. Sem texto fora do JSON.
+Responda SOMENTE com um objeto JSON: {"reply": string, "tasks": [{"title","objective","agent","model"?,"effort","why","replaces"?}], "answers": [{"threadTitle","text"}], "ask": [{"threadTitle","text"}], "resume": [{"threadTitle","text"}], "memory": [{"section","text"}]}. Sem texto fora do JSON.
 
 Regras:
 - Pergunta simples, conversa ou "como está?": responda em "reply" com tasks=[]. Não crie threads para isso; use o estado das threads abaixo.
@@ -128,6 +131,7 @@ Regras:
       : ''
   }
 - Se uma thread está AGUARDANDO O USUÁRIO e a mensagem do usuário responde essa pergunta, devolva em "answers" {threadTitle (exato), text (a resposta)} e diga em "reply" que repassou. Se não ficar claro a qual thread a resposta pertence, pergunte em "reply" citando os nomes. Sem resposta a repassar: answers=[].
+- Para saber detalhes do que uma thread fez ou decidiu (o resumo acima não basta), devolva em "ask" {threadTitle (exato), text (a pergunta)}; a thread responde e você recebe a resposta para responder ao usuário. Diga em "reply" que foi perguntar. Sem pergunta: ask=[].
 - Threads INTERROMPIDAS (o app fechou ou reiniciou no meio) podem ser retomadas. Quando o usuário pedir para continuar ou retomar ("continue", "continue as threads", "retome"), devolva em "resume" {threadTitle (o título exato, entre aspas abaixo), text (instrução curta, ex.: "Continue de onde parou.")} para cada thread interrompida que ele quer de volta e não crie tasks novas para o mesmo trabalho. Se não ficar claro quais threads, pergunte em "reply" citando os nomes. Sem retomada: resume=[].
 - Só se for melhor recomeçar do zero uma thread interrompida ou com falha, crie a task com "replaces" (título exato da antiga): ela fica marcada como substituída pela nova.
 - Processos em execução (servidores de dev, portas) são do usuário; você só os cita, não os controla.
@@ -191,7 +195,7 @@ export function parsePlan(
 ): Plan {
   const raw = (structured ?? extractJson(text)) as { reply?: unknown; tasks?: unknown } | undefined
   if (!raw || typeof raw.reply !== 'string') {
-    return { reply: text.trim() || 'Não consegui interpretar a resposta do coordenador.', tasks: [], answers: [], resume: [], memory: [] }
+    return { reply: text.trim() || 'Não consegui interpretar a resposta do coordenador.', tasks: [], answers: [], ask: [], resume: [], memory: [] }
   }
   const tasks: PlannedTask[] = []
   const fallback = [...installed.keys()][0]
@@ -214,7 +218,7 @@ export function parsePlan(
     }
   }
   const rawAnswers = (raw as { answers?: unknown }).answers
-  return { reply: unescapeReply(raw.reply), tasks, answers: replyList(rawAnswers), resume: replyList((raw as { resume?: unknown }).resume), memory: parseNotes((raw as { memory?: unknown }).memory) }
+  return { reply: unescapeReply(raw.reply), tasks, answers: replyList(rawAnswers), ask: replyList((raw as { ask?: unknown }).ask), resume: replyList((raw as { resume?: unknown }).resume), memory: parseNotes((raw as { memory?: unknown }).memory) }
 }
 
 export function buildThreadPrompt(project: Project, objective: string, agent: AgentId, skill?: string): string {

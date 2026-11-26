@@ -10,13 +10,21 @@ const project = (threads: Thread[]) => ({ threads }) as Project
 /** stands in for Engine.sendToThread: records what reached each thread */
 function sender() {
   const sent: { threadId: string; text: string }[] = []
-  return { sent, sendToThread: (_p: Project, threadId: string, text: string) => void sent.push({ threadId, text }) }
+  const asked: { threadId: string; question: string }[] = []
+  let note = ''
+  return {
+    sent,
+    asked,
+    setNote: (n: string) => void (note = n),
+    sendToThread: (_p: Project, threadId: string, text: string) => void sent.push({ threadId, text }),
+    askThread: (_p: Project, t: Thread, question: string) => (asked.push({ threadId: t.id, question }), note)
+  }
 }
 
 test('resume restarts an interrupted thread with the given text', () => {
   const p = project([th('a', 'Conector MCP Context7', 'interrupted'), th('b', 'Logs MCP', 'interrupted')])
   const s = sender()
-  const r = dispatchReplies(s, p, { answers: [], resume: [{ threadTitle: 'Conector MCP Context7', text: 'Continue de onde parou.' }] })
+  const r = dispatchReplies(s, p, { answers: [], ask: [], resume: [{ threadTitle: 'Conector MCP Context7', text: 'Continue de onde parou.' }] })
   assert.deepEqual(s.sent, [{ threadId: 'a', text: 'Continue de onde parou.' }])
   assert.deepEqual(r.resumed, ['a'])
   assert.deepEqual(r.notes, [])
@@ -25,7 +33,7 @@ test('resume restarts an interrupted thread with the given text', () => {
 test('resume with an ambiguous title resumes nothing and says why', () => {
   const p = project([th('a', 'Corrigir MCP Context7', 'interrupted'), th('b', 'Corrigir MCP logs', 'interrupted')])
   const s = sender()
-  const r = dispatchReplies(s, p, { answers: [], resume: [{ threadTitle: 'Corrigir MCP', text: 'siga' }] })
+  const r = dispatchReplies(s, p, { answers: [], ask: [], resume: [{ threadTitle: 'Corrigir MCP', text: 'siga' }] })
   assert.deepEqual(s.sent, [])
   assert.deepEqual(r.resumed, [])
   assert.equal(r.notes.length, 1)
@@ -36,7 +44,7 @@ test('resume with an ambiguous title resumes nothing and says why', () => {
 
 test('resume with an unknown title is reported', () => {
   const s = sender()
-  const r = dispatchReplies(s, project([th('a', 'Outra', 'interrupted')]), { answers: [], resume: [{ threadTitle: 'Nada disso', text: 'siga' }] })
+  const r = dispatchReplies(s, project([th('a', 'Outra', 'interrupted')]), { answers: [], ask: [], resume: [{ threadTitle: 'Nada disso', text: 'siga' }] })
   assert.deepEqual(s.sent, [])
   assert.match(r.notes[0], /Nada disso/)
 })
@@ -45,7 +53,7 @@ test('resume skips threads that are not interrupted, and retired ones', () => {
   const retired = { ...th('b', 'Logs MCP', 'interrupted'), retired: { reason: 'superseded', at: 'x' } } as Thread
   const p = project([th('a', 'Conector MCP', 'running'), retired])
   const s = sender()
-  const r = dispatchReplies(s, p, { answers: [], resume: [{ threadTitle: 'Conector MCP', text: 'siga' }, { threadTitle: 'Logs MCP', text: 'siga' }] })
+  const r = dispatchReplies(s, p, { answers: [], ask: [], resume: [{ threadTitle: 'Conector MCP', text: 'siga' }, { threadTitle: 'Logs MCP', text: 'siga' }] })
   assert.deepEqual(s.sent, [])
   assert.equal(r.notes.length, 2)
 })
@@ -53,7 +61,7 @@ test('resume skips threads that are not interrupted, and retired ones', () => {
 test('answers still reach only threads waiting for the user, by unique prefix too', () => {
   const p = project([th('a', 'Escolher banco de dados', 'waiting'), th('b', 'Escolher banco antigo', 'interrupted')])
   const s = sender()
-  const r = dispatchReplies(s, p, { answers: [{ threadTitle: 'Escolher banco', text: 'Postgres' }], resume: [] })
+  const r = dispatchReplies(s, p, { answers: [{ threadTitle: 'Escolher banco', text: 'Postgres' }], ask: [], resume: [] })
   assert.deepEqual(s.sent, [{ threadId: 'a', text: 'Postgres' }])
   assert.deepEqual(r.notes, [])
 })
@@ -84,4 +92,29 @@ test('replaces with an unknown title marks nothing and is reported', () => {
 test('notes are appended to the reply as a warning', () => {
   assert.equal(withNotes('Feito.', []), 'Feito.')
   assert.match(withNotes('Feito.', ['x', 'y']), /^Feito\.\n\n\*\*Aviso:\*\*[\s\S]*- x\n- y$/)
+})
+
+const live = (id: string, title: string, state: Thread['state']) => ({ ...th(id, title, state), sessionId: 's' }) as Thread
+
+test('ask goes to the matching thread (any non-retired thread with a session)', () => {
+  const s = sender()
+  const r = dispatchReplies(s, project([live('a', 'Logs MCP', 'done')]), { answers: [], resume: [], ask: [{ threadTitle: 'Logs MCP', text: 'O que mudou?' }] })
+  assert.deepEqual(s.asked, [{ threadId: 'a', question: 'O que mudou?' }])
+  assert.deepEqual(s.sent, [])
+  assert.deepEqual(r.notes, [])
+})
+
+test('ask with an unknown title becomes a note', () => {
+  const s = sender()
+  const r = dispatchReplies(s, project([th('a', 'Sem sessão', 'done')]), { answers: [], resume: [], ask: [{ threadTitle: 'X', text: '?' }, { threadTitle: 'Sem sessão', text: '?' }] })
+  assert.deepEqual(s.asked, [])
+  assert.equal(r.notes[0], 'Pergunta não enviada: nenhuma thread disponível com o título “X”.')
+  assert.equal(r.notes.length, 2)
+})
+
+test('the askThread note (busy, no session) is added to notes', () => {
+  const s = sender()
+  s.setNote('A thread está ocupada.')
+  const r = dispatchReplies(s, project([live('a', 'Logs MCP', 'running')]), { answers: [], resume: [], ask: [{ threadTitle: 'Logs MCP', text: '?' }] })
+  assert.deepEqual(r.notes, ['A thread está ocupada.'])
 })

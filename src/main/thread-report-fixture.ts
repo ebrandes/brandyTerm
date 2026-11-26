@@ -20,6 +20,7 @@ export const plan = (reply: string, memory: MemoryNote[] = []): Plan => ({
   reply,
   tasks: [],
   answers: [],
+  ask: [],
   resume: [],
   memory
 })

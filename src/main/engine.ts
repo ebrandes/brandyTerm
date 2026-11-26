@@ -248,7 +248,7 @@ export class Engine extends EventEmitter {
       const reply = this.msg('coordinator', plan.reply)
       p.messages.push(reply)
       remember(this, p, plan.memory)
-      const sent = dispatchReplies({ sendToThread: (q, id, t) => this.sendToThread(q, id, t, []) }, p, plan)
+      const sent = dispatchReplies({ sendToThread: (q, id, t) => this.sendToThread(q, id, t, []), askThread: (q, t, text) => this.reporter.ask(q, t, text) }, p, plan)
       const tasks = await routeTasks(p.path!, plan.tasks, route, this.installed().has('claude'))
       const opened = tasks.map((task) => this.createThread(p, task, requestId, atts))
       const notes = [...sent.notes, ...retireReplaced(p, tasks, opened)]

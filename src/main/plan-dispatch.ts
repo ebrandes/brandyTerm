@@ -5,6 +5,8 @@ import { matchThread } from './thread-match.ts'
 
 export interface ThreadSender {
   sendToThread(p: Project, threadId: string, text: string): void
+  /** puts a question to the thread; returns '' when it started, else a pt-BR note */
+  askThread(p: Project, t: Thread, question: string): string
 }
 
 const waiting = (t: Thread) => t.state === 'waiting'
@@ -28,7 +30,7 @@ function miss(kind: string, title: string, m: { error: 'missing' | 'ambiguous'; 
 export function dispatchReplies(
   sender: ThreadSender,
   p: Project,
-  plan: { answers: Answer[]; resume: Answer[] }
+  plan: { answers: Answer[]; ask: Answer[]; resume: Answer[] }
 ): { resumed: string[]; notes: string[] } {
   const notes: string[] = []
   const resumed: string[] = []
@@ -36,6 +38,15 @@ export function dispatchReplies(
     const m = matchThread(p.threads, a.threadTitle, waiting)
     if ('thread' in m) sender.sendToThread(p, m.thread.id, a.text)
     else notes.push(miss('Resposta não repassada', a.threadTitle, m))
+  }
+  for (const a of plan.ask) {
+    const m = matchThread(p.threads, a.threadTitle, (t) => !t.retired && !!t.sessionId)
+    if ('error' in m) {
+      notes.push(miss('Pergunta não enviada', a.threadTitle, m))
+      continue
+    }
+    const note = sender.askThread(p, m.thread, a.text)
+    if (note) notes.push(note)
   }
   for (const r of plan.resume) {
     const m = matchThread(p.threads, r.threadTitle, resumable)

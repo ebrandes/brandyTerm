@@ -12,7 +12,7 @@ test('thread prompt mentions connectors', () => {
   }
 })
 
-import { buildPlanPrompt, parsePlan } from './coordinator.ts'
+import { buildPlanPrompt, parsePlan, PLAN_SCHEMA } from './coordinator.ts'
 import type { Thread } from '../shared/types.ts'
 
 const installed = new Map([['claude', ['sonnet']]]) as Parameters<typeof parsePlan>[2]
@@ -33,6 +33,27 @@ test('parsePlan reads resume entries and the thread a task replaces', () => {
 
 test('parsePlan without resume gives an empty list', () => {
   assert.deepEqual(parsePlan({ reply: 'ok', tasks: [] }, '', installed).resume, [])
+})
+
+test('parsePlan reads ask', () => {
+  const plan = parsePlan({ reply: 'ok', tasks: [], ask: [{ threadTitle: 'Logs MCP', text: 'O que mudou?' }, { threadTitle: 'x', text: ' ' }] }, '', installed)
+  assert.deepEqual(plan.ask, [{ threadTitle: 'Logs MCP', text: 'O que mudou?' }])
+})
+
+test('parsePlan without ask gives []', () => {
+  assert.deepEqual(parsePlan({ reply: 'ok', tasks: [] }, '', installed).ask, [])
+  assert.deepEqual(parsePlan(undefined, 'texto', installed).ask, [])
+})
+
+test('PLAN_SCHEMA has ask', () => {
+  assert.ok('ask' in PLAN_SCHEMA.properties)
+  assert.ok(!(PLAN_SCHEMA as { required?: string[] }).required?.includes('ask'))
+})
+
+test('buildPlanPrompt explains ask', () => {
+  const p = buildPlanPrompt({ name: 'P', path: null, processes: [], threads: [], messages: [] } as unknown as Project, ['claude'], 'oi')
+  assert.ok(p.includes('"ask": [{"threadTitle","text"}]'))
+  assert.ok(p.includes('- Para saber detalhes do que uma thread fez ou decidiu (o resumo acima não basta), devolva em "ask" {threadTitle (exato), text (a pergunta)}; a thread responde e você recebe a resposta para responder ao usuário. Diga em "reply" que foi perguntar. Sem pergunta: ask=[].'))
 })
 
 const thread = (title: string, state: Thread['state'], extra: Partial<Thread> = {}) => ({ title, state, agent: 'claude', ...extra }) as Thread
