@@ -121,6 +121,7 @@ export class ThreadReporter {
 
   private start(p: Project, t: Thread, prompt: string, question: string | undefined, done: Done): void {
     const entry: Running = { run: this.host.run(p, t, prompt), thread: t, question }
+    const startedWith = t.sessionId
     this.running.set(t.id, entry)
     void entry.run.result
       .catch((e: unknown): SilentResult => ({ ok: false, text: '', error: e instanceof Error ? e.message : String(e) }))
@@ -128,7 +129,8 @@ export class ThreadReporter {
         // cancelled: the user took the thread over, nothing of this run is kept
         if (this.running.get(t.id) !== entry) return
         this.running.delete(t.id)
-        if (res.sessionId) t.sessionId = res.sessionId
+        // a session changed meanwhile (/clear, /compact) wins over the one this run continued
+        if (res.sessionId && t.sessionId === startedWith) t.sessionId = res.sessionId
         done(res.ok && !res.text.trim() ? { ...res, ok: false } : res)
         this.drain(p, t)
       })

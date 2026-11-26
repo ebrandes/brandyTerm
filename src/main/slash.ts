@@ -37,6 +37,8 @@ export function runSlash(e: Engine, p: Project, cmd: { name: string; args: strin
   if (cmd.name === 'help') return note(helpText(e.commands(p.id)))
   const s = t ?? p.coordinator
   if (t && (t.state === 'running' || t.state === 'queued')) return note('A thread está executando; espere terminar.', true)
+  // a silent report/question may still be running in the session about to change
+  if (t) e.reporter.cancel(t.id)
   if (cmd.name === 'clear') {
     s.sessionId = undefined
     return note(t ? 'Contexto da thread limpo: a próxima mensagem começa uma sessão nova.' : 'Contexto do coordenador limpo: a próxima mensagem começa uma conversa nova.')

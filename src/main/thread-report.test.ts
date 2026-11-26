@@ -203,3 +203,16 @@ test('cancel on a thread with nothing running is a no-op', () => {
   r.cancel('t1')
   assert.equal(f.state.touches, 0)
 })
+
+test('a session changed during the run (e.g. /clear) is not overwritten by its result', async () => {
+  const f = fakeHost()
+  const r = new ThreadReporter(f.host)
+  const t = thread()
+  const p = project(t)
+  r.report(p, t, 'curto')
+  t.sessionId = undefined
+  f.runs[0].resolve({ ok: true, text: REPORT, sessionId: 's2' })
+  await flush()
+  assert.equal(t.sessionId, undefined)
+  assert.equal(p.messages.length, 1)
+})
