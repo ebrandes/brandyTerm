@@ -1,7 +1,16 @@
 import type { Message, Project, Summary, Thread } from '../shared/types.ts'
 import type { Plan } from './coordinator.ts'
 import type { MemoryNote } from './memory.ts'
-import { askPrompt, followUpPrompt, parseReport, reportNotes, reportPrompt, type ReportKind } from './thread-report-text.ts'
+import {
+  askPrompt,
+  followUpPrompt,
+  parseReport,
+  reportBody,
+  reportNotes,
+  reportPrompt,
+  reportShort,
+  type ReportKind
+} from './thread-report-text.ts'
 
 export interface SilentResult {
   ok: boolean
@@ -135,9 +144,10 @@ export class ThreadReporter {
     const r = parseReport(res.text)
     if (r.feito) t.summary = r.feito
     t.reportedAt = new Date().toISOString()
-    const summaries: Summary[] = [{ agent: t.agent, title: t.title, text: r.texto, threadId: t.id }]
+    // the report itself goes in the markdown text; the card only links to the thread
+    const summaries: Summary[] = [{ agent: t.agent, title: t.title, text: reportShort(r), threadId: t.id }]
     const label = kind === 'curto' ? 'Resumo' : 'Relatório'
-    p.messages.push(this.host.msg('agent', `${label} da thread “${t.title}”`, { summaries }))
+    p.messages.push(this.host.msg('agent', `${label} da thread “${t.title}”\n\n${reportBody(r, kind)}`, { summaries }))
     this.host.remember(p, reportNotes(t.title, r, kind))
     this.host.touch()
   }

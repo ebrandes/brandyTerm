@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { ThreadReporter } from './thread-report.ts'
-import { parseReport, reportNotes, reportPrompt } from './thread-report-text.ts'
+import { parseReport, reportBody, reportNotes, reportPrompt } from './thread-report-text.ts'
 import { fakeHost, flush, project, thread } from './thread-report-fixture.ts'
 
 const REPORT = 'FEITO: login pronto\nDECIDIDO: usar JWT\nARQUIVOS: auth.ts\nPENDENTE: testes e2e'
@@ -21,8 +21,8 @@ test('report curto: one agent message with the summary, memory notes, summary an
   assert.equal(p.messages.length, 1)
   const m = p.messages[0]
   assert.equal(m.author, 'agent')
-  assert.equal(m.text, 'Resumo da thread “T”')
-  assert.deepEqual(m.summaries, [{ agent: 'claude', title: 'T', text: REPORT, threadId: 't1' }])
+  assert.equal(m.text, 'Resumo da thread “T”\n\n- **Feito:** login pronto\n- **Decidido:** usar JWT\n- **Arquivos:** auth.ts')
+  assert.deepEqual(m.summaries, [{ agent: 'claude', title: 'T', text: 'login pronto', threadId: 't1' }])
   assert.deepEqual(f.remembered, [reportNotes('T', parseReport(REPORT), 'curto')])
   assert.equal(t.summary, 'login pronto')
   assert.ok(t.reportedAt && !Number.isNaN(Date.parse(t.reportedAt)))
@@ -40,9 +40,23 @@ test('report completo: "Relatório" message and notes with the pending line', as
   assert.equal(f.runs[0].prompt, reportPrompt('completo'))
   f.runs[0].resolve({ ok: true, text: REPORT })
   await flush()
-  assert.equal(p.messages[0].text, 'Relatório da thread “T”')
+  assert.equal(p.messages[0].text, `Relatório da thread “T”\n\n${reportBody(parseReport(REPORT), 'completo')}`)
+  assert.ok(p.messages[0].text.endsWith('\n- **Pendente:** testes e2e'))
+  assert.equal(p.messages[0].summaries?.[0].text, 'login pronto')
   assert.deepEqual(f.remembered, [reportNotes('T', parseReport(REPORT), 'completo')])
   assert.ok(f.remembered[0].some((n) => n.section === 'Pendências'))
+})
+
+test('report completo is not cut at 600', async () => {
+  const f = fakeHost()
+  const r = new ThreadReporter(f.host)
+  const t = thread()
+  const p = project(t)
+  const long = 'z'.repeat(900)
+  r.report(p, t, 'completo')
+  f.runs[0].resolve({ ok: true, text: `FEITO: f\nPENDENTE: ${long}` })
+  await flush()
+  assert.equal(p.messages[0].text, `Relatório da thread “T”\n\n- **Feito:** f\n- **Pendente:** ${long}`)
 })
 
 test('report keeps the thread visible state untouched', async () => {
@@ -74,6 +88,7 @@ test('report without FEITO keeps the old summary and sends the whole text', asyn
   f.runs[0].resolve({ ok: true, text: '  texto solto  ' })
   await flush()
   assert.equal(t.summary, 'antigo')
+  assert.equal(p.messages[0].text, 'Resumo da thread “T”\n\ntexto solto')
   assert.equal(p.messages[0].summaries?.[0].text, 'texto solto')
 })
 
@@ -179,7 +194,7 @@ test('cancel during a report: run cancelled, late result ignored, reporting fals
   f.runs[1].resolve({ ok: true, text: REPORT })
   await flush()
   assert.equal(p.messages.length, 1)
-  assert.equal(p.messages[0].text, 'Relatório da thread “T”')
+  assert.ok(p.messages[0].text.startsWith('Relatório da thread “T”\n\n'))
 })
 
 test('cancel on a thread with nothing running is a no-op', () => {

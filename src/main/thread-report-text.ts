@@ -7,13 +7,25 @@ export interface Report {
   decidido?: string
   arquivos?: string
   pendente?: string
+  /** the whole answer, trimmed and uncut */
   texto: string
 }
 
 const EMPTY_RE = /^(nada|nenhum|nenhuma|-)[.!;,]*$/i
 // scoped to this answer: a killed silent turn may leave it in the session before the user's next message
 const NO_CHANGES = 'Não altere arquivos nem rode comandos nesta resposta.'
-const LABEL_RE = /^\s*(?:[-*]\s+)?\**\s*(FEITO|DECIDIDO|ARQUIVOS|PENDENTE)\**\s*:\**/i
+// RESUMO/PERGUNTA/OPCOES (the thread's own closing lines) end the current label and are not kept
+const LABEL_RE = /^\s*(?:[-*]\s+)?\**\s*(FEITO|DECIDIDO|ARQUIVOS|PENDENTE|RESUMO|PERGUNTA|OPCOES)\**\s*:\**/i
+const STOP = new Set(['resumo', 'pergunta', 'opcoes'])
+const FIELDS = [
+  ['feito', 'Feito'],
+  ['decidido', 'Decidido'],
+  ['arquivos', 'Arquivos'],
+  ['pendente', 'Pendente']
+] as const
+/** raw text shown when no label was parsed */
+const RAW_MAX: Record<ReportKind, number> = { curto: 600, completo: 2000 }
+const SHORT_MAX = 200
 
 export function reportPrompt(kind: ReportKind): string {
   if (kind === 'curto') {
@@ -65,8 +77,9 @@ export function parseReport(text: string): Report {
   for (const line of trimmed.split('\n')) {
     const m = LABEL_RE.exec(line)
     if (m) {
-      current = m[1].toLowerCase()
-      values[current] = line.slice(m[0].length)
+      const label = m[1].toLowerCase()
+      current = STOP.has(label) ? null : label
+      if (current) values[current] = line.slice(m[0].length)
     } else if (current) {
       values[current] += ' ' + line
     }
@@ -76,8 +89,25 @@ export function parseReport(text: string): Report {
     decidido: clean(values.decidido ?? ''),
     arquivos: clean(values.arquivos ?? ''),
     pendente: clean(values.pendente ?? ''),
-    texto: trimmed.slice(0, 600)
+    texto: trimmed
   }
+}
+
+function cap(text: string, max: number): string {
+  return text.length > max ? text.slice(0, max) + '…' : text
+}
+
+/** The visible report (markdown): one item per field, or the raw answer when it had no labels. */
+export function reportBody(r: Report, kind: ReportKind): string {
+  const items = FIELDS.filter(([key]) => kind === 'completo' || key !== 'pendente')
+    .filter(([key]) => r[key])
+    .map(([key, label]) => `- **${label}:** ${r[key]}`)
+  return items.length ? items.join('\n') : cap(r.texto, RAW_MAX[kind])
+}
+
+/** The short line of the summary card that links to the thread. */
+export function reportShort(r: Report): string {
+  return r.feito ?? cap(r.texto, SHORT_MAX)
 }
 
 export function reportNotes(title: string, r: Report, kind: ReportKind): MemoryNote[] {
