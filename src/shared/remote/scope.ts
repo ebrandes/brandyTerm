@@ -22,6 +22,7 @@ export const SCOPED: Record<string, Where> = {
 /** Channels known to name no project (archive:list names several, in an array). Anything not here or in SCOPED is refused by the host. */
 export const UNSCOPED = new Set([
   'state:get', 'archive:list', 'settings:set', 'project:set-remote-hidden', 'plugin:install', 'plugin:open-report', 'logs:open', 'usage:report',
+  'logs:read', 'logs:summarize', 'logs:summarize-cancel',
   'project:open-folder', 'attach:open', 'process:open-port', 'clipboard:read', 'clipboard:write',
   'accounts:activate', 'accounts:auto', 'accounts:rename', 'accounts:remove', 'accounts:probe',
   'accounts:add-token', 'accounts:login-start', 'accounts:login-cancel',

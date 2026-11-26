@@ -1,0 +1,35 @@
+/* "Ver logs" (LogsModal.tsx). Base .modal and .modal-back live in styles.css. Only <pre> scrolls sideways. */
+.logs-back { position: fixed; z-index: 40; -webkit-app-region: no-drag; }
+.modal.logs-modal { width: min(1040px, 94vw); height: 86vh; display: flex; flex-direction: column; gap: 10px; }
+.logs-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.logs-head h3 { flex: 1; min-width: 0; margin: 0; }
+.logs-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 12.5px; border: 1px solid var(--line-hi); border-radius: 7px; }
+.logs-btn:hover { background: var(--card-hi); }
+.logs-summary { flex: none; max-height: 30vh; overflow: hidden auto; padding: 10px 12px; background: var(--card); border: 1px solid var(--accent-line); border-radius: 10px; user-select: text; }
+.logs-summary h4 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; font-size: 13px; }
+.logs-cached { font-size: 11.5px; font-weight: 400; color: var(--faint); }
+.modal .logs-summary p { margin: 0; overflow-wrap: anywhere; }
+.modal .logs-summary .logs-text { white-space: pre-wrap; color: var(--text); }
+.logs-wait { display: flex; align-items: center; gap: 7px; }
+.logs-fail { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.modal .logs-summary .logs-fail p { flex: 1; min-width: 0; color: var(--red); }
+.logs-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.logs-controls input { flex: 1; min-width: 180px; padding: 6px 10px; font: inherit; font-size: 13px; background: var(--bg); color: var(--text); border: 1px solid var(--line-hi); border-radius: 7px; }
+.logs-levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.logs-level { padding: 4px 10px; font-size: 12px; border: 1px solid var(--line-hi); border-radius: 999px; }
+.logs-level[aria-pressed='true'] { border-color: currentColor; background: var(--card-hi); }
+.logs-body { flex: 1; min-height: 0; overflow: hidden auto; user-select: text; }
+.modal .logs-note { padding: 14px 0; }
+.logs-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.log-row { display: grid; grid-template-columns: auto 44px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.log-row time { font-variant-numeric: tabular-nums; color: var(--faint); }
+.log-level { font-size: 11.5px; font-weight: 600; }
+.log-body { min-width: 0; }
+.log-msg { overflow-wrap: anywhere; }
+.log-row.error .log-level, .log-row.error .log-msg, .logs-level.error { color: var(--red); }
+.log-row.warn .log-level, .logs-level.warn { color: var(--amber); }
+.log-row.info .log-level, .logs-level.info { color: var(--muted); }
+.log-row.debug .log-level, .log-row.debug .log-msg, .logs-level.debug { color: var(--faint); }
+.log-body details { margin-top: 3px; }
+.log-body summary { width: fit-content; font-size: 11.5px; color: var(--faint); cursor: pointer; }
+.log-body pre { max-width: 100%; margin: 5px 0 0; padding: 8px 10px; overflow-x: auto; font-size: 11.5px; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; }

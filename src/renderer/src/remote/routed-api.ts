@@ -53,6 +53,9 @@ export function createRoutedApi(
       : local.revealProject(a),
     // the logs are this machine's, whatever project is open
     openLogs: () => local.openLogs(),
+    readLogs: area => local.readLogs(area),
+    summarizeLogs: area => local.summarizeLogs(area),
+    cancelLogSummary: area => local.cancelLogSummary(area),
     send: a => via('chat:send', a, x => local.send(x)),
     saveAttachment: a => via('attach:save', a, x => local.saveAttachment(x)),
     readArtifact: a => via('artifact:read', a, x => local.readArtifact(x)),

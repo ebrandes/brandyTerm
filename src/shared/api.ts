@@ -1,3 +1,4 @@
+import type { LogArea, LogSummary, LogsRead } from './logs.ts'
 import type { DetectedProc } from './proc-attribution.ts'
 import type { FileDiff } from './diff-summary.ts'
 import type { MonthReport } from './usage-report.ts'
@@ -84,6 +85,11 @@ export interface BrandyApi {
   openPluginReport(id: string): Promise<void>
   /** opens this machine's diagnostic logs folder (mcp, plugins, skills, remote) */
   openLogs(): Promise<void>
+  /** the entries of one log area of this machine, oldest first */
+  readLogs(area: LogArea): Promise<LogsRead>
+  /** asks the model (or the cache) for a short summary of that log: call only while it is on screen */
+  summarizeLogs(area: LogArea): Promise<LogSummary>
+  cancelLogSummary(area: LogArea): Promise<void>
   /** this machine's tokens, savings and quality of a month ("YYYY-MM"; default: the current one) */
   usageReport(month?: string): Promise<MonthReport>
   /** turns one of the user's own Claude Code plugins (or 'personal' skills) on/off for threads */

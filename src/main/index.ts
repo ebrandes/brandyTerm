@@ -34,6 +34,7 @@ import { refreshSkills, startSkills } from './skills/wiring.ts'
 import { ApplyQueue } from './apply-queue.ts'
 import { appGateway } from './apply-gateway.ts'
 import { registerApplyIpc } from './apply-ipc.ts'
+import { registerLogsIpc } from './logs-ipc.ts'
 import { startNotifications } from './notify/index.ts'
 
 const isMac = process.platform === 'darwin'
@@ -151,6 +152,7 @@ app.whenReady().then(async () => {
   void refreshLimits(accounts)
   registerAppIpc({ engine, getWin: () => win, pushState })
   registerAttachmentIpc()
+  registerLogsIpc()
   const projectRoot = (id: string) => {
     const p = engine.state.projects.find((x) => x.id === id)
     return p && !p.demo ? p.path : null

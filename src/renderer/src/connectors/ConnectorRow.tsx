@@ -9,6 +9,7 @@ import { report } from '../notice'
 import { ConfigureConnector } from './ConfigureConnector'
 import { ConfirmRemove, ConnectorMenu } from './ConnectorMenu'
 import { FixConnector } from './FixConnector'
+import { LogsModal } from './LogsModal'
 import { RAILWAY_HINT, entrarArgs, showsEntrar } from './status'
 import { useConnectorTest } from './useConnectorTest'
 
@@ -29,6 +30,7 @@ export function ConnectorRow({ c, projects, here }: Props) {
   // a saved definition that cannot run: Corrigir (custom ones) or Remover, never hidden
   const canFix = Boolean(c.problem) && !c.preset
   const [removing, setRemoving] = useState(false)
+  const [logs, setLogs] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const more = useRef<HTMLButtonElement>(null)
   const t = useConnectorTest(c.id)
@@ -114,10 +116,11 @@ export function ConnectorRow({ c, projects, here }: Props) {
           onScope={(patch) => run(api.connectors.update({ id: c.id, patch }))}
           onConfigure={() => { setEditing(true); setFixing(false) }}
           onTest={t.run}
-          onLogs={() => run(api.openLogs())}
+          onLogs={() => setLogs(true)}
           onRemove={() => setRemoving(true)}
           onClose={closeMenu} />
       )}
+      {logs && <LogsModal area="mcp" initialQuery={c.name} onClose={() => setLogs(false)} />}
       {removing && (
         <ConfirmRemove name={c.name} onCancel={() => setRemoving(false)}
           onConfirm={() => { setRemoving(false); run(api.connectors.remove({ id: c.id })) }} />

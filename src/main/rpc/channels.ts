@@ -56,6 +56,10 @@ export const RULES = {
   'plugin:open-report': 'deny',
   // the diagnostic logs folder of this machine
   'logs:open': 'deny',
+  // reading and summarizing them: the summary spends this machine's account
+  'logs:read': 'deny',
+  'logs:summarize': 'deny',
+  'logs:summarize-cancel': 'deny',
   // spend of every project of this machine, hidden ones included
   'usage:report': 'deny',
   'accounts:activate': 'deny',

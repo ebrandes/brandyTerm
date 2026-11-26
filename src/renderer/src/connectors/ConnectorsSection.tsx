@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, FileText, Plus } from 'lucide-react'
 import { api } from '../api'
-import { report } from '../notice'
 import type { ConnectorsState } from '../../../shared/connectors.ts'
 import { connectorDot, type DotProject } from '../../../shared/connector-dot.ts'
 import type { MachineInfo } from '../../../shared/remote/machine.ts'
@@ -13,6 +12,7 @@ import { AddConnectorDialog } from './AddConnectorDialog'
 import { ConnectorRow } from './ConnectorRow'
 import { ImportConnectors } from './ImportConnectors'
 import { LoginCard } from './LoginCard'
+import { LogsModal } from './LogsModal'
 import { onlyElsewhere } from './elsewhere'
 import { goneTerminals } from './login-terminals'
 import { useHostConnectors } from './useHostConnectors'
@@ -32,6 +32,7 @@ interface Props {
 export function ConnectorsSection({ state, projects, viewing, active }: Props) {
   const [adding, setAdding] = useState<{ preset?: string } | null>(null)
   const [importing, setImporting] = useState(false)
+  const [logs, setLogs] = useState(false)
   const hosts = useHostConnectors(useRemoteHosts())
   // a login terminal lives until its login ends, not until its card unmounts
   const seen = useRef<string[]>([])
@@ -56,7 +57,7 @@ export function ConnectorsSection({ state, projects, viewing, active }: Props) {
       <button className="icon-btn" onClick={() => setImporting(true)} aria-label="Importar do Claude Code" title="Importar do Claude Code">
         <Download size={13} />
       </button>
-      <button className="icon-btn" onClick={() => void api.openLogs().catch(report)} aria-label="Ver logs" title="Ver logs de diagnóstico">
+      <button className="icon-btn" onClick={() => setLogs(true)} aria-label="Ver logs" title="Ver logs de diagnóstico">
         <FileText size={13} />
       </button>
     </>
@@ -95,6 +96,7 @@ export function ConnectorsSection({ state, projects, viewing, active }: Props) {
           </div>
         )}
       </SideSection>
+      {logs && <LogsModal area="mcp" onClose={() => setLogs(false)} />}
       {importing && <ImportConnectors onClose={() => setImporting(false)} />}
       {adding && <AddConnectorDialog initial={adding.preset} onClose={() => setAdding(null)} />}
     </>
