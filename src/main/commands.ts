@@ -4,15 +4,18 @@ import type { SlashCommand } from '../shared/types.ts'
 import { diagLogOnChange } from './diag-log.ts'
 
 /**
- * Slash commands of the composer. `/clear`, `/compact` and `/help` are handled by the
- * app; every other command (plugin skills, plugin and project commands) runs in a
+ * Slash commands of the composer. `/clear`, `/compact`, `/help` and the `/skill-*` commands are
+ * handled by the app; every other command (plugin skills, plugin and project commands) runs in a
  * Claude thread, which expands it in headless mode like the interactive CLI does.
  */
 
 export const APP_COMMANDS: SlashCommand[] = [
   { name: 'clear', description: 'Começa uma conversa nova com o coordenador (ou com esta thread). O histórico na tela fica.', source: 'app' },
   { name: 'compact', description: 'Resume o contexto da sessão para economizar tokens, mantendo o essencial.', source: 'app' },
-  { name: 'help', description: 'Lista os comandos disponíveis.', source: 'app' }
+  { name: 'help', description: 'Lista os comandos disponíveis.', source: 'app' },
+  { name: 'skill-init', description: 'Propõe as skills e plugins deste projeto a partir da biblioteca, com um cartão por item. Com --buscar, procura também fora dela.', source: 'app' },
+  { name: 'skill-refresh', description: 'Revê a lista de skills do projeto: o que ligar e o que tirar, com um cartão por item. Aceita --buscar.', source: 'app' },
+  { name: 'skill-install', description: 'Instala e liga neste projeto uma skill ou plugin (dono/repo, URL do GitHub ou id do catálogo), depois da checagem de segurança.', source: 'app' }
 ]
 
 export function parseSlash(text: string): { name: string; args: string } | null {

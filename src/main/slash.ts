@@ -5,8 +5,9 @@ import { addUsage, runOnce } from './run.ts'
 import { APP_COMMANDS, helpText } from './commands.ts'
 import type { Engine } from './engine.ts'
 import { compactCoordinator } from './compact.ts'
+import { runSkillCommand, skillKind } from './skill-commands.ts'
 
-/** `/clear`, `/compact`, `/help` here; any other command runs raw in a Claude thread, which expands it. */
+/** `/clear`, `/compact`, `/help` and `/skill-*` here; any other command runs raw in a Claude thread, which expands it. */
 export function runSlash(e: Engine, p: Project, cmd: { name: string; args: string }, t: Thread | undefined, atts: Attachment[]): void {
   const raw = `/${cmd.name}${cmd.args ? ' ' + cmd.args : ''}`
   const log = t ? t.messages : p.messages
@@ -14,6 +15,7 @@ export function runSlash(e: Engine, p: Project, cmd: { name: string; args: strin
     log.push(e.msg('system', text, { isError }))
     e.touch()
   }
+  if (skillKind(cmd.name)) return runSkillCommand(e, p, cmd, atts, t)
   if (!APP_COMMANDS.some((c) => c.name === cmd.name)) {
     const all = e.commands(p.id)
     // `/brainstorming` finds `superpowers:brainstorming` when only one plugin has it

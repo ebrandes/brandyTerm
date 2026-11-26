@@ -27,6 +27,9 @@ import { bindIpc } from './rpc/ipc.ts'
 import { configureDiagLog } from './diag-log.ts'
 import { startConnectors } from './connectors/index.ts'
 import { registerConnectorsIpc } from './connectors/connectors-ipc.ts'
+import { appSettings } from './settings.ts'
+import { setSkillEnv } from './skill-commands.ts'
+import { skillsPaths } from './skills/paths.ts'
 
 const isMac = process.platform === 'darwin'
 
@@ -145,6 +148,7 @@ app.whenReady().then(async () => {
     engine, attachmentsRoot, rootOf: projectRoot, userData: () => app.getPath('userData'),
     hiddenRoots: () => engine.state.projects.filter((p) => p.remoteHidden && p.path).map((p) => p.path as string)
   })
+  setSkillEnv(() => ({ paths: skillsPaths(app.getPath('userData')), library: appSettings().skillsLibrary }))
   const connectors = await startConnectors({ engine, userData: app.getPath('userData'), hosts: hosts ?? undefined, getWin: () => win?.webContents })
   app.once('before-quit', () => void connectors.stop())
   registerConnectorsIpc(connectors.deps)
